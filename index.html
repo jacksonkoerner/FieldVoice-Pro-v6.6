@@ -117,11 +117,21 @@
                     </h1>
                     <p id="currentDate" class="text-xs text-slate-400 mt-1"></p>
                 </div>
-                <button onclick="openSettings()" class="w-10 h-10 border border-slate-600 flex items-center justify-center text-slate-400 hover:bg-slate-800 hover:text-white transition-colors">
-                    <i class="fas fa-cog"></i>
-                </button>
+                <div class="flex gap-2">
+                    <button onclick="openProjectConfig()" class="w-10 h-10 border border-slate-600 flex items-center justify-center text-slate-400 hover:bg-slate-800 hover:text-white transition-colors" title="Manage Projects">
+                        <i class="fas fa-folder-open"></i>
+                    </button>
+                    <button onclick="openSettings()" class="w-10 h-10 border border-slate-600 flex items-center justify-center text-slate-400 hover:bg-slate-800 hover:text-white transition-colors" title="Settings">
+                        <i class="fas fa-cog"></i>
+                    </button>
+                </div>
             </div>
         </header>
+
+        <!-- ACTIVE PROJECT CARD -->
+        <section id="activeProjectSection" class="px-4 mb-4">
+            <!-- Content rendered by updateActiveProjectCard() -->
+        </section>
 
 
         <!-- WEATHER STATUS CARD -->
@@ -182,6 +192,109 @@
     </div>
 
     <script>
+        // ============ PROJECT MANAGEMENT ============
+        const PROJECTS_KEY = 'fvp_projects';
+        const ACTIVE_PROJECT_KEY = 'fvp_active_project';
+
+        function getProjects() {
+            const saved = localStorage.getItem(PROJECTS_KEY);
+            if (saved) {
+                try {
+                    return JSON.parse(saved);
+                } catch (e) {
+                    return [];
+                }
+            }
+            return [];
+        }
+
+        function getActiveProject() {
+            const activeId = localStorage.getItem(ACTIVE_PROJECT_KEY);
+            if (!activeId) return null;
+
+            const projects = getProjects();
+            return projects.find(p => p.id === activeId) || null;
+        }
+
+        function openProjectConfig() {
+            window.location.href = 'project-config.html';
+        }
+
+        function updateActiveProjectCard() {
+            const section = document.getElementById('activeProjectSection');
+            const project = getActiveProject();
+
+            if (project) {
+                section.innerHTML = `
+                    <div class="bg-white border-l-4 border-safety-green p-4">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-3 min-w-0 flex-1">
+                                <div class="w-10 h-10 bg-safety-green flex items-center justify-center shrink-0">
+                                    <i class="fas fa-building text-white"></i>
+                                </div>
+                                <div class="min-w-0">
+                                    <p class="text-[10px] font-bold text-safety-green uppercase tracking-wider">Active Project</p>
+                                    <p class="font-bold text-slate-800 truncate">${escapeHtml(project.name)}</p>
+                                    ${project.noabProjectNo ? `<p class="text-xs text-slate-500">#${escapeHtml(project.noabProjectNo)}</p>` : ''}
+                                </div>
+                            </div>
+                            <a href="project-config.html" class="text-dot-blue hover:text-dot-navy transition-colors shrink-0 ml-2" title="Change Project">
+                                <i class="fas fa-exchange-alt"></i>
+                            </a>
+                        </div>
+                    </div>
+                `;
+            } else {
+                section.innerHTML = `
+                    <a href="project-config.html" class="block bg-white border-2 border-dashed border-dot-orange p-4 hover:bg-orange-50 transition-colors">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 bg-dot-orange/10 border-2 border-dot-orange flex items-center justify-center shrink-0">
+                                <i class="fas fa-exclamation text-dot-orange"></i>
+                            </div>
+                            <div class="flex-1">
+                                <p class="text-xs font-bold text-dot-orange uppercase tracking-wider">No Project Selected</p>
+                                <p class="text-sm text-slate-600">Tap to configure a project</p>
+                            </div>
+                            <i class="fas fa-chevron-right text-dot-orange"></i>
+                        </div>
+                    </a>
+                `;
+            }
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        function beginDailyReport() {
+            const project = getActiveProject();
+            if (!project) {
+                showNoProjectModal();
+                return;
+            }
+            window.location.href = 'quick-interview.html';
+        }
+
+        function continueDailyReport() {
+            window.location.href = 'quick-interview.html';
+        }
+
+        function showNoProjectModal() {
+            document.getElementById('noProjectModal').classList.remove('hidden');
+        }
+
+        function closeNoProjectModal() {
+            document.getElementById('noProjectModal').classList.add('hidden');
+        }
+
+        function goToProjectSetup() {
+            closeNoProjectModal();
+            window.location.href = 'project-config.html';
+        }
+
         // ============ STORAGE ============
         function getTodayKey() {
             return `fieldvoice_report_${new Date().toISOString().split('T')[0]}`;
@@ -364,12 +477,12 @@
                             </div>
                             <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">No Report Started</p>
                             <p class="text-sm text-slate-500 mb-4">Begin documentation to create today's report</p>
-                            <a href="quick-interview.html" class="block w-full bg-dot-navy hover:bg-dot-blue text-white p-4 transition-colors">
+                            <button onclick="beginDailyReport()" class="block w-full bg-dot-navy hover:bg-dot-blue text-white p-4 transition-colors">
                                 <div class="flex items-center justify-center gap-3">
                                     <i class="fas fa-plus text-dot-yellow"></i>
                                     <span class="font-bold uppercase tracking-wide">Begin Daily Report</span>
                                 </div>
-                            </a>
+                            </button>
                         </div>
                     </div>
                 `;
@@ -595,10 +708,36 @@
                 year: 'numeric'
             });
 
+            updateActiveProjectCard();
             updateReportStatus();
             syncWeather();
         });
     </script>
+
+    <!-- No Project Modal -->
+    <div id="noProjectModal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white max-w-sm w-full shadow-xl">
+            <div class="bg-dot-orange p-4">
+                <div class="flex items-center gap-3 text-white">
+                    <i class="fas fa-exclamation-triangle text-xl"></i>
+                    <h3 class="font-bold uppercase tracking-wider">Project Required</h3>
+                </div>
+            </div>
+            <div class="p-6">
+                <p class="text-slate-700 mb-2">You need to select an active project before creating a daily report.</p>
+                <p class="text-sm text-slate-500 mb-6">Configure your project details including contractors, equipment, and contract information.</p>
+                <div class="space-y-3">
+                    <button onclick="goToProjectSetup()" class="w-full p-4 bg-safety-green hover:bg-green-700 text-white font-bold uppercase transition-colors flex items-center justify-center gap-2">
+                        <i class="fas fa-folder-open"></i>
+                        Setup Project
+                    </button>
+                    <button onclick="closeNoProjectModal()" class="w-full p-3 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold uppercase transition-colors text-sm">
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- PWA Navigation Fix - Prevent Safari from breaking out of standalone mode -->
     <script>
