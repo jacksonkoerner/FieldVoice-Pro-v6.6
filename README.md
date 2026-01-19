@@ -52,14 +52,15 @@
 
 ```
 /
-├── index.html              # Home dashboard / main entry point
-├── quick-interview.html    # Daily report flow (streamlined field entry)
+├── index.html              # Home dashboard / main entry point with project selection
+├── quick-interview.html    # Daily report flow (contractor-based DOT field entry)
 ├── review.html             # AI Kit - text refinement & editing via n8n webhook
 ├── report.html             # Print-ready PDF report viewer/generator
 ├── editor.html             # Photo editor & section-specific editing
 ├── permissions.html        # System setup, permission testing (mic, camera, GPS)
 ├── permission-debug.html   # Permission debugging and troubleshooting utility
-├── settings.html           # Project configuration & data management
+├── project-config.html     # Project & contractor configuration management
+├── settings.html           # Inspector profile & personal information
 ├── landing.html            # Marketing/onboarding landing page
 ├── sw.js                   # Service worker for PWA offline support
 ├── manifest.json           # PWA manifest with app metadata and icons
@@ -87,21 +88,89 @@
 
 | Page | Lines | Purpose |
 |------|-------|---------|
-| `index.html` | ~678 | Simplified dashboard with single-action interface, weather display, and navigation |
-| `quick-interview.html` | ~1,350 | Streamlined report with 7 sections: Weather, Work Summary, Issues, Inspections, Safety, Visitors, Photos |
+| `index.html` | ~880 | Dashboard with project selection, active project display, weather, and navigation |
+| `quick-interview.html` | ~2,345 | DOT-compliant report with 12 sections: Weather, Contractor Work, Personnel, Equipment, Issues, Inspections, Safety, Contractor Communications, Visitors/Deliveries, Photos |
 | `review.html` | ~1,296 | AI Kit - side-by-side original vs. AI-refined text comparison with manual editing, n8n webhook integration |
 | `report.html` | ~883 | Professional PDF-ready report with submit functionality, streamlined navigation |
 | `editor.html` | ~674 | Photo capture with GPS embedding, section-specific editing interface |
 | `permissions.html` | ~1,596 | Permission testing (mic, camera, GPS), iOS-specific instructions for native dictation |
 | `permission-debug.html` | ~1,074 | Debugging utility for troubleshooting permission issues |
-| `settings.html` | ~374 | Project settings, inspector name, Setup button, data export/clear functions |
+| `project-config.html` | ~1,090 | Project management with contractor roster, equipment inventory, and contract details |
+| `settings.html` | ~396 | Inspector profile - personal information, title, company, and signature preview |
 | `landing.html` | ~1,560 | Marketing page with feature overview and onboarding |
 
 ---
 
 ## Data Model
 
-### Report Data Structure (localStorage)
+### Project Data Structure (localStorage: `fvp_projects`)
+
+```javascript
+// Array of project configurations
+[
+  {
+    id: "proj_1705234567890",           // Unique project ID
+    projectName: "I-10 Bridge Reconstruction",
+    noabProjectNo: "1291",
+    cnoSolicitationNo: "N/A",
+    location: "Jefferson Highway at Mississippi River",
+    engineer: "AECOM",
+    primeContractor: "Boh Bros Construction",
+    noticeToProceed: "2025-01-15",       // ISO date
+    contractDuration: 467,                // Days
+    weatherDays: 0,
+    expectedCompletion: "2026-04-25",    // ISO date
+    defaultStartTime: "06:00",
+    defaultEndTime: "16:00",
+
+    // Contractor roster
+    contractors: [
+      {
+        id: "cont_1705234567891",
+        name: "Boh Bros Construction",
+        abbreviation: "BOH",
+        type: "prime",                   // "prime" or "subcontractor"
+        trades: ["General", "Pile Driving"]
+      },
+      {
+        id: "cont_1705234567892",
+        name: "Delta Concrete",
+        abbreviation: "DELTA",
+        type: "subcontractor",
+        trades: ["Concrete"]
+      }
+    ],
+
+    // Equipment inventory per contractor
+    equipment: [
+      {
+        id: "equip_1705234567893",
+        contractorId: "cont_1705234567891",
+        type: "Excavator",
+        model: "CAT 336"
+      }
+    ],
+
+    createdAt: "2025-01-14T08:00:00.000Z",
+    updatedAt: "2025-01-14T08:00:00.000Z"
+  }
+]
+```
+
+### User Settings Structure (localStorage: `fvp_user_settings`)
+
+```javascript
+{
+  inspectorName: "Andrew Stiebing",       // Required
+  title: "RPR",                           // Required - Resident Project Representative
+  company: "Burns & McDonnell",           // Required
+  email: "astiebing@burnsmcd.com",        // Optional
+  phone: "(504) 555-1234"                 // Optional
+}
+// Generates signature: "Andrew Stiebing, RPR (Burns & McDonnell)"
+```
+
+### Report Data Structure (localStorage: `fieldvoice_report_YYYY-MM-DD`)
 
 ```javascript
 {
@@ -115,29 +184,30 @@
     naMarked: {                              // Sections marked as "Not Applicable"
       issues: false,
       inspections: false,
-      visitors: false,
+      contractorCommunications: false,
+      visitorsRemarks: false,
       photos: false
     }
   },
 
-  // Project Overview (user-configurable via Settings)
+  // Project Overview (auto-populated from active project)
   overview: {
-    projectName: "Your Project Name",
-    noabProjectNo: "12345",
+    projectName: "I-10 Bridge Reconstruction",
+    noabProjectNo: "1291",
     cnoSolicitationNo: "N/A",
     date: "1/14/2025",
     startTime: "6:00 AM",
     endTime: "4:00 PM",
     shiftDuration: "10.00 hours",
-    location: "Project Location",
-    engineer: "Engineering Firm",
-    contractor: "Prime Contractor Name",
-    noticeToProceed: "Start Date",
-    contractDuration: "X days",
-    expectedCompletion: "End Date",
-    contractDayNo: "Day X of Y",
+    location: "Jefferson Highway at Mississippi River",
+    engineer: "AECOM",
+    contractor: "Boh Bros Construction",
+    noticeToProceed: "1/15/2025",
+    contractDuration: "467 days",
+    expectedCompletion: "4/25/2026",
+    contractDayNo: "Day 1 of 467",
     weatherDays: "0 days",
-    completedBy: "Inspector Name, RPR",
+    completedBy: "Andrew Stiebing, RPR (Burns & McDonnell)",
     weather: {
       highTemp: "78°F",
       lowTemp: "62°F",
@@ -148,33 +218,45 @@
     }
   },
 
-  // Contractors on site
-  contractors: [
-    { name: "Contractor Name", trade: "General Contractor", count: 12 }
-  ],
-
-  // Work activities documented
+  // Contractor-based work activities (NEW FORMAT)
   activities: [
-    { contractor: "General", trade: "General", narrative: "Continued grading operations..." }
+    {
+      contractorId: "cont_1705234567891",
+      noWork: false,                      // True if "No work performed" checked
+      narrative: "Continued pile driving operations at Bent 4...",
+      equipmentUsed: "Crane (1); Pile Driver (1)",
+      crew: "Operator (2); Laborer (4)"
+    },
+    {
+      contractorId: "cont_1705234567892",
+      noWork: true,                       // No work performed today
+      narrative: "",
+      equipmentUsed: "",
+      crew: ""
+    }
   ],
 
-  // Personnel headcounts
+  // Personnel/Operations tracking (DOT-compliant columns)
   operations: [
     {
-      contractor: "Contractor Name",
-      trade: "Earthwork",
+      contractorId: "cont_1705234567891",
       superintendents: 1,
       foremen: 2,
       operators: 4,
       laborers: 6,
-      others: 0,
-      total: 13
+      surveyors: 0,
+      others: 0
+      // Total calculated automatically
     }
   ],
 
-  // Equipment on site
+  // Equipment status tracking
   equipment: [
-    { contractor: "Contractor Name", type: "Excavator", model: "CAT 336", quantity: 2, status: "Active" }
+    {
+      equipmentId: "equip_1705234567893",
+      contractorId: "cont_1705234567891",
+      hoursUtilized: 8                    // 0 = IDLE, 1-10 = hours utilized
+    }
   ],
 
   // Issues and delays
@@ -196,10 +278,11 @@
     ]
   },
 
-  // Visitors and communications
-  visitorsRemarks: [
-    "DOT inspector on site 10:00 AM - 2:00 PM"
-  ],
+  // Contractor communications (NEW - separate section)
+  contractorCommunications: "Discussed schedule acceleration with BOH superintendent...",
+
+  // Visitors, deliveries, remarks (NEW - separate section, string format)
+  visitorsRemarks: "DOT inspector on site 10:00 AM - 2:00 PM. Material delivery: 500 LF of 24\" pipe.",
 
   // Photo documentation
   photos: [
@@ -228,6 +311,7 @@
     issues: "A utility conflict was identified at Station 45+00...",
     inspections: "Quality control testing included casting of concrete cylinders...",
     safety: "No safety incidents were reported. A toolbox talk on heat stress...",
+    contractorCommunications: "Coordination meeting held with prime contractor...",
     visitors: "DOT representative conducted a site inspection..."
   }
 }
@@ -239,7 +323,10 @@
 |-------------|---------|
 | `fieldvoice_report_YYYY-MM-DD` | Primary storage for date-specific reports |
 | `fieldvoice_report` | Legacy/backup key for compatibility |
-| `fvp_settings` | User's project configuration settings |
+| `fvp_projects` | Array of saved project configurations |
+| `fvp_active_project` | ID of currently active project |
+| `fvp_user_settings` | User's personal inspector profile (name, title, company) |
+| `fvp_settings` | Legacy settings key (deprecated, migrated to above) |
 | `fvp_mic_granted` | Microphone permission status flag |
 | `fvp_loc_granted` | Location permission status flag |
 | `fvp_onboarded` | First-time onboarding completed flag |
@@ -257,6 +344,10 @@
      │
      ├─► First visit? ─► [permissions.html] Setup permissions
      │
+     ├─► Check for active project
+     │    ├─► No projects? ─► Prompt to create project ─► [project-config.html]
+     │    └─► Has project: Show active project card with name/number
+     │
      ├─► Check for existing report
      │    ├─► No report: Show "Begin Daily Report" button
      │    ├─► In progress: Show progress bar, "Continue" button
@@ -264,21 +355,63 @@
      │
      └─► User clicks "Begin Daily Report"
           │
-          └─► [quick-interview.html]
+          ├─► Project picker modal appears
+          │    ├─► Shows all saved projects
+          │    ├─► Highlights currently active project
+          │    └─► "Manage Projects" link to project-config.html
+          │
+          └─► User selects project ─► [quick-interview.html]
 ```
 
-### 2. Interview/Documentation Flow
+### 2. Project Configuration Workflow
+
+```
+[project-config.html] Project Management
+     │
+     ├─► View saved projects list
+     │    ├─► Active project highlighted with checkmark
+     │    └─► Each project shows name, number, location
+     │
+     ├─► Create new project
+     │    ├─► Project Details (name, number, location, engineer)
+     │    ├─► Contract Information (NTP date, duration, completion)
+     │    ├─► Contractor Roster (prime + subcontractors with trades)
+     │    └─► Equipment Inventory (per contractor)
+     │
+     ├─► Edit existing project
+     │    └─► All fields editable, changes saved automatically
+     │
+     └─► Set active project
+          └─► Selected project used for new reports
+```
+
+### 3. Interview/Documentation Flow
 
 ```
 [quick-interview.html]
      │
-     ├─► Expandable section cards for each field:
+     ├─► Load contractors/equipment from active project
+     │
+     ├─► Expandable section cards (12 sections):
      │    ├─► Weather & Site Conditions
-     │    ├─► Work Summary (activities)
+     │    ├─► Contractor Work (per-contractor cards)
+     │    │    ├─► "No work performed" checkbox
+     │    │    ├─► Work narrative textarea
+     │    │    ├─► Equipment used input
+     │    │    └─► Crew input (role/quantity)
+     │    ├─► Personnel/Operations (DOT columns)
+     │    │    ├─► Superintendent(s), Foreman, Operators
+     │    │    ├─► Laborers, Surveyors, Others
+     │    │    └─► Auto-calculated totals
+     │    ├─► Equipment Status
+     │    │    ├─► Per-equipment status dropdown
+     │    │    ├─► IDLE or 1-10 hours utilized
+     │    │    └─► "Mark All IDLE" quick action
      │    ├─► Issues & Delays
      │    ├─► QA/QC Inspections
      │    ├─► Safety
-     │    ├─► Visitors & Communications
+     │    ├─► Communications with Contractor
+     │    ├─► Visitors; Deliveries; Other Remarks
      │    └─► Progress Photos
      │
      ├─► Each section supports:
@@ -286,12 +419,12 @@
      │    ├─► Mark as N/A (skip section)
      │    └─► Real-time preview updates
      │
-     ├─► Progress bar shows completion percentage
+     ├─► Progress bar shows completion percentage (12 sections)
      │
      └─► User clicks "Finish" ─► [review.html] (AI Kit)
 ```
 
-### 3. Voice Input Flow (Native Keyboard Dictation)
+### 4. Voice Input Flow (Native Keyboard Dictation)
 
 ```
 User enters text in any input field
@@ -312,7 +445,7 @@ providing consistent, reliable behavior across all platforms without custom
 microphone buttons.
 ```
 
-### 4. AI Kit Flow (review.html)
+### 5. AI Kit Flow (review.html)
 
 ```
 [review.html] Loaded with report data (AI Kit)
@@ -340,7 +473,7 @@ microphone buttons.
      └─► User clicks "Export" ─► [report.html]
 ```
 
-### 5. Report Generation Flow
+### 6. Report Generation Flow
 
 ```
 [report.html] Loaded with report data
@@ -367,7 +500,7 @@ microphone buttons.
           └─► Color-accurate printing
 ```
 
-### 6. Photo Capture Flow
+### 7. Photo Capture Flow
 
 ```
 User taps photo capture (camera icon)
@@ -400,17 +533,42 @@ User taps photo capture (camera icon)
 
 ### Project Configuration
 
-Project details are configured via `settings.html` and stored in localStorage under the `fvp_settings` key. Users can configure:
+Project details are configured via `project-config.html` and stored in localStorage under the `fvp_projects` key. Each project includes:
 
+**Project Details:**
 - Project Name
-- Project Number
+- NOAB Project Number
+- CNO Solicitation Number
 - Location
+- Engineer (Firm)
+- Prime Contractor Name
+
+**Contract Information:**
 - Notice to Proceed Date
 - Contract Duration (Days)
-- Prime Contractor Name
-- Engineering Firm Name
-- Inspector Name
+- Weather Days
+- Expected Completion Date
 - Default Start/End Times
+
+**Contractor Roster:**
+- Full Name and Abbreviation
+- Type (Prime or Subcontractor)
+- Trades (semicolon-separated)
+
+**Equipment Inventory:**
+- Equipment Type and Model (per contractor)
+
+### Inspector Profile
+
+Personal information is configured via `settings.html` (Inspector Profile) and stored under `fvp_user_settings`:
+
+- Inspector Name (required)
+- Title (required) - e.g., RPR
+- Company/Firm (required) - e.g., Burns & McDonnell
+- Email (optional)
+- Phone (optional)
+
+The signature line is auto-generated as: `[Name], [Title] ([Company])`
 
 ### Custom Theme Colors (Tailwind)
 
@@ -711,20 +869,21 @@ npx serve .
 
 | File | Lines | Size (approx) |
 |------|-------|---------------|
-| index.html | 678 | 32 KB |
-| quick-interview.html | 1,350 | 77 KB |
+| index.html | 880 | 42 KB |
+| quick-interview.html | 2,345 | 130 KB |
 | review.html | 1,296 | 65 KB |
 | report.html | 883 | 44 KB |
 | editor.html | 674 | 32 KB |
 | permissions.html | 1,596 | 81 KB |
 | permission-debug.html | 1,074 | 53 KB |
-| settings.html | 374 | 20 KB |
+| project-config.html | 1,090 | 55 KB |
+| settings.html | 396 | 19 KB |
 | landing.html | 1,560 | 80 KB |
 | sw.js | 205 | 7 KB |
 | manifest.json | 65 | 2 KB |
 | icons/ | - | ~3 KB |
 | assets/ | - | ~325 KB |
-| **Total** | **~9,755** | **~821 KB** |
+| **Total** | **~12,064** | **~938 KB** |
 
 ---
 
@@ -772,6 +931,63 @@ Extend the `weatherCodes` object in `index.html` (lines 418-433) with additional
 
 ## Recent Changes
 
+### Project Configuration System (January 2026)
+- **New page: project-config.html** - Comprehensive project management interface
+  - Create and manage multiple construction projects
+  - Configure project details (name, number, location, engineer, contractor)
+  - Set contract information (NTP date, duration, expected completion)
+  - Build contractor roster with prime and subcontractor designations
+  - Manage equipment inventory per contractor
+  - Set active project for daily reports
+
+### Dashboard Project Integration
+- Added "Manage Projects" button in header navigation
+- New Active Project card displays current project name and number
+- Project picker modal appears when beginning a daily report
+- Warning modal when no active project is selected
+- Seamless navigation between dashboard and project configuration
+
+### Inspector Profile (Settings Refactored)
+- **settings.html renamed to Inspector Profile**
+- Personal information section: Name, Title, Company/Firm, Email, Phone
+- Live signature preview shows formatted "Completed By" line
+- Project configuration moved to dedicated project-config.html
+- Storage key changed from `fvp_settings` to `fvp_user_settings`
+- Added prominent "Manage Projects" link
+
+### Contractor-Based Work Entry
+- Replaced simple work summary with contractor-organized system
+- Each contractor from active project displayed as expandable card
+- "No work performed on [date]" checkbox for inactive contractors
+- Per-contractor fields: work narrative, equipment used, crew
+- Prime contractors sorted first, visual distinction from subcontractors
+
+### DOT-Compliant Personnel/Operations Section
+- New Personnel section tracks headcounts with DOT columns:
+  - Superintendent(s), Foreman, Operator(s), Laborer(s), Surveyor(s), Other(s)
+- Compact grid layout with number inputs per contractor
+- Auto-calculated totals row
+- Trade abbreviation logic (Pile Driving→PLE, Concrete→CONC)
+- Visual indicators: green border for prime, blue for subcontractors
+
+### Equipment Status Tracking
+- New Equipment section loads inventory from active project
+- Per-equipment status dropdown: IDLE or 1-10 hours utilized
+- "Mark All IDLE" quick action for low-activity days
+- Summary shows active vs. idle equipment counts
+- Data stored with equipmentId, contractorId, and hoursUtilized
+
+### Visitors Section Split into DOT-Compliant Sections
+- **Communications with Contractor**: Dedicated section for contractor discussions
+- **Visitors; Deliveries; Additional Contract and/or Change Order Activities; Other Remarks**: Matches official DOT form title
+- Both sections use text areas with dictation support and N/A toggle
+- Migrated from array format to string format for DOT compatibility
+
+### Progress Tracking Expanded
+- Quick interview now tracks 12 sections (up from 7)
+- Progress bar accurately reflects completion across all new sections
+- Status icons update in real-time for each section
+
 ### AI Review Renamed to AI Kit
 - The review page has been rebranded from "AI Review" to "AI Kit"
 - Updated page title and header to reflect the new branding
@@ -818,17 +1034,18 @@ Extend the `weatherCodes` object in `index.html` (lines 418-433) with additional
 ## Summary
 
 FieldVoice Pro is a sophisticated, production-ready field documentation system that:
+- **Multi-project management** - Configure and switch between multiple construction projects with contractor rosters and equipment inventories
 - **Fully installable as a PWA** - Works offline when saved to home screen on mobile devices
-- **Simplified single-action dashboard** - Streamlined interface for quick daily report creation
+- **DOT-compliant reporting** - Contractor-based work entry, personnel tracking, and equipment status matching DOT form requirements
 - **AI Kit integration** - Side-by-side text refinement with training data export for prompt improvement
 - Operates primarily client-side with optional n8n webhook integration for AI features
 - Supports voice-first data entry via native keyboard dictation with AI enhancement
-- Generates professional, DOT-compliant PDF reports
+- Generates professional, DOT-compliant PDF reports with 12 comprehensive sections
 - **Complete offline support** for report creation, editing, and viewing (weather sync and AI features require internet)
 - Uses n8n webhooks for AI text refinement and report submission
 - Manages browser storage efficiently with automatic compression
 - **Service worker caching** ensures fast load times and airplane mode compatibility
 - **Safe-area support** for modern iOS devices with notch/Dynamic Island
-- **Streamlined navigation** with Home buttons and improved workflow tracking
+- **Streamlined navigation** with project picker, Home buttons, and improved workflow tracking
 
-The codebase is mature (~9,755 lines including PWA infrastructure), well-structured, and includes comprehensive error handling for real-world field conditions including graceful offline degradation.
+The codebase is mature (~12,000 lines including PWA infrastructure), well-structured, and includes comprehensive error handling for real-world field conditions including graceful offline degradation.
