@@ -289,6 +289,74 @@
                 </div>
             </div>
 
+            <!-- Equipment Section -->
+            <div class="section-card bg-white border-2 border-slate-200" data-section="equipment">
+                <button onclick="toggleSection('equipment')" class="w-full p-4 flex items-center gap-4">
+                    <div class="w-12 h-12 bg-dot-orange flex items-center justify-center">
+                        <i class="fas fa-truck text-white text-lg"></i>
+                    </div>
+                    <div class="flex-1 text-left">
+                        <p class="font-bold text-slate-800 uppercase text-sm">Equipment</p>
+                        <p id="equipment-preview" class="text-sm text-slate-500 truncate">Tap to add</p>
+                    </div>
+                    <div id="equipment-status" class="w-8 h-8 border border-slate-300 flex items-center justify-center">
+                        <i class="fas fa-chevron-down text-slate-400 text-xs"></i>
+                    </div>
+                </button>
+                <div class="section-content">
+                    <div class="px-4 pb-4 space-y-3 border-t border-slate-200 pt-4">
+                        <!-- No project warning -->
+                        <div id="no-project-warning-equip" class="hidden bg-dot-orange/10 border-2 border-dashed border-dot-orange p-4 text-center">
+                            <i class="fas fa-exclamation-triangle text-dot-orange text-xl mb-2"></i>
+                            <p class="text-sm font-bold text-dot-orange uppercase mb-1">No Project Selected</p>
+                            <p class="text-xs text-slate-600 mb-3">Select a project to load equipment</p>
+                            <a href="project-config.html" class="inline-block px-4 py-2 bg-dot-orange text-white text-sm font-bold uppercase">Setup Project</a>
+                        </div>
+                        <!-- No equipment warning -->
+                        <div id="no-equipment-warning" class="hidden bg-slate-100 border-2 border-dashed border-slate-300 p-4 text-center">
+                            <i class="fas fa-truck text-slate-400 text-xl mb-2"></i>
+                            <p class="text-sm font-bold text-slate-500 uppercase mb-1">No Equipment Configured</p>
+                            <p class="text-xs text-slate-500 mb-3">Add equipment in project configuration</p>
+                            <a href="project-config.html" class="inline-block px-4 py-2 bg-dot-blue text-white text-sm font-bold uppercase">Add Equipment</a>
+                        </div>
+                        <!-- Mark All IDLE button -->
+                        <button onclick="markAllEquipmentIdle()" id="mark-all-idle-btn" class="hidden w-full p-3 bg-slate-100 border border-slate-300 text-slate-600 hover:bg-slate-200 transition-colors text-sm font-medium uppercase">
+                            <i class="fas fa-moon mr-2"></i>Mark All IDLE
+                        </button>
+                        <!-- Equipment header row -->
+                        <div id="equipment-header" class="hidden bg-dot-navy text-white text-[9px] font-bold uppercase tracking-wider">
+                            <div class="grid grid-cols-12 gap-1 p-2">
+                                <div class="col-span-2">Contr</div>
+                                <div class="col-span-5">Type / Model</div>
+                                <div class="col-span-1 text-center">Qty</div>
+                                <div class="col-span-4 text-center">Status</div>
+                            </div>
+                        </div>
+                        <!-- Equipment rows grouped by contractor -->
+                        <div id="equipment-list" class="space-y-1">
+                            <!-- Rendered by renderEquipmentCards() -->
+                        </div>
+                        <!-- Equipment totals -->
+                        <div id="equipment-totals" class="hidden bg-slate-100 border-2 border-slate-300">
+                            <div class="p-2 text-xs font-bold">
+                                <div class="flex justify-between">
+                                    <span class="text-slate-600 uppercase">Total Equipment</span>
+                                    <span id="equipment-total-count" class="text-dot-blue">0</span>
+                                </div>
+                                <div class="flex justify-between mt-1">
+                                    <span class="text-slate-500">Active (Hours Logged)</span>
+                                    <span id="equipment-active-count" class="text-safety-green">0</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-slate-500">Idle</span>
+                                    <span id="equipment-idle-count" class="text-slate-400">0</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Issues Section -->
             <div class="section-card bg-white border-2 border-slate-200" data-section="issues">
                 <button onclick="toggleSection('issues')" class="w-full p-4 flex items-center gap-4">
@@ -1085,6 +1153,241 @@
             );
         }
 
+        // ============ EQUIPMENT ============
+        function getProjectEquipment() {
+            if (!activeProject || !activeProject.equipment) return [];
+            return activeProject.equipment;
+        }
+
+        function getEquipmentEntry(equipmentId) {
+            if (!report || !report.equipment) return null;
+            return report.equipment.find(e => e.equipmentId === equipmentId);
+        }
+
+        function initializeEquipment() {
+            if (!report.equipment) report.equipment = [];
+
+            const projectEquipment = getProjectEquipment();
+
+            // Ensure each equipment item from project config has an entry
+            projectEquipment.forEach(equip => {
+                const existing = report.equipment.find(e => e.equipmentId === equip.id);
+                if (!existing) {
+                    report.equipment.push({
+                        equipmentId: equip.id,
+                        contractorId: equip.contractorId,
+                        hoursUtilized: null  // null means IDLE
+                    });
+                }
+            });
+
+            // Clean up equipment entries for items no longer in project config
+            report.equipment = report.equipment.filter(e =>
+                projectEquipment.some(pe => pe.id === e.equipmentId)
+            );
+        }
+
+        function renderEquipmentCards() {
+            const container = document.getElementById('equipment-list');
+            const warningEl = document.getElementById('no-project-warning-equip');
+            const noEquipWarningEl = document.getElementById('no-equipment-warning');
+            const headerEl = document.getElementById('equipment-header');
+            const totalsEl = document.getElementById('equipment-totals');
+            const markAllBtn = document.getElementById('mark-all-idle-btn');
+
+            if (!activeProject) {
+                warningEl.classList.remove('hidden');
+                noEquipWarningEl.classList.add('hidden');
+                headerEl.classList.add('hidden');
+                totalsEl.classList.add('hidden');
+                markAllBtn.classList.add('hidden');
+                container.innerHTML = '';
+                return;
+            }
+
+            warningEl.classList.add('hidden');
+
+            const projectEquipment = getProjectEquipment();
+
+            if (projectEquipment.length === 0) {
+                noEquipWarningEl.classList.remove('hidden');
+                headerEl.classList.add('hidden');
+                totalsEl.classList.add('hidden');
+                markAllBtn.classList.add('hidden');
+                container.innerHTML = '';
+                return;
+            }
+
+            noEquipWarningEl.classList.add('hidden');
+            headerEl.classList.remove('hidden');
+            totalsEl.classList.remove('hidden');
+            markAllBtn.classList.remove('hidden');
+            initializeEquipment();
+
+            // Group equipment by contractor
+            const grouped = {};
+            projectContractors.forEach(c => {
+                grouped[c.id] = {
+                    contractor: c,
+                    equipment: []
+                };
+            });
+
+            projectEquipment.forEach(equip => {
+                if (grouped[equip.contractorId]) {
+                    grouped[equip.contractorId].equipment.push(equip);
+                }
+            });
+
+            // Generate status options HTML
+            const statusOptions = `
+                <option value="">IDLE</option>
+                <option value="1">1 HR</option>
+                <option value="2">2 HRS</option>
+                <option value="3">3 HRS</option>
+                <option value="4">4 HRS</option>
+                <option value="5">5 HRS</option>
+                <option value="6">6 HRS</option>
+                <option value="7">7 HRS</option>
+                <option value="8">8 HRS</option>
+                <option value="9">9 HRS</option>
+                <option value="10">10 HRS</option>
+            `;
+
+            let html = '';
+
+            Object.values(grouped).forEach(group => {
+                if (group.equipment.length === 0) return;
+
+                const contractor = group.contractor;
+                const borderColor = contractor.type === 'prime' ? 'border-l-safety-green' : 'border-l-dot-blue';
+                const bgColor = contractor.type === 'prime' ? 'bg-safety-green/5' : 'bg-dot-blue/5';
+
+                // Contractor header row
+                html += `
+                    <div class="${bgColor} border border-slate-200 ${borderColor} border-l-4 p-2">
+                        <p class="text-[10px] font-bold text-slate-700 uppercase">${escapeHtml(contractor.abbreviation)} - ${escapeHtml(contractor.name)}</p>
+                    </div>
+                `;
+
+                // Equipment rows for this contractor
+                group.equipment.forEach(equip => {
+                    const entry = getEquipmentEntry(equip.id) || { hoursUtilized: null };
+                    const typeModel = equip.model ? `${equip.type} / ${equip.model}` : (equip.type || 'N/A');
+                    const isActive = entry.hoursUtilized !== null && entry.hoursUtilized > 0;
+
+                    html += `
+                        <div class="bg-white border border-slate-200 ${borderColor} border-l-4" data-equip-id="${equip.id}">
+                            <div class="grid grid-cols-12 gap-1 p-2 items-center">
+                                <!-- Contractor Abbreviation -->
+                                <div class="col-span-2">
+                                    <p class="text-[10px] font-bold text-slate-500">${escapeHtml(contractor.abbreviation)}</p>
+                                </div>
+                                <!-- Type / Model -->
+                                <div class="col-span-5 min-w-0">
+                                    <p class="text-[10px] text-slate-700 truncate" title="${escapeHtml(typeModel)}">${escapeHtml(typeModel)}</p>
+                                </div>
+                                <!-- Quantity (always 1) -->
+                                <div class="col-span-1 text-center">
+                                    <p class="text-[10px] font-bold text-slate-600">1</p>
+                                </div>
+                                <!-- Status Picker -->
+                                <div class="col-span-4">
+                                    <select
+                                        id="equip-status-${equip.id}"
+                                        onchange="updateEquipmentStatus('${equip.id}')"
+                                        class="w-full h-8 text-[10px] border ${isActive ? 'border-safety-green bg-safety-green/10' : 'border-slate-300 bg-white'} focus:border-dot-blue focus:outline-none px-1">
+                                        ${statusOptions.replace(`value="${entry.hoursUtilized || ''}"`, `value="${entry.hoursUtilized || ''}" selected`)}
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+            });
+
+            container.innerHTML = html;
+            updateEquipmentTotals();
+        }
+
+        function updateEquipmentStatus(equipmentId) {
+            const entry = report.equipment.find(e => e.equipmentId === equipmentId);
+            if (!entry) return;
+
+            const select = document.getElementById(`equip-status-${equipmentId}`);
+            if (!select) return;
+
+            const val = select.value;
+            entry.hoursUtilized = val === '' ? null : parseInt(val);
+
+            // Update visual style
+            const isActive = entry.hoursUtilized !== null && entry.hoursUtilized > 0;
+            select.className = `w-full h-8 text-[10px] border ${isActive ? 'border-safety-green bg-safety-green/10' : 'border-slate-300 bg-white'} focus:border-dot-blue focus:outline-none px-1`;
+
+            saveReport();
+            updateEquipmentTotals();
+            updateAllPreviews();
+        }
+
+        function markAllEquipmentIdle() {
+            if (!report || !report.equipment) return;
+
+            report.equipment.forEach(entry => {
+                entry.hoursUtilized = null;
+            });
+
+            saveReport();
+            renderEquipmentCards();
+            updateAllPreviews();
+            showToast('All equipment marked IDLE');
+        }
+
+        function updateEquipmentTotals() {
+            if (!report || !report.equipment) return;
+
+            const total = report.equipment.length;
+            const active = report.equipment.filter(e => e.hoursUtilized !== null && e.hoursUtilized > 0).length;
+            const idle = total - active;
+
+            document.getElementById('equipment-total-count').textContent = total;
+            document.getElementById('equipment-active-count').textContent = active;
+            document.getElementById('equipment-idle-count').textContent = idle;
+        }
+
+        function getEquipmentPreview() {
+            if (!activeProject) {
+                return 'Tap to add';
+            }
+
+            const projectEquipment = getProjectEquipment();
+            if (projectEquipment.length === 0) {
+                return 'No equipment configured';
+            }
+
+            if (!report || !report.equipment) {
+                return 'Tap to add';
+            }
+
+            const total = report.equipment.length;
+            const active = report.equipment.filter(e => e.hoursUtilized !== null && e.hoursUtilized > 0).length;
+            const idle = total - active;
+
+            if (active === 0) {
+                return `${total} equipment - all IDLE`;
+            }
+
+            return `${active} active, ${idle} idle`;
+        }
+
+        function hasEquipmentData() {
+            if (!activeProject) return false;
+            const projectEquipment = getProjectEquipment();
+            if (projectEquipment.length === 0) return false;
+
+            // Consider complete if we have equipment initialized (even if all IDLE)
+            return report && report.equipment && report.equipment.length > 0;
+        }
+
         // ============ STORAGE ============
         function getTodayKey() { return `fieldvoice_report_${new Date().toISOString().split('T')[0]}`; }
 
@@ -1479,6 +1782,10 @@
                     // Personnel cards are rendered by renderPersonnelCards()
                     renderPersonnelCards();
                     break;
+                case 'equipment':
+                    // Equipment cards are rendered by renderEquipmentCards()
+                    renderEquipmentCards();
+                    break;
                 case 'issues':
                     document.getElementById('issues-list').innerHTML = report.generalIssues.map((issue, i) => `
                         <div class="bg-red-50 border border-red-200 p-3 flex items-start gap-3">
@@ -1546,7 +1853,7 @@
         }
 
         function renderAllSections() {
-            ['activities', 'operations', 'issues', 'inspections', 'safety', 'visitors', 'photos'].forEach(renderSection);
+            ['activities', 'operations', 'equipment', 'issues', 'inspections', 'safety', 'visitors', 'photos'].forEach(renderSection);
             updateWeatherDisplay();
         }
 
@@ -1560,6 +1867,7 @@
             document.getElementById('weather-preview').textContent = w.jobSiteCondition || `${w.generalCondition}, ${w.highTemp}`;
             document.getElementById('activities-preview').textContent = getWorkSummaryPreview();
             document.getElementById('operations-preview').textContent = getOperationsPreview();
+            document.getElementById('equipment-preview').textContent = getEquipmentPreview();
             const naMarked = report.meta.naMarked || {};
             document.getElementById('issues-preview').textContent = naMarked.issues ? 'N/A - No issues' : report.generalIssues.length > 0 ? `${report.generalIssues.length} issues` : 'None reported';
             document.getElementById('inspections-preview').textContent = naMarked.inspections ? 'N/A - No inspections' : report.qaqcNotes.length > 0 ? `${report.qaqcNotes.length} inspections` : 'None reported';
@@ -1580,6 +1888,7 @@
                 'weather': report.overview.weather.jobSiteCondition,
                 'activities': hasWorkLogged || allMarkedNoWork,
                 'operations': hasOperationsData(),
+                'equipment': hasEquipmentData(),
                 'issues': report.generalIssues.length > 0 || naMarked.issues,
                 'inspections': report.qaqcNotes.length > 0 || naMarked.inspections,
                 'safety': report.safety.noIncidents || report.safety.hasIncidents || report.safety.notes.length > 0,
@@ -1605,7 +1914,7 @@
         function updateProgress() {
             const naMarked = report.meta.naMarked || {};
             let filled = 0;
-            let total = 10; // reporter, project, weather, activities, operations, issues, inspections, safety, visitors, photos
+            let total = 11; // reporter, project, weather, activities, operations, equipment, issues, inspections, safety, visitors, photos
 
             // Reporter - has name
             if (report.reporter?.name) filled++;
@@ -1623,6 +1932,9 @@
 
             // Operations - has personnel data entered
             if (hasOperationsData()) filled++;
+
+            // Equipment - has equipment data (even if all IDLE)
+            if (hasEquipmentData()) filled++;
 
             // Issues - has issues OR marked N/A
             if (report.generalIssues.length > 0 || naMarked.issues) filled++;
