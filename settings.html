@@ -172,6 +172,23 @@
                 </div>
             </section>
 
+            <!-- Troubleshooting -->
+            <section class="bg-white border-2 border-slate-200">
+                <div class="bg-dot-slate text-white p-4">
+                    <h2 class="text-sm font-bold uppercase tracking-wider flex items-center gap-2">
+                        <i class="fas fa-wrench"></i>
+                        Troubleshooting
+                    </h2>
+                </div>
+                <div class="p-4 space-y-3">
+                    <p class="text-xs text-slate-500">If the app isn't working correctly or you want to get the latest version, use this option to refresh the app cache.</p>
+                    <button onclick="refreshApp()" class="w-full p-4 bg-slate-500 text-white font-bold uppercase hover:bg-slate-600 transition-colors flex items-center justify-center gap-2">
+                        <i class="fas fa-sync-alt"></i>
+                        Refresh App
+                    </button>
+                </div>
+            </section>
+
         </main>
 
         <!-- SAVE BUTTON -->
@@ -308,6 +325,37 @@
             toast.innerHTML = `<i class="fas fa-check"></i>${message}`;
             document.body.appendChild(toast);
             setTimeout(() => toast.remove(), 3000);
+        }
+
+        async function refreshApp() {
+            const confirmed = confirm('This will refresh the app to get the latest version. Your reports and settings will be kept. Continue?');
+            if (!confirmed) return;
+
+            showToast('Refreshing app...', 'warning');
+
+            try {
+                // Unregister all service workers
+                if ('serviceWorker' in navigator) {
+                    const registrations = await navigator.serviceWorker.getRegistrations();
+                    for (const registration of registrations) {
+                        await registration.unregister();
+                    }
+                }
+
+                // Clear all caches (but NOT localStorage - reports and settings are preserved)
+                if ('caches' in window) {
+                    const cacheNames = await caches.keys();
+                    for (const cacheName of cacheNames) {
+                        await caches.delete(cacheName);
+                    }
+                }
+
+                // Reload the page to get fresh code
+                window.location.reload(true);
+            } catch (error) {
+                console.error('Error refreshing app:', error);
+                showToast('Error refreshing app. Please try again.', 'error');
+            }
         }
 
         // Update preview on input change
