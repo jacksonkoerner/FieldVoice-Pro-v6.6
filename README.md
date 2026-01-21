@@ -91,15 +91,15 @@
 
 | Page | Lines | Purpose |
 |------|-------|---------|
-| `index.html` | ~887 | Dashboard with project selection, active project display, weather, and navigation |
-| `quick-interview.html` | ~2,487 | DOT-compliant report with 12 sections: Weather, Contractor Work, Personnel, Equipment, Issues, Inspections, Safety, Contractor Communications, Visitors/Deliveries, Photos |
-| `report.html` | ~1,700 | AI-populated editable DOT form with Form View and Original Notes tabs, submit functionality |
-| `archives.html` | ~431 | Report history with swipe-to-delete, date-sorted report list, view/delete past reports |
-| `editor.html` | ~674 | Photo capture with GPS embedding, section-specific editing interface |
+| `index.html` | ~931 | Dashboard with project selection, active project display, weather, and navigation |
+| `quick-interview.html` | ~3,243 | DOT-compliant report with dual capture modes (Quick Notes minimal or Guided Sections), 12 expandable sections, auto-expanding textareas, contractor-based work entry |
+| `report.html` | ~1,881 | AI-populated editable DOT form with Form View and Original Notes tabs, submit functionality |
+| `archives.html` | ~491 | Report history with swipe-to-delete, date-sorted report list, view/delete past reports |
+| `editor.html` | ~741 | Photo capture with GPS embedding, full-size photo cards with orientation handling, editable captions |
 | `permissions.html` | ~1,596 | Permission testing (mic, camera, GPS), iOS-specific instructions for native dictation |
 | `permission-debug.html` | ~1,074 | Debugging utility for troubleshooting permission issues |
 | `project-config.html` | ~1,581 | Project management with document import, contractor roster, equipment inventory, and contract details |
-| `settings.html` | ~477 | Inspector profile - personal information, title, company, signature preview, and app refresh |
+| `settings.html` | ~478 | Inspector profile - personal information, title, company, signature preview, and app refresh |
 | `landing.html` | ~1,560 | Marketing page with feature overview and onboarding |
 
 ---
@@ -449,11 +449,20 @@
      │
      ├─► Load contractors/equipment from active project
      │
-     ├─► Expandable section cards (12 sections):
+     ├─► Choose capture mode (toggle at top):
+     │    ├─► "Quick Notes" (Minimal Mode):
+     │    │    ├─► Single freeform textarea for dictation-first workflow
+     │    │    ├─► Auto-expanding textarea adjusts height as you type
+     │    │    └─► Best for fast field notes via voice input
+     │    │
+     │    └─► "Guided Sections" (Structured Mode):
+     │         └─► 12 expandable section cards with structured input
+     │
+     ├─► Expandable section cards (Guided Mode - 12 sections):
      │    ├─► Weather & Site Conditions
      │    ├─► Contractor Work (per-contractor cards)
      │    │    ├─► "No work performed" checkbox
-     │    │    ├─► Work narrative textarea
+     │    │    ├─► Work narrative textarea (auto-expanding)
      │    │    ├─► Equipment used input
      │    │    └─► Crew input (role/quantity)
      │    ├─► Personnel/Operations (DOT columns)
@@ -469,16 +478,17 @@
      │    ├─► Safety
      │    ├─► Communications with Contractor
      │    ├─► Visitors; Deliveries; Other Remarks
-     │    └─► Progress Photos
+     │    └─► Progress Photos (full-size cards with orientation handling)
      │
      ├─► Each section supports:
      │    ├─► Text input (manual typing or keyboard dictation)
+     │    ├─► Auto-expanding textareas (grow with content, max 60vh)
      │    ├─► Mark as N/A (skip section)
      │    └─► Real-time preview updates
      │
      ├─► Progress bar shows completion percentage (12 sections)
      │
-     └─► User clicks "Finish" ─► Webhook processes data ─► [report.html]
+     └─► User clicks "Finish" ─► AI processes data ─► [report.html]
 ```
 
 ### 5. Voice Input Flow (Native Keyboard Dictation)
@@ -826,7 +836,7 @@ FieldVoice Pro is a fully installable Progressive Web App (PWA) that works offli
 
 **Cache Versioning:**
 ```javascript
-const CACHE_VERSION = 'v1.2.0';
+const CACHE_VERSION = 'v1.4.0';
 const CACHE_NAME = `fieldvoice-pro-${CACHE_VERSION}`;
 ```
 
@@ -988,21 +998,21 @@ npx serve .
 
 | File | Lines | Size (approx) |
 |------|-------|---------------|
-| index.html | 887 | 43 KB |
-| quick-interview.html | 3,100 | 160 KB |
-| report.html | 1,700 | 85 KB |
-| archives.html | 431 | 19 KB |
-| editor.html | 674 | 32 KB |
-| permissions.html | 1,596 | 81 KB |
+| index.html | 931 | 45 KB |
+| quick-interview.html | 3,243 | 158 KB |
+| report.html | 1,881 | 85 KB |
+| archives.html | 491 | 22 KB |
+| editor.html | 741 | 34 KB |
+| permissions.html | 1,596 | 80 KB |
 | permission-debug.html | 1,074 | 53 KB |
-| project-config.html | 1,581 | 77 KB |
-| settings.html | 477 | 23 KB |
+| project-config.html | 1,581 | 76 KB |
+| settings.html | 478 | 23 KB |
 | landing.html | 1,560 | 80 KB |
-| sw.js | 205 | 7 KB |
+| sw.js | 208 | 7 KB |
 | manifest.json | 65 | 2 KB |
 | icons/ | - | ~3 KB |
-| assets/ | - | ~325 KB |
-| **Total** | **~13,278** | **~994 KB** |
+| assets/ | - | ~328 KB |
+| **Total** | **~13,849** | **~1 MB** |
 
 ---
 
@@ -1049,6 +1059,36 @@ Extend the `weatherCodes` object in `index.html` (lines 418-433) with additional
 ---
 
 ## Recent Changes
+
+### Dual Capture Modes (January 2026)
+- **New feature in quick-interview.html** - Choose between two capture workflows:
+  - **Quick Notes (Minimal)**: Single freeform textarea optimized for dictation-first workflow
+  - **Guided Sections**: 12 expandable section cards with structured input fields
+  - Toggle at top of page to switch between modes
+  - Both modes support native keyboard dictation
+  - Quick Notes ideal for fast field entry; Guided for comprehensive DOT documentation
+
+### Auto-Expanding Textareas (January 2026)
+- **Enhanced input experience** across all textarea fields
+  - Textareas automatically grow as content is added
+  - Maximum height capped at 60vh to prevent excessive scrolling
+  - 16px font size prevents iOS zoom issues
+  - Real-time height adjustment for better mobile experience
+  - Scrollable when content exceeds max height
+
+### Photo Display Improvements (January 2026)
+- **Full-size photo cards** with improved display
+  - Photos now display at full size within cards
+  - Proper orientation handling for portrait/landscape photos
+  - Editable captions for each photo
+  - Better visual hierarchy in photo sections
+
+### Streamlined AI Processing Flow (January 2026)
+- **Integrated AI processing** directly into quick-interview workflow
+  - AI refinement now triggered automatically when clicking "Finish"
+  - Removed separate AI review step for faster workflow
+  - Processing happens before navigation to report.html
+  - Better error handling for offline scenarios
 
 ### Report Archives Page (January 2026)
 - **New page: archives.html** - View and manage historical reports
@@ -1195,7 +1235,9 @@ FieldVoice Pro is a sophisticated, production-ready field documentation system t
 - **Multi-project management** - Configure and switch between multiple construction projects with contractor rosters and equipment inventories
 - **Document import** - Automatically extract project data from existing PDF/DOCX reports via AI-powered document processing
 - **Fully installable as a PWA** - Works offline when saved to home screen on mobile devices
+- **Dual capture modes** - Quick Notes (minimal freeform) or Guided Sections (12 structured DOT sections) to fit your workflow
 - **DOT-compliant reporting** - Contractor-based work entry, personnel tracking, and equipment status matching DOT form requirements
+- **Auto-expanding textareas** - Input fields grow with content for better mobile experience
 - **AI Kit integration** - Side-by-side text refinement with training data export for prompt improvement
 - Operates primarily client-side with optional n8n webhook integration for AI features
 - Supports voice-first data entry via native keyboard dictation with AI enhancement
@@ -1207,4 +1249,4 @@ FieldVoice Pro is a sophisticated, production-ready field documentation system t
 - **Safe-area support** for modern iOS devices with notch/Dynamic Island
 - **Streamlined navigation** with project picker, Home buttons, and improved workflow tracking
 
-The codebase is mature (~13,278 lines including PWA infrastructure), well-structured, and includes comprehensive error handling for real-world field conditions including graceful offline degradation.
+The codebase is mature (~13,849 lines including PWA infrastructure), well-structured, and includes comprehensive error handling for real-world field conditions including graceful offline degradation.
