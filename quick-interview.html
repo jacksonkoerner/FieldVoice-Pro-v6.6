@@ -1108,7 +1108,39 @@ Example: 'ABC Concrete had 5 workers pouring the foundation today. Weather was g
                     throw new Error(`Webhook failed: ${response.status}`);
                 }
 
-                return await response.json();
+                const data = await response.json();
+
+                // Validate response structure
+                if (!data.success && !data.aiGenerated) {
+                    console.error('Invalid webhook response:', data);
+                    throw new Error('Invalid response from AI processing');
+                }
+
+                // If aiGenerated is a string, try to parse it
+                if (typeof data.aiGenerated === 'string') {
+                    try {
+                        data.aiGenerated = JSON.parse(data.aiGenerated);
+                    } catch (e) {
+                        console.error('Failed to parse aiGenerated string:', e);
+                    }
+                }
+
+                // Validate required fields in AI response
+                const ai = data.aiGenerated;
+                if (ai) {
+                    // Ensure arrays exist
+                    ai.activities = ai.activities || [];
+                    ai.operations = ai.operations || [];
+                    ai.equipment = ai.equipment || [];
+                    ai.generalIssues = ai.generalIssues || [];
+                    ai.qaqcNotes = ai.qaqcNotes || [];
+                    ai.safety = ai.safety || { hasIncidents: false, noIncidents: true, notes: '' };
+                }
+
+                // Log the AI response for debugging
+                console.log('[AI] Received response:', JSON.stringify(data.aiGenerated, null, 2));
+
+                return data;
             } catch (error) {
                 clearTimeout(timeoutId);
                 throw error;
