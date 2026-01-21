@@ -359,22 +359,58 @@
         }
 
         // ============ STORAGE ============
+        /**
+         * Generate a report storage key
+         * @param {string|null} projectId - Project ID (null for legacy fallback)
+         * @param {string|null} dateStr - Date string YYYY-MM-DD (null for today)
+         * @returns {string} Storage key
+         */
+        function getReportKey(projectId, dateStr) {
+            const date = dateStr || new Date().toISOString().split('T')[0];
+            return projectId
+                ? `fieldvoice_report_${projectId}_${date}`
+                : `fieldvoice_report_${date}`; // fallback for legacy
+        }
+
         function getTodayKey() {
-            return `fieldvoice_report_${new Date().toISOString().split('T')[0]}`;
+            const activeProject = getActiveProject();
+            return getReportKey(activeProject?.id, null);
         }
 
         function getYesterdayKey() {
             const yesterday = new Date();
             yesterday.setDate(yesterday.getDate() - 1);
-            return `fieldvoice_report_${yesterday.toISOString().split('T')[0]}`;
+            const activeProject = getActiveProject();
+            return getReportKey(activeProject?.id, yesterday.toISOString().split('T')[0]);
         }
 
         function getReport() {
-            const saved = localStorage.getItem(getTodayKey());
-            if (saved) {
+            const activeProject = getActiveProject();
+            const todayStr = new Date().toISOString().split('T')[0];
+
+            // First try project-specific key (new format)
+            if (activeProject) {
+                const projectKey = getReportKey(activeProject.id, todayStr);
+                const saved = localStorage.getItem(projectKey);
+                if (saved) {
+                    try {
+                        const parsed = JSON.parse(saved);
+                        if (parsed.meta && parsed.meta.submitted === true) {
+                            return null;
+                        }
+                        return parsed;
+                    } catch (e) {
+                        return null;
+                    }
+                }
+            }
+
+            // Fallback to legacy key (date-only, for backwards compatibility)
+            const legacyKey = getReportKey(null, todayStr);
+            const legacySaved = localStorage.getItem(legacyKey);
+            if (legacySaved) {
                 try {
-                    const parsed = JSON.parse(saved);
-                    // If report was submitted, treat as no report for dashboard
+                    const parsed = JSON.parse(legacySaved);
                     if (parsed.meta && parsed.meta.submitted === true) {
                         return null;
                     }
@@ -383,11 +419,12 @@
                     return null;
                 }
             }
+
+            // Check very old legacy key
             const legacy = localStorage.getItem('fieldvoice_report');
             if (legacy) {
                 try {
                     const parsed = JSON.parse(legacy);
-                    // Also check legacy report for submitted status
                     if (parsed.meta && parsed.meta.submitted === true) {
                         return null;
                     }
@@ -400,14 +437,26 @@
         }
 
         function hasYesterdayReport() {
-            const saved = localStorage.getItem(getYesterdayKey());
-            if (saved) return true;
+            const activeProject = getActiveProject();
+            const yesterday = new Date();
+            yesterday.setDate(yesterday.getDate() - 1);
+            const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+            // Check project-specific key first
+            if (activeProject) {
+                const projectKey = getReportKey(activeProject.id, yesterdayStr);
+                if (localStorage.getItem(projectKey)) return true;
+            }
+
+            // Fallback to legacy key
+            const legacyKey = getReportKey(null, yesterdayStr);
+            if (localStorage.getItem(legacyKey)) return true;
+
+            // Check very old legacy key
             const legacy = localStorage.getItem('fieldvoice_report');
             if (legacy) {
                 try {
                     const parsed = JSON.parse(legacy);
-                    const yesterday = new Date();
-                    yesterday.setDate(yesterday.getDate() - 1);
                     if (parsed.overview?.date === yesterday.toLocaleDateString()) {
                         return true;
                     }
@@ -417,7 +466,20 @@
         }
 
         function saveReport(report) {
-            localStorage.setItem(getTodayKey(), JSON.stringify(report));
+            const activeProject = getActiveProject();
+            const todayStr = new Date().toISOString().split('T')[0];
+
+            // Always save with project-specific key if we have an active project
+            if (activeProject) {
+                const projectKey = getReportKey(activeProject.id, todayStr);
+                localStorage.setItem(projectKey, JSON.stringify(report));
+            } else {
+                // Fallback to legacy key if no active project
+                const legacyKey = getReportKey(null, todayStr);
+                localStorage.setItem(legacyKey, JSON.stringify(report));
+            }
+
+            // Also save to very old legacy key for backwards compatibility
             localStorage.setItem('fieldvoice_report', JSON.stringify(report));
         }
 

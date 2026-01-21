@@ -150,27 +150,76 @@
         // ============ STATE ============
         let pendingDeleteKey = null;
 
+        // ============ PROJECT LOADING ============
+        const PROJECTS_KEY = 'fvp_projects';
+
+        function getProjects() {
+            const saved = localStorage.getItem(PROJECTS_KEY);
+            if (saved) {
+                try { return JSON.parse(saved); } catch (e) { return []; }
+            }
+            return [];
+        }
+
+        function getProjectById(projectId) {
+            const projects = getProjects();
+            return projects.find(p => p.id === projectId) || null;
+        }
+
         // ============ STORAGE HELPERS ============
         function getAllReports() {
             const reports = [];
-            const reportKeyPattern = /^fieldvoice_report_(\d{4}-\d{2}-\d{2})$/;
-            const submittedKeyPattern = /^fieldvoice_report_(\d{4}-\d{2}-\d{2})_submitted_\d+$/;
+            // Legacy patterns (date only)
+            const legacyKeyPattern = /^fieldvoice_report_(\d{4}-\d{2}-\d{2})$/;
+            const legacySubmittedPattern = /^fieldvoice_report_(\d{4}-\d{2}-\d{2})_submitted_\d+$/;
+            // Project-specific patterns (projectId_date)
+            const projectKeyPattern = /^fieldvoice_report_([a-zA-Z0-9_-]+)_(\d{4}-\d{2}-\d{2})$/;
+            const projectSubmittedPattern = /^fieldvoice_report_([a-zA-Z0-9_-]+)_(\d{4}-\d{2}-\d{2})_submitted_\d+$/;
 
             for (let i = 0; i < localStorage.length; i++) {
                 const key = localStorage.key(i);
 
-                // Check for regular report keys
-                const match = key.match(reportKeyPattern);
-                const submittedMatch = key.match(submittedKeyPattern);
+                // Check for project-specific keys first
+                const projectMatch = key.match(projectKeyPattern);
+                const projectSubmittedMatch = key.match(projectSubmittedPattern);
 
-                if (match || submittedMatch) {
+                if (projectMatch || projectSubmittedMatch) {
                     try {
                         const data = JSON.parse(localStorage.getItem(key));
-                        const dateStr = match ? match[1] : submittedMatch[1];
+                        const projectId = projectMatch ? projectMatch[1] : projectSubmittedMatch[1];
+                        const dateStr = projectMatch ? projectMatch[2] : projectSubmittedMatch[2];
+                        const project = getProjectById(projectId);
 
                         reports.push({
                             key: key,
                             date: dateStr,
+                            projectId: projectId,
+                            projectName: project?.name || data.project?.name || data.overview?.projectName || 'Unknown Project',
+                            submitted: data.meta?.submitted === true,
+                            photoCount: data.photos?.length || 0,
+                            createdAt: data.meta?.createdAt || dateStr,
+                            submittedAt: data.meta?.submittedAt || null
+                        });
+                    } catch (e) {
+                        console.error('Error parsing report:', key, e);
+                    }
+                    continue;
+                }
+
+                // Check for legacy keys (no project ID)
+                const legacyMatch = key.match(legacyKeyPattern);
+                const legacySubmittedMatch = key.match(legacySubmittedPattern);
+
+                if (legacyMatch || legacySubmittedMatch) {
+                    try {
+                        const data = JSON.parse(localStorage.getItem(key));
+                        const dateStr = legacyMatch ? legacyMatch[1] : legacySubmittedMatch[1];
+
+                        reports.push({
+                            key: key,
+                            date: dateStr,
+                            projectId: null,
+                            projectName: data.project?.name || data.overview?.projectName || null,
                             submitted: data.meta?.submitted === true,
                             photoCount: data.photos?.length || 0,
                             createdAt: data.meta?.createdAt || dateStr,
@@ -254,12 +303,22 @@
             `;
         }
 
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
         function renderReportRow(report) {
             const formattedDate = formatDate(report.date);
             const statusClass = report.submitted
                 ? 'bg-safety-green text-white'
                 : 'bg-dot-yellow text-slate-800';
             const statusText = report.submitted ? 'Submitted' : 'Draft';
+            const projectDisplay = report.projectName
+                ? `<p class="text-xs text-slate-500 truncate"><i class="fas fa-building mr-1"></i>${escapeHtml(report.projectName)}</p>`
+                : '';
 
             return `
                 <div class="swipe-container flex bg-white shadow-sm border border-slate-200">
@@ -268,6 +327,7 @@
                        class="swipe-content flex-shrink-0 w-full p-4 flex items-center gap-4 hover:bg-slate-50 transition-colors">
                         <div class="flex-1 min-w-0">
                             <p class="font-bold text-slate-800 truncate">${formattedDate}</p>
+                            ${projectDisplay}
                             <div class="flex items-center gap-3 mt-1">
                                 <span class="inline-flex items-center px-2 py-0.5 text-[10px] font-bold uppercase ${statusClass}">
                                     ${statusText}

@@ -379,6 +379,30 @@
         let refinedData = {};
         let naSections = {};
         let isRefining = {}; // Track which sections are currently being refined
+        let activeProject = null;
+
+        // ============ PROJECT LOADING ============
+        const PROJECTS_KEY = 'fvp_projects';
+        const ACTIVE_PROJECT_KEY = 'fvp_active_project';
+
+        function getProjects() {
+            const saved = localStorage.getItem(PROJECTS_KEY);
+            if (saved) {
+                try { return JSON.parse(saved); } catch (e) { return []; }
+            }
+            return [];
+        }
+
+        function loadActiveProject() {
+            const activeId = localStorage.getItem(ACTIVE_PROJECT_KEY);
+            if (!activeId) {
+                activeProject = null;
+                return null;
+            }
+            const projects = getProjects();
+            activeProject = projects.find(p => p.id === activeId) || null;
+            return activeProject;
+        }
 
         // ============ AUTO-EXPAND TEXTAREAS ============
         /**
@@ -431,41 +455,81 @@
         }
 
         // ============ STORAGE ============
+        /**
+         * Generate a report storage key
+         * @param {string|null} projectId - Project ID (null for legacy fallback)
+         * @param {string|null} dateStr - Date string YYYY-MM-DD (null for today)
+         * @returns {string} Storage key
+         */
+        function getReportKey(projectId, dateStr) {
+            const date = dateStr || new Date().toISOString().split('T')[0];
+            return projectId
+                ? `fieldvoice_report_${projectId}_${date}`
+                : `fieldvoice_report_${date}`; // fallback for legacy
+        }
+
         function getTodayKey() {
-            return `fieldvoice_report_${new Date().toISOString().split('T')[0]}`;
+            return getReportKey(activeProject?.id, null);
+        }
+
+        function migrateReportFields(parsed) {
+            if (!parsed.meta) parsed.meta = {};
+            if (!parsed.meta.naMarked) parsed.meta.naMarked = {};
+            if (!parsed.safety) parsed.safety = { hasIncidents: false, noIncidents: false, notes: [] };
+            if (parsed.safety.noIncidents === undefined) parsed.safety.noIncidents = false;
+            if (!parsed.refinedData) parsed.refinedData = {};
+            return parsed;
         }
 
         function getReport() {
-            const saved = localStorage.getItem(getTodayKey());
-            if (saved) {
+            const todayStr = new Date().toISOString().split('T')[0];
+
+            // First try project-specific key (new format)
+            if (activeProject) {
+                const projectKey = getReportKey(activeProject.id, todayStr);
+                const saved = localStorage.getItem(projectKey);
+                if (saved) {
+                    try {
+                        return migrateReportFields(JSON.parse(saved));
+                    } catch (e) {}
+                }
+            }
+
+            // Fallback to legacy key (date-only)
+            const legacyKey = getReportKey(null, todayStr);
+            const legacySaved = localStorage.getItem(legacyKey);
+            if (legacySaved) {
                 try {
-                    const parsed = JSON.parse(saved);
-                    if (!parsed.meta) parsed.meta = {};
-                    if (!parsed.meta.naMarked) parsed.meta.naMarked = {};
-                    if (!parsed.safety) parsed.safety = { hasIncidents: false, noIncidents: false, notes: [] };
-                    if (parsed.safety.noIncidents === undefined) parsed.safety.noIncidents = false;
-                    if (!parsed.refinedData) parsed.refinedData = {};
-                    return parsed;
+                    return migrateReportFields(JSON.parse(legacySaved));
                 } catch (e) {}
             }
+
+            // Check very old legacy key
             const legacy = localStorage.getItem('fieldvoice_report');
             if (legacy) {
                 try {
-                    const parsed = JSON.parse(legacy);
-                    if (!parsed.meta) parsed.meta = {};
-                    if (!parsed.meta.naMarked) parsed.meta.naMarked = {};
-                    if (!parsed.safety) parsed.safety = { hasIncidents: false, noIncidents: false, notes: [] };
-                    if (parsed.safety.noIncidents === undefined) parsed.safety.noIncidents = false;
-                    if (!parsed.refinedData) parsed.refinedData = {};
-                    return parsed;
+                    return migrateReportFields(JSON.parse(legacy));
                 } catch (e) {}
             }
             return null;
         }
 
         function saveReport() {
-            localStorage.setItem(getTodayKey(), JSON.stringify(report));
-            localStorage.setItem('fieldvoice_report', JSON.stringify(report));
+            const todayStr = new Date().toISOString().split('T')[0];
+            const reportJson = JSON.stringify(report);
+
+            // Save with project-specific key if we have an active project
+            if (activeProject) {
+                const projectKey = getReportKey(activeProject.id, todayStr);
+                localStorage.setItem(projectKey, reportJson);
+            } else {
+                // Fallback to legacy key if no active project
+                const legacyKey = getReportKey(null, todayStr);
+                localStorage.setItem(legacyKey, reportJson);
+            }
+
+            // Also save to very old legacy key for backwards compatibility
+            localStorage.setItem('fieldvoice_report', reportJson);
         }
 
         // Update photo caption and save to localStorage
@@ -1317,6 +1381,9 @@
                 month: 'long',
                 day: 'numeric'
             });
+
+            // Load active project first (needed for project-specific report keys)
+            loadActiveProject();
 
             report = getReport();
 
