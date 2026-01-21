@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Daily Report - FieldVoice Pro</title>
 
     <!-- PWA Meta Tags -->
@@ -20,980 +20,1379 @@
 
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'dot-navy': '#0a1628',
+                        'dot-blue': '#1e3a5f',
+                        'dot-slate': '#334155',
+                        'dot-orange': '#ea580c',
+                        'dot-yellow': '#f59e0b',
+                        'safety-green': '#16a34a',
+                    }
+                }
+            }
+        }
+    </script>
     <style>
         body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
             padding-top: env(safe-area-inset-top);
             padding-bottom: env(safe-area-inset-bottom);
             padding-left: env(safe-area-inset-left);
             padding-right: env(safe-area-inset-right);
         }
-        @media print {
-            .print-hidden { display: none !important; }
-            .page-break { page-break-before: always; }
-            body { -webkit-print-color-adjust: exact; print-color-adjust: exact; padding: 0; }
-            @page { margin: 0.5in; }
-            .report-page { max-width: 8.5in; min-height: 11in; }
+        .header-stripe {
+            background: repeating-linear-gradient(-45deg, #f59e0b, #f59e0b 10px, #0a1628 10px, #0a1628 20px);
+            height: 4px;
         }
-        @media screen {
-            .report-page { max-width: 100%; }
+        /* Auto-expanding textareas */
+        .auto-expand {
+            min-height: 72px;
+            max-height: 400px;
+            overflow-y: hidden;
+            resize: none;
+            transition: height 0.1s ease-out;
         }
-        @media screen and (min-width: 768px) {
-            .report-page { max-width: 8.5in; min-height: auto; }
+        .auto-expand.scrollable {
+            overflow-y: auto;
         }
-        .table-scroll-wrapper {
-            overflow-x: auto;
-            -webkit-overflow-scrolling: touch;
-            margin: 0 4px;
+        /* Editable field styles */
+        .editable-field {
+            background: white;
+            border: 1px solid #e2e8f0;
+            transition: all 0.2s ease;
         }
-        .table-scroll-wrapper table {
-            min-width: 600px;
+        .editable-field:hover {
+            border-color: #94a3b8;
+        }
+        .editable-field:focus {
+            outline: none;
+            border-color: #1e3a5f;
+            box-shadow: 0 0 0 2px rgba(30, 58, 95, 0.1);
+        }
+        .editable-field.user-edited {
+            background: #fef9c3;
+            border-color: #f59e0b;
+        }
+        /* Section headers */
+        .section-header {
+            background: #0a1628;
+            color: white;
+            font-weight: bold;
+            text-transform: uppercase;
+            padding: 0.75rem 1rem;
+            font-size: 0.875rem;
+            letter-spacing: 0.05em;
+        }
+        /* Table styles */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.75rem;
+        }
+        .data-table th {
+            background: #f1f5f9;
+            border: 1px solid #e2e8f0;
+            padding: 0.5rem;
+            text-align: left;
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.65rem;
+            color: #64748b;
+        }
+        .data-table td {
+            border: 1px solid #e2e8f0;
+            padding: 0.25rem;
+        }
+        .data-table input {
+            width: 100%;
+            border: none;
+            background: transparent;
+            padding: 0.25rem;
+            font-size: 0.75rem;
+        }
+        .data-table input:focus {
+            outline: none;
+            background: #fef9c3;
+        }
+        .data-table .totals-row {
+            background: #f8fafc;
+            font-weight: bold;
+        }
+        /* Contractor card */
+        .contractor-card {
+            border: 2px solid #e2e8f0;
+            transition: border-color 0.2s ease;
+        }
+        .contractor-card.has-content {
+            border-color: #16a34a;
+        }
+        .contractor-card.no-work {
+            border-color: #94a3b8;
+            background: #f8fafc;
+        }
+        /* Photo grid */
+        .photo-item {
+            position: relative;
+        }
+        .photo-item img {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+        /* Save indicator */
+        .save-indicator {
+            position: fixed;
+            bottom: 1rem;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #16a34a;
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            font-size: 0.875rem;
+            font-weight: 600;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            z-index: 100;
+        }
+        .save-indicator.visible {
+            opacity: 1;
+        }
+        /* Hide scrollbar but allow scrolling */
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        /* Number input styling */
+        input[type="number"]::-webkit-inner-spin-button,
+        input[type="number"]::-webkit-outer-spin-button {
+            opacity: 1;
         }
     </style>
 </head>
-<body class="bg-slate-100 min-h-screen overflow-x-hidden">
+<body class="bg-slate-100 min-h-screen">
+    <div class="header-stripe"></div>
 
-    <!-- NAVIGATION BAR (hidden on print) -->
-    <div class="print-hidden sticky top-0 z-50 bg-white border-b shadow-sm">
-        <div class="max-w-4xl mx-auto px-4 py-3 flex justify-between items-center">
-            <div class="flex items-center gap-2">
-                <a href="index.html" class="w-9 h-9 flex items-center justify-center bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors" title="Home">
-                    <i class="fas fa-home text-slate-600"></i>
+    <!-- STICKY HEADER -->
+    <header class="sticky top-0 z-50 bg-dot-navy text-white shadow-lg">
+        <div class="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <a href="review.html" class="w-10 h-10 flex items-center justify-center border border-slate-600 hover:bg-slate-800 transition-colors">
+                    <i class="fas fa-arrow-left text-slate-400"></i>
                 </a>
-                <!-- Standard navigation (hidden in readonly mode) -->
-                <a id="nav-ai-kit" href="review.html" class="flex items-center gap-2 text-slate-600 font-bold hover:text-slate-800 transition-colors">
-                    <i class="fas fa-arrow-left"></i>
-                    <span class="hidden sm:inline">Back to AI Kit</span>
-                </a>
-                <!-- Readonly navigation (hidden by default) -->
-                <a id="nav-archives" href="archives.html" class="hidden flex items-center gap-2 text-slate-600 font-bold hover:text-slate-800 transition-colors">
-                    <i class="fas fa-arrow-left"></i>
-                    <span class="hidden sm:inline">Back to Archives</span>
-                </a>
+                <div>
+                    <h1 class="font-bold text-sm uppercase tracking-wide">Daily Report</h1>
+                    <p id="headerDate" class="text-xs text-slate-400"></p>
+                </div>
             </div>
             <div class="flex items-center gap-2">
-                <!-- View Only badge (hidden by default) -->
-                <span id="readonly-badge" class="hidden px-3 py-1.5 bg-slate-200 text-slate-600 rounded-lg font-bold text-xs uppercase tracking-wide">
-                    <i class="fas fa-eye mr-1"></i>View Only
-                </span>
-                <button id="submit-report-btn" onclick="showSubmitConfirmation()" class="px-4 py-2 bg-orange-600 text-white rounded-lg font-bold text-sm shadow-md hover:bg-orange-700 transition-colors">
-                    <i class="fas fa-cloud-upload-alt mr-1"></i> Submit
+                <button onclick="saveReport()" class="px-3 py-2 bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold uppercase transition-colors flex items-center gap-1">
+                    <i class="fas fa-save"></i>
+                    <span class="hidden sm:inline">Save</span>
+                </button>
+                <button onclick="exportPDF()" class="px-3 py-2 bg-dot-blue hover:bg-blue-700 text-white text-xs font-bold uppercase transition-colors flex items-center gap-1">
+                    <i class="fas fa-file-pdf"></i>
+                    <span class="hidden sm:inline">PDF</span>
+                </button>
+                <button onclick="showSubmitModal()" class="px-3 py-2 bg-safety-green hover:bg-green-700 text-white text-xs font-bold uppercase transition-colors flex items-center gap-1">
+                    <i class="fas fa-cloud-upload-alt"></i>
+                    <span class="hidden sm:inline">Submit</span>
                 </button>
             </div>
         </div>
+    </header>
+
+    <!-- MAIN CONTENT -->
+    <main class="max-w-4xl mx-auto pb-24">
+
+        <!-- 1. PROJECT OVERVIEW SECTION -->
+        <section class="bg-white border-b-4 border-slate-200 mb-4">
+            <div class="section-header flex items-center gap-2">
+                <i class="fas fa-clipboard-list"></i>
+                <span>Project Overview</span>
+            </div>
+            <div class="p-4 space-y-4">
+                <!-- Project Info Grid -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Project Name</label>
+                        <input type="text" id="projectName" class="editable-field w-full px-3 py-2 text-sm" placeholder="Enter project name">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Project Number</label>
+                        <input type="text" id="projectNumber" class="editable-field w-full px-3 py-2 text-sm" placeholder="e.g., 2024-DOT-001">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Location</label>
+                        <input type="text" id="projectLocation" class="editable-field w-full px-3 py-2 text-sm" placeholder="Enter location">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Date</label>
+                        <input type="date" id="reportDate" class="editable-field w-full px-3 py-2 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Contract Day #</label>
+                        <input type="number" id="contractDay" class="editable-field w-full px-3 py-2 text-sm" placeholder="e.g., 45">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Completed By</label>
+                        <input type="text" id="completedBy" class="editable-field w-full px-3 py-2 text-sm" placeholder="Your name">
+                    </div>
+                </div>
+
+                <!-- Weather Block -->
+                <div class="bg-slate-50 border border-slate-200 p-4 rounded">
+                    <h3 class="text-xs font-bold text-slate-600 uppercase mb-3 flex items-center gap-2">
+                        <i class="fas fa-cloud-sun text-dot-blue"></i>
+                        Weather Conditions
+                    </h3>
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">High Temp</label>
+                            <input type="text" id="weatherHigh" class="editable-field w-full px-2 py-1.5 text-sm" placeholder="--°F">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Low Temp</label>
+                            <input type="text" id="weatherLow" class="editable-field w-full px-2 py-1.5 text-sm" placeholder="--°F">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Precipitation</label>
+                            <input type="text" id="weatherPrecip" class="editable-field w-full px-2 py-1.5 text-sm" placeholder="0.00&quot;">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Condition</label>
+                            <input type="text" id="weatherCondition" class="editable-field w-full px-2 py-1.5 text-sm" placeholder="e.g., Sunny">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Job Site</label>
+                            <select id="weatherJobSite" class="editable-field w-full px-2 py-1.5 text-sm">
+                                <option value="">Select...</option>
+                                <option value="Dry">Dry</option>
+                                <option value="Wet">Wet</option>
+                                <option value="Muddy">Muddy</option>
+                                <option value="Frozen">Frozen</option>
+                            </select>
+                        </div>
+                        <div class="col-span-2 sm:col-span-3">
+                            <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Adverse Conditions</label>
+                            <input type="text" id="weatherAdverse" class="editable-field w-full px-2 py-1.5 text-sm" placeholder="None / Describe if any">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 2. DAILY WORK SUMMARY SECTION -->
+        <section class="bg-white border-b-4 border-slate-200 mb-4">
+            <div class="section-header flex items-center gap-2">
+                <i class="fas fa-hard-hat"></i>
+                <span>Daily Work Summary</span>
+            </div>
+            <div id="workSummaryContainer" class="p-4 space-y-4">
+                <!-- Contractor cards will be populated here -->
+                <div class="text-center text-slate-400 py-8">
+                    <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
+                    <p class="text-sm">Loading contractors...</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- 3. PERSONNEL/OPERATIONS SECTION -->
+        <section class="bg-white border-b-4 border-slate-200 mb-4">
+            <div class="section-header flex items-center gap-2">
+                <i class="fas fa-users"></i>
+                <span>Personnel / Operations</span>
+            </div>
+            <div class="p-4 overflow-x-auto">
+                <table class="data-table" id="personnelTable">
+                    <thead>
+                        <tr>
+                            <th class="min-w-[120px]">Contractor</th>
+                            <th class="min-w-[80px]">Trade</th>
+                            <th class="w-12">Super</th>
+                            <th class="w-12">Foreman</th>
+                            <th class="w-12">Operators</th>
+                            <th class="w-12">Laborers</th>
+                            <th class="w-12">Surveyors</th>
+                            <th class="w-12">Others</th>
+                            <th class="w-16">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody id="personnelTableBody">
+                        <!-- Rows will be populated here -->
+                    </tbody>
+                    <tfoot>
+                        <tr class="totals-row">
+                            <td colspan="2" class="text-right font-bold px-2">TOTALS:</td>
+                            <td id="totalSuper" class="text-center">0</td>
+                            <td id="totalForeman" class="text-center">0</td>
+                            <td id="totalOperators" class="text-center">0</td>
+                            <td id="totalLaborers" class="text-center">0</td>
+                            <td id="totalSurveyors" class="text-center">0</td>
+                            <td id="totalOthers" class="text-center">0</td>
+                            <td id="totalAll" class="text-center font-bold">0</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </section>
+
+        <!-- 4. EQUIPMENT STATUS SECTION -->
+        <section class="bg-white border-b-4 border-slate-200 mb-4">
+            <div class="section-header flex items-center gap-2">
+                <i class="fas fa-truck"></i>
+                <span>Equipment Status</span>
+            </div>
+            <div class="p-4 overflow-x-auto">
+                <table class="data-table" id="equipmentTable">
+                    <thead>
+                        <tr>
+                            <th class="min-w-[120px]">Contractor</th>
+                            <th class="min-w-[200px]">Equipment Type / Model</th>
+                            <th class="w-16">Qty</th>
+                            <th class="min-w-[120px]">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="equipmentTableBody">
+                        <!-- Rows will be populated here -->
+                    </tbody>
+                </table>
+                <button onclick="addEquipmentRow()" class="mt-3 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold uppercase transition-colors">
+                    <i class="fas fa-plus mr-1"></i> Add Equipment
+                </button>
+            </div>
+        </section>
+
+        <!-- 5. ISSUES & DELAYS SECTION -->
+        <section class="bg-white border-b-4 border-slate-200 mb-4">
+            <div class="section-header flex items-center gap-2 bg-red-700">
+                <i class="fas fa-exclamation-triangle"></i>
+                <span>Issues, Delays & RFIs</span>
+            </div>
+            <div class="p-4">
+                <textarea id="issuesText" class="editable-field auto-expand w-full px-3 py-2 text-sm"
+                    placeholder="Document any issues, delays, or RFIs. Include details about impact, resolution status, and responsible parties..."></textarea>
+                <p class="text-xs text-slate-400 mt-1">Leave blank if no issues to report</p>
+            </div>
+        </section>
+
+        <!-- 6. QA/QC INSPECTIONS SECTION -->
+        <section class="bg-white border-b-4 border-slate-200 mb-4">
+            <div class="section-header flex items-center gap-2 bg-purple-700">
+                <i class="fas fa-clipboard-check"></i>
+                <span>QA/QC Testing & Inspections</span>
+            </div>
+            <div class="p-4">
+                <textarea id="qaqcText" class="editable-field auto-expand w-full px-3 py-2 text-sm"
+                    placeholder="Document any QA/QC tests, inspections, or quality control activities performed today..."></textarea>
+                <p class="text-xs text-slate-400 mt-1">Leave blank if no inspections to report</p>
+            </div>
+        </section>
+
+        <!-- 7. SAFETY SECTION -->
+        <section class="bg-white border-b-4 border-slate-200 mb-4">
+            <div class="section-header flex items-center gap-2 bg-safety-green">
+                <i class="fas fa-hard-hat"></i>
+                <span>Safety & Incidents</span>
+            </div>
+            <div class="p-4 space-y-4">
+                <!-- Incident Toggle -->
+                <div class="flex gap-4">
+                    <label class="flex items-center gap-2 p-3 bg-green-50 border-2 border-green-500 cursor-pointer flex-1">
+                        <input type="radio" name="safetyIncident" id="safetyNoIncident" value="none" class="w-4 h-4">
+                        <span class="font-bold text-green-700 text-sm uppercase">No Incidents</span>
+                    </label>
+                    <label class="flex items-center gap-2 p-3 bg-red-50 border-2 border-red-500 cursor-pointer flex-1">
+                        <input type="radio" name="safetyIncident" id="safetyHasIncident" value="incident" class="w-4 h-4">
+                        <span class="font-bold text-red-700 text-sm uppercase">Incident Occurred</span>
+                    </label>
+                </div>
+                <!-- Safety Notes -->
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Safety Notes / Toolbox Talks</label>
+                    <textarea id="safetyText" class="editable-field auto-expand w-full px-3 py-2 text-sm"
+                        placeholder="Document safety meetings, toolbox talks, observations, near misses..."></textarea>
+                </div>
+            </div>
+        </section>
+
+        <!-- 8. COMMUNICATIONS SECTION -->
+        <section class="bg-white border-b-4 border-slate-200 mb-4">
+            <div class="section-header flex items-center gap-2 bg-blue-700">
+                <i class="fas fa-comments"></i>
+                <span>Communications with Contractor</span>
+            </div>
+            <div class="p-4">
+                <textarea id="communicationsText" class="editable-field auto-expand w-full px-3 py-2 text-sm"
+                    placeholder="Document any communications, directives, or discussions with contractors..."></textarea>
+                <p class="text-xs text-slate-400 mt-1">Leave blank if no communications to report</p>
+            </div>
+        </section>
+
+        <!-- 9. VISITORS & DELIVERIES SECTION -->
+        <section class="bg-white border-b-4 border-slate-200 mb-4">
+            <div class="section-header flex items-center gap-2 bg-amber-600">
+                <i class="fas fa-truck-loading"></i>
+                <span>Visitors, Deliveries & Remarks</span>
+            </div>
+            <div class="p-4">
+                <textarea id="visitorsText" class="editable-field auto-expand w-full px-3 py-2 text-sm"
+                    placeholder="Document any visitors to the site, deliveries received, or additional remarks..."></textarea>
+                <p class="text-xs text-slate-400 mt-1">Leave blank if nothing to report</p>
+            </div>
+        </section>
+
+        <!-- 10. PHOTOS SECTION -->
+        <section class="bg-white border-b-4 border-slate-200 mb-4">
+            <div class="section-header flex items-center gap-2">
+                <i class="fas fa-camera"></i>
+                <span>Progress Photos</span>
+                <span id="photoCount" class="ml-auto bg-white/20 px-2 py-0.5 rounded text-xs">0 photos</span>
+            </div>
+            <div id="photosContainer" class="p-4">
+                <!-- Photos will be populated here -->
+                <div class="text-center text-slate-400 py-8">
+                    <i class="fas fa-images text-4xl mb-2"></i>
+                    <p class="text-sm">No photos captured</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- 11. SIGNATURE SECTION -->
+        <section class="bg-white mb-4">
+            <div class="section-header flex items-center gap-2 bg-slate-700">
+                <i class="fas fa-signature"></i>
+                <span>Certification & Signature</span>
+            </div>
+            <div class="p-4 space-y-4">
+                <p class="text-xs text-slate-600">
+                    I certify that the information contained in this daily report is accurate and complete to the best of my knowledge.
+                </p>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Inspector Name</label>
+                        <input type="text" id="signatureName" class="editable-field w-full px-3 py-2 text-sm" placeholder="Full name">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Title</label>
+                        <input type="text" id="signatureTitle" class="editable-field w-full px-3 py-2 text-sm" placeholder="e.g., Project Inspector">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Company</label>
+                        <input type="text" id="signatureCompany" class="editable-field w-full px-3 py-2 text-sm" placeholder="Company name">
+                    </div>
+                </div>
+                <div class="border-t-2 border-slate-300 pt-4 mt-4">
+                    <div class="flex items-end gap-4">
+                        <div class="flex-1">
+                            <div class="border-b-2 border-slate-400 h-12"></div>
+                            <p class="text-xs text-slate-500 mt-1">Signature</p>
+                        </div>
+                        <div class="w-32">
+                            <div class="border-b-2 border-slate-400 h-12 flex items-end justify-center pb-1">
+                                <span id="signatureDate" class="text-sm"></span>
+                            </div>
+                            <p class="text-xs text-slate-500 mt-1">Date</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Save Indicator -->
+    <div id="saveIndicator" class="save-indicator">
+        <i class="fas fa-check mr-1"></i> Saved
     </div>
 
     <!-- Submit Confirmation Modal -->
-    <div id="submit-modal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4 print-hidden">
-        <div class="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
-            <div class="flex items-center gap-3 mb-4">
-                <div class="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center">
-                    <i class="fas fa-cloud-upload-alt text-orange-600 text-xl"></i>
+    <div id="submitModal" class="fixed inset-0 bg-black/80 z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-md">
+            <div class="bg-safety-green text-white p-4 text-center">
+                <i class="fas fa-cloud-upload-alt text-3xl mb-2"></i>
+                <p class="font-bold uppercase">Submit Report</p>
+            </div>
+            <div class="p-4">
+                <p class="text-sm text-slate-600 mb-4">
+                    Are you sure you want to submit this report? This will archive it as a completed report.
+                </p>
+                <div class="space-y-2">
+                    <button onclick="confirmSubmit()" class="w-full p-3 bg-safety-green hover:bg-green-700 text-white font-bold uppercase transition-colors">
+                        Submit Report
+                    </button>
+                    <button onclick="hideSubmitModal()" class="w-full p-3 bg-slate-100 hover:bg-slate-200 text-slate-600 font-medium transition-colors">
+                        Cancel
+                    </button>
                 </div>
-                <div>
-                    <h3 class="font-bold text-lg text-slate-800">Submit Report</h3>
-                    <p class="text-sm text-slate-500">This action cannot be undone</p>
-                </div>
-            </div>
-            <p class="text-slate-600 mb-6">Are you sure you want to submit this report? This will save it to the project database.</p>
-            <div class="flex gap-3 justify-end">
-                <button onclick="hideSubmitConfirmation()" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg font-bold text-sm hover:bg-slate-200 transition-colors">
-                    Cancel
-                </button>
-                <button id="confirm-submit-btn" onclick="submitReport()" class="px-4 py-2 bg-orange-600 text-white rounded-lg font-bold text-sm shadow-md hover:bg-orange-700 transition-colors">
-                    <i class="fas fa-cloud-upload-alt mr-1"></i> Submit Report
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Toast notification container -->
-    <div id="toast-container" class="fixed bottom-4 right-4 z-50 print-hidden"></div>
-
-    <div class="max-w-4xl mx-auto p-4 sm:p-8 print:p-0 print:max-w-none">
-
-        <!-- PAGE 1: OVERVIEW & WORK SUMMARY -->
-        <div id="page1" class="report-page bg-white border-4 border-slate-900 p-1 mb-8 print:mb-0 print:border-2">
-            <!-- Header -->
-            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-2 border-b-2 border-slate-900 pb-2 mb-4 px-2">
-                <div class="flex items-center gap-2 sm:gap-4">
-                    <div class="w-10 h-10 sm:w-14 sm:h-14 bg-slate-200 flex items-center justify-center text-[7px] sm:text-[8px] font-bold rounded flex-shrink-0">LOGO</div>
-                    <div>
-                        <h1 class="text-base sm:text-xl font-black uppercase tracking-tighter">RPR Daily Report</h1>
-                        <p class="text-[9px] sm:text-[10px] text-slate-500 font-bold uppercase">Resident Project Representative</p>
-                    </div>
-                </div>
-                <div class="text-[10px] sm:text-xs font-bold text-left sm:text-right">
-                    <div id="reportDate" class="text-slate-600"></div>
-                    <div>Page 1 of <span id="totalPages">2</span></div>
-                </div>
-            </div>
-
-            <!-- Project Overview Section -->
-            <div class="bg-emerald-900 text-white text-center font-bold py-1 uppercase text-sm mb-2 mx-1">
-                Project Overview
-            </div>
-            <div id="overviewGrid" class="grid grid-cols-1 sm:grid-cols-2 gap-0 border border-slate-900 text-[10px] mx-1 mb-4 overflow-hidden">
-                <!-- Filled by JS -->
-            </div>
-
-            <!-- Daily Work Summary Section -->
-            <div class="bg-emerald-900 text-white text-center font-bold py-1 uppercase text-sm mb-2 mx-1">
-                Daily Work Summary
-            </div>
-            <div id="workSummary" class="text-[10px] px-3 py-2 space-y-4 min-h-[350px]">
-                <!-- Filled by JS -->
-            </div>
-        </div>
-
-        <!-- PAGE 2: ISSUES, QA/QC, SAFETY -->
-        <div id="page2" class="report-page bg-white border-4 border-slate-900 p-1 mb-8 print:mb-0 print:border-2 page-break">
-            <!-- Header -->
-            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-2 border-b-2 border-slate-900 pb-2 mb-4 px-2">
-                <div class="flex items-center gap-2 sm:gap-4">
-                    <div class="w-10 h-10 sm:w-14 sm:h-14 bg-slate-200 flex items-center justify-center text-[7px] sm:text-[8px] font-bold rounded flex-shrink-0">LOGO</div>
-                    <h1 class="text-base sm:text-xl font-black uppercase tracking-tighter">RPR Daily Report</h1>
-                </div>
-                <div class="text-[10px] sm:text-xs font-bold">Page 2 of <span class="totalPages">2</span></div>
-            </div>
-
-            <!-- Issues & Delays -->
-            <div class="bg-emerald-900 text-white text-center font-bold py-1 uppercase text-sm mb-2 mx-1">
-                Issues, Delays & RFIs
-            </div>
-            <div id="issuesSection" class="text-[10px] px-3 py-2 mb-4 min-h-[80px] border border-slate-200 mx-1 rounded">
-                <!-- Filled by JS -->
-            </div>
-
-            <!-- Communications & Visitors -->
-            <div class="bg-emerald-900 text-white text-center font-bold py-1 uppercase text-sm mb-2 mx-1">
-                Communications & Visitors
-            </div>
-            <div id="visitorsSection" class="text-[10px] px-3 py-2 mb-4 min-h-[60px] border border-slate-200 mx-1 rounded">
-                <!-- Filled by JS -->
-            </div>
-
-            <!-- QA/QC Inspections -->
-            <div class="bg-emerald-900 text-white text-center font-bold py-1 uppercase text-sm mb-2 mx-1">
-                QA/QC Testing & Inspections
-            </div>
-            <div id="qaqcSection" class="text-[10px] px-3 py-2 mb-4 min-h-[80px] border border-slate-200 mx-1 rounded">
-                <!-- Filled by JS -->
-            </div>
-
-            <!-- Safety & Incidents -->
-            <div class="bg-emerald-900 text-white text-center font-bold py-1 uppercase text-sm mb-2 mx-1">
-                Safety & Incidents
-            </div>
-            <div id="safetySection" class="text-[10px] px-3 py-2 min-h-[80px] border border-slate-200 mx-1 rounded mb-4">
-                <!-- Filled by JS -->
-            </div>
-
-            <!-- Additional Notes (conditional) -->
-            <div id="notesWrapper" class="hidden">
-                <div class="bg-slate-600 text-white text-center font-bold py-1 uppercase text-sm mb-2 mx-1">
-                    Additional Notes & Comments
-                </div>
-                <div id="notesSection" class="text-[10px] px-3 py-2 min-h-[60px] border border-slate-200 mx-1 rounded">
-                    <!-- Filled by JS -->
-                </div>
-            </div>
-
-            <!-- Signature Block -->
-            <div class="mt-8 mx-1 border-t-2 border-slate-900 pt-4">
-                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
-                    <div class="text-[9px] text-slate-500 font-bold uppercase">
-                        Report prepared by Resident Project Representative
-                    </div>
-                    <div class="text-right w-full sm:w-auto">
-                        <div id="signatureLine" class="border-b border-slate-900 w-full sm:w-56 mb-1 h-8 flex items-end justify-center">
-                            <span class="italic font-serif text-lg text-slate-700"></span>
-                        </div>
-                        <div class="text-[8px] font-bold text-slate-500 uppercase">RPR Signature / Date</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- PAGE 3: PHOTOS (conditional) -->
-        <div id="page3" class="report-page bg-white border-4 border-slate-900 p-1 mb-8 print:mb-0 print:border-2 page-break hidden">
-            <!-- Header -->
-            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-2 border-b-2 border-slate-900 pb-2 mb-4 px-2">
-                <div class="flex items-center gap-2 sm:gap-4">
-                    <div class="w-10 h-10 sm:w-14 sm:h-14 bg-slate-200 flex items-center justify-center text-[7px] sm:text-[8px] font-bold rounded flex-shrink-0">LOGO</div>
-                    <h1 class="text-base sm:text-xl font-black uppercase tracking-tighter">RPR Daily Report</h1>
-                </div>
-                <div class="text-[10px] sm:text-xs font-bold">Page 3 of <span class="totalPages">3</span></div>
-            </div>
-
-            <!-- Photos Section -->
-            <div class="bg-emerald-900 text-white text-center font-bold py-1 uppercase text-sm mb-4 mx-1">
-                Daily Progress Photos
-            </div>
-            <div id="photosGrid" class="grid grid-cols-1 sm:grid-cols-2 gap-4 px-3">
-                <!-- Filled by JS -->
             </div>
         </div>
     </div>
 
     <script>
-        // ============ CONFIGURATION ============
-        const N8N_SUBMIT_WEBHOOK = "https://advidere.app.n8n.cloud/webhook/fieldvoice-submit";
-
-        // ============ STATE MANAGEMENT ============
-        let isReadonlyMode = false;
+        // ============ STATE ============
+        let report = null;
         let activeProject = null;
+        let projectContractors = [];
+        let userEdits = {}; // Track user edits separately
+        let saveTimeout = null;
+        let isReadonly = false;
 
-        // ============ PROJECT LOADING ============
         const PROJECTS_KEY = 'fvp_projects';
         const ACTIVE_PROJECT_KEY = 'fvp_active_project';
 
-        function getProjects() {
-            const saved = localStorage.getItem(PROJECTS_KEY);
-            if (saved) {
-                try { return JSON.parse(saved); } catch (e) { return []; }
-            }
-            return [];
-        }
+        // ============ INITIALIZATION ============
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Load project first
+            loadActiveProject();
 
+            // Load report data
+            report = loadReport();
+
+            // Initialize user edits tracking
+            if (!report.userEdits) report.userEdits = {};
+            userEdits = report.userEdits;
+
+            // Populate all fields
+            populateAllFields();
+
+            // Setup auto-save listeners
+            setupAutoSave();
+
+            // Initialize auto-expand textareas
+            initAutoExpandTextareas();
+
+            // Update header date
+            updateHeaderDate();
+        });
+
+        // ============ PROJECT LOADING ============
         function loadActiveProject() {
             const activeId = localStorage.getItem(ACTIVE_PROJECT_KEY);
             if (!activeId) {
                 activeProject = null;
-                return null;
+                projectContractors = [];
+                return;
             }
-            const projects = getProjects();
-            activeProject = projects.find(p => p.id === activeId) || null;
-            return activeProject;
+
+            const projectsJson = localStorage.getItem(PROJECTS_KEY);
+            if (!projectsJson) {
+                activeProject = null;
+                projectContractors = [];
+                return;
+            }
+
+            try {
+                const projects = JSON.parse(projectsJson);
+                activeProject = projects.find(p => p.id === activeId) || null;
+                if (activeProject && activeProject.contractors) {
+                    projectContractors = [...activeProject.contractors].sort((a, b) => {
+                        if (a.type === 'prime' && b.type !== 'prime') return -1;
+                        if (a.type !== 'prime' && b.type === 'prime') return 1;
+                        return 0;
+                    });
+                } else {
+                    projectContractors = [];
+                }
+            } catch (e) {
+                console.error('Failed to load project:', e);
+                activeProject = null;
+                projectContractors = [];
+            }
         }
 
-        /**
-         * Generate a report storage key
-         * @param {string|null} projectId - Project ID (null for legacy fallback)
-         * @param {string|null} dateStr - Date string YYYY-MM-DD (null for today)
-         * @returns {string} Storage key
-         */
-        function buildReportKey(projectId, dateStr) {
-            const date = dateStr || new Date().toISOString().split('T')[0];
-            return projectId
-                ? `fieldvoice_report_${projectId}_${date}`
-                : `fieldvoice_report_${date}`; // fallback for legacy
-        }
-
+        // ============ REPORT LOADING ============
         function getReportKey() {
             const params = new URLSearchParams(window.location.search);
-
-            // Support 'date' param (YYYY-MM-DD format) for archives
             const dateParam = params.get('date');
-            if (dateParam) {
-                // First check for project-specific key
-                if (activeProject) {
-                    const projectKey = buildReportKey(activeProject.id, dateParam);
-                    if (localStorage.getItem(projectKey)) {
-                        return projectKey;
-                    }
-                    // Check for submitted project-specific reports
-                    const submittedProjectPattern = new RegExp(`^fieldvoice_report_${activeProject.id}_${dateParam}_submitted_\\d+$`);
-                    for (let i = 0; i < localStorage.length; i++) {
-                        const key = localStorage.key(i);
-                        if (submittedProjectPattern.test(key)) {
-                            return key;
-                        }
-                    }
-                }
+            const todayStr = dateParam || new Date().toISOString().split('T')[0];
 
-                // Fallback to legacy key (date-only)
-                const baseKey = buildReportKey(null, dateParam);
-                if (localStorage.getItem(baseKey)) {
-                    return baseKey;
-                }
-
-                // Also check for archived submitted reports (key pattern: fieldvoice_report_YYYY-MM-DD_submitted_timestamp)
-                const submittedKeyPattern = new RegExp(`^fieldvoice_report_${dateParam}_submitted_\\d+$`);
-                for (let i = 0; i < localStorage.length; i++) {
-                    const key = localStorage.key(i);
-                    if (submittedKeyPattern.test(key)) {
-                        return key;
-                    }
-                }
-
-                // Return project-specific key if we have a project, otherwise legacy
-                return activeProject ? buildReportKey(activeProject.id, dateParam) : baseKey;
+            if (activeProject) {
+                return `fieldvoice_report_${activeProject.id}_${todayStr}`;
             }
-
-            // Fall back to 'key' param or today's key
-            return params.get('key') || getTodayKey();
+            return `fieldvoice_report_${todayStr}`;
         }
 
-        function getTodayKey() {
-            return buildReportKey(activeProject?.id, null);
-        }
-
-        function checkReadonlyMode() {
-            const params = new URLSearchParams(window.location.search);
-            isReadonlyMode = params.get('readonly') === 'true';
-
-            if (isReadonlyMode) {
-                // Hide submit button
-                const submitBtn = document.getElementById('submit-report-btn');
-                if (submitBtn) submitBtn.classList.add('hidden');
-
-                // Hide standard navigation, show archives navigation
-                const navAiKit = document.getElementById('nav-ai-kit');
-                const navArchives = document.getElementById('nav-archives');
-                if (navAiKit) navAiKit.classList.add('hidden');
-                if (navArchives) navArchives.classList.remove('hidden');
-
-                // Show readonly badge
-                const readonlyBadge = document.getElementById('readonly-badge');
-                if (readonlyBadge) readonlyBadge.classList.remove('hidden');
-            }
-        }
-
-        function migrateReportFields(parsed) {
-            if (!parsed.meta) parsed.meta = {};
-            if (!parsed.meta.naMarked) parsed.meta.naMarked = {};
-            if (!parsed.safety) parsed.safety = { hasIncidents: false, noIncidents: false, notes: [] };
-            if (!parsed.refinedData) parsed.refinedData = {};
-            return parsed;
-        }
-
-        function getReport() {
+        function loadReport() {
             const key = getReportKey();
+            let saved = localStorage.getItem(key);
 
-            // Try specific key first
-            const saved = localStorage.getItem(key);
+            // Try project-specific key first
             if (saved) {
                 try {
-                    return migrateReportFields(JSON.parse(saved));
+                    return JSON.parse(saved);
                 } catch (e) {}
             }
 
-            // Fallback to legacy key
-            const legacy = localStorage.getItem('fieldvoice_report');
-            if (legacy) {
+            // Try legacy key
+            const todayStr = new Date().toISOString().split('T')[0];
+            const legacyKey = `fieldvoice_report_${todayStr}`;
+            saved = localStorage.getItem(legacyKey);
+            if (saved) {
                 try {
-                    return migrateReportFields(JSON.parse(legacy));
+                    return JSON.parse(saved);
                 } catch (e) {}
             }
 
-            return getInitialReport();
+            // Try very old legacy key
+            saved = localStorage.getItem('fieldvoice_report');
+            if (saved) {
+                try {
+                    return JSON.parse(saved);
+                } catch (e) {}
+            }
+
+            // Return fresh report
+            return createFreshReport();
         }
 
-        function getInitialReport() {
+        function createFreshReport() {
             return {
-                reporter: {
-                    name: ""
-                },
-                project: {
-                    name: "",
-                    dayNumber: null
+                meta: {
+                    createdAt: new Date().toISOString(),
+                    version: 3
                 },
                 overview: {
-                    projectName: "",
-                    noabProjectNo: "",
-                    cnoSolicitationNo: "",
-                    noticeToProceed: "",
-                    contractDuration: "",
-                    expectedCompletion: "",
-                    contractDayNo: "",
-                    weatherDays: "0 days",
+                    projectName: activeProject?.name || '',
+                    projectNumber: activeProject?.projectNumber || '',
+                    location: activeProject?.location || '',
                     date: new Date().toLocaleDateString(),
-                    location: "",
-                    engineer: "",
-                    contractor: "",
-                    startTime: "",
-                    endTime: "",
-                    shiftDuration: "",
-                    completedBy: "",
+                    contractDay: '',
+                    completedBy: '',
                     weather: {
-                        highTemp: "--",
-                        lowTemp: "--",
-                        precipitation: "0.00\"",
-                        generalCondition: "--",
-                        jobSiteCondition: "Dry",
-                        adverseConditions: "N/A",
-                    },
+                        highTemp: '',
+                        lowTemp: '',
+                        precipitation: '',
+                        generalCondition: '',
+                        jobSiteCondition: '',
+                        adverseConditions: ''
+                    }
                 },
-                contractors: [],
                 activities: [],
                 operations: [],
                 equipment: [],
-                generalIssues: [],
-                communications: [],
-                qaqcNotes: [],
-                safety: { hasIncidents: false, notes: [] },
-                visitorsRemarks: [],
-                photos: [],
-                additionalNotes: "",
-            };
-        }
-
-        // ============ RENDER REPORT ============
-        function renderReport() {
-            const report = getReport();
-            const o = report.overview;
-            const w = o.weather || {};
-
-            // Get reporter and project info (new fields with fallback to overview for legacy)
-            const reporterName = report.reporter?.name || o.completedBy || '';
-            const projectName = report.project?.name || o.projectName || '';
-            const projectDay = report.project?.dayNumber ? `Day ${report.project.dayNumber}` : o.contractDayNo || '';
-
-            // Update document title
-            document.title = `Daily Report - ${o.date} - FieldVoice Pro`;
-            document.getElementById('reportDate').textContent = o.date;
-
-            // Page 1: Overview Grid
-            document.getElementById('overviewGrid').innerHTML = `
-                <div class="sm:border-r border-b border-slate-900 p-2">
-                    <span class="font-black text-slate-600">PROJECT NAME:</span><br>
-                    <span class="font-bold break-words">${projectName || '--'}</span>
-                </div>
-                <div class="border-b border-slate-900 p-2">
-                    <span class="font-black text-slate-600">DATE:</span><br>
-                    <span class="font-bold">${o.date}</span>
-                </div>
-
-                <div class="sm:border-r border-b border-slate-900 p-2">
-                    <span class="font-black text-slate-600">CONTRACT DAY:</span><br>
-                    <span class="font-bold">${projectDay || '--'}</span>
-                </div>
-                <div class="border-b border-slate-900 p-2">
-                    <span class="font-black text-slate-600">LOCATION:</span><br>
-                    <span class="font-bold break-words">${o.location || '--'}</span>
-                </div>
-
-                <div class="sm:border-r border-b border-slate-900 p-2">
-                    <span class="font-black text-slate-600">PROJECT NO:</span><br>
-                    <span class="font-bold">${o.noabProjectNo || '--'}</span>
-                </div>
-                <div class="border-b border-slate-900 p-2">
-                    <span class="font-black text-slate-600">PRIME CONTRACTOR:</span><br>
-                    <span class="font-bold break-words">${o.contractor || '--'}</span>
-                </div>
-
-                <div class="sm:border-r border-b border-slate-900 p-2">
-                    <span class="font-black text-slate-600">SHIFT HOURS:</span><br>
-                    <span class="font-bold">${o.startTime || '--'} - ${o.endTime || '--'} (${o.shiftDuration || '--'})</span>
-                </div>
-                <div class="border-b border-slate-900 p-2">
-                    <span class="font-black text-slate-600">ENGINEER:</span><br>
-                    <span class="font-bold break-words">${o.engineer || '--'}</span>
-                </div>
-
-                <div class="sm:border-r border-b sm:border-b-0 border-slate-900 p-2">
-                    <span class="font-black text-slate-600">WEATHER CONDITIONS:</span><br>
-                    <div class="grid grid-cols-2 gap-1 mt-1">
-                        <span>High: <strong>${w.highTemp || '--'}</strong></span>
-                        <span>Low: <strong>${w.lowTemp || '--'}</strong></span>
-                        <span>Precip: <strong>${w.precipitation || '--'}</strong></span>
-                        <span>Condition: <strong>${w.generalCondition || '--'}</strong></span>
-                    </div>
-                    <div class="mt-1">
-                        <span>Site Condition: <strong class="${w.jobSiteCondition === 'Wet' ? 'text-blue-600' : 'text-emerald-600'}">${w.jobSiteCondition || 'Dry'}</strong></span>
-                    </div>
-                </div>
-                <div class="p-2 flex flex-col justify-between">
-                    <div>
-                        <span class="font-black text-slate-600">COMPLETED BY:</span>
-                    </div>
-                    <div class="text-right mt-2">
-                        <div class="border-b border-slate-900 w-full mb-1 pb-1 text-center italic font-serif text-base break-words">${reporterName || '--'}</div>
-                        <div class="text-[8px] font-black text-slate-500 uppercase">RPR Name & Title</div>
-                    </div>
-                </div>
-            `;
-
-            // Page 1: Work Summary - check for refined data first
-            const workSummary = document.getElementById('workSummary');
-            const refinedActivities = report.refinedData?.activities;
-
-            if (refinedActivities) {
-                // Use refined text if available
-                workSummary.innerHTML = `
-                    <p class="font-bold text-slate-700 mb-3">Construction Activities Performed and Observed on this Date:</p>
-                    <div class="mb-4 pb-3">
-                        <p class="text-slate-700 leading-relaxed">${refinedActivities.replace(/\n/g, '<br>')}</p>
-                    </div>
-                `;
-            } else if (report.activities.length === 0) {
-                workSummary.innerHTML = `
-                    <p class="font-bold text-slate-700 mb-2">Construction Activities Performed and Observed on this Date:</p>
-                    <p class="italic text-slate-400">No work summary recorded for today.</p>
-                `;
-            } else {
-                workSummary.innerHTML = `
-                    <p class="font-bold text-slate-700 mb-3">Construction Activities Performed and Observed on this Date:</p>
-                    ${report.activities.map(act => `
-                        <div class="mb-4 pb-3 border-b border-slate-100 last:border-0">
-                            <p class="font-black uppercase text-emerald-800 mb-1">${act.contractor} – ${act.trade || 'GENERAL CONTRACTOR'}</p>
-                            <p class="text-slate-700 leading-relaxed">${act.narrative || 'Work performed - details not recorded.'}</p>
-                            ${act.equipmentSummary ? `<p class="mt-1"><span class="font-bold text-slate-600">EQUIPMENT:</span> ${act.equipmentSummary}</p>` : ''}
-                            ${act.crewSummary ? `<p class="mt-1"><span class="font-bold text-slate-600">CREW:</span> ${act.crewSummary}</p>` : ''}
-                        </div>
-                    `).join('')}
-                `;
-            }
-
-            // Page 2: Issues - check for refined data first
-            const issuesSection = document.getElementById('issuesSection');
-            const refinedIssues = report.refinedData?.issues;
-            const naMarked = report.meta?.naMarked || {};
-
-            if (naMarked.issues) {
-                issuesSection.innerHTML = '<p class="italic text-slate-400">N/A - No issues reported.</p>';
-            } else if (refinedIssues) {
-                issuesSection.innerHTML = `<p class="text-slate-700">${refinedIssues.replace(/\n/g, '<br>')}</p>`;
-            } else if (report.generalIssues.length > 0) {
-                issuesSection.innerHTML = `<ul class="list-disc list-inside space-y-1">${report.generalIssues.map(issue => `<li>${issue}</li>`).join('')}</ul>`;
-            } else {
-                issuesSection.innerHTML = '<p class="italic text-slate-400">No issues, delays, or RFIs reported.</p>';
-            }
-
-            // Page 2: Visitors - check for refined data first
-            const visitorsSection = document.getElementById('visitorsSection');
-            const refinedVisitors = report.refinedData?.visitors;
-
-            if (naMarked.visitors) {
-                visitorsSection.innerHTML = '<p class="italic text-slate-400">N/A - No visitors.</p>';
-            } else if (refinedVisitors) {
-                visitorsSection.innerHTML = `<p class="text-slate-700">${refinedVisitors.replace(/\n/g, '<br>')}</p>`;
-            } else {
-                const visitorsContent = [
-                    ...(report.visitorsRemarks || []),
-                    ...(report.communications || [])
-                ];
-                visitorsSection.innerHTML = visitorsContent.length > 0
-                    ? `<ul class="list-disc list-inside space-y-1">${visitorsContent.map(v => `<li>${v}</li>`).join('')}</ul>`
-                    : '<p class="italic text-slate-400">No visitors or significant communications recorded.</p>';
-            }
-
-            // Page 2: QA/QC - check for refined data first
-            const qaqcSection = document.getElementById('qaqcSection');
-            const refinedInspections = report.refinedData?.inspections;
-
-            if (naMarked.inspections) {
-                qaqcSection.innerHTML = '<p class="italic text-slate-400">N/A - No inspections.</p>';
-            } else if (refinedInspections) {
-                qaqcSection.innerHTML = `<p class="text-slate-700">${refinedInspections.replace(/\n/g, '<br>')}</p>`;
-            } else if (report.qaqcNotes.length > 0) {
-                qaqcSection.innerHTML = `<ul class="list-disc list-inside space-y-1">${report.qaqcNotes.map(note => `<li>${note}</li>`).join('')}</ul>`;
-            } else {
-                qaqcSection.innerHTML = '<p class="italic text-slate-400">No QA/QC inspections or testing recorded.</p>';
-            }
-
-            // Page 2: Safety - check for refined data first
-            const safetySection = document.getElementById('safetySection');
-            const refinedSafety = report.refinedData?.safety;
-            const safety = report.safety || { hasIncidents: false, notes: [] };
-
-            safetySection.innerHTML = `
-                <div class="flex items-center gap-2 mb-2">
-                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase ${safety.hasIncidents ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}">
-                        <i class="fas ${safety.hasIncidents ? 'fa-exclamation-triangle' : 'fa-check-circle'}"></i>
-                        ${safety.hasIncidents ? 'Incidents Reported' : 'No Incidents'}
-                    </span>
-                </div>
-                ${refinedSafety
-                    ? `<p class="text-slate-700">${refinedSafety.replace(/\n/g, '<br>')}</p>`
-                    : (safety.notes && safety.notes.length > 0
-                        ? `<ul class="list-disc list-inside space-y-1">${safety.notes.map(note => `<li>${note}</li>`).join('')}</ul>`
-                        : '<p class="italic text-slate-400">No additional safety notes.</p>'
-                    )
-                }
-            `;
-
-            // Page 2: Additional Notes (conditional) - check for refined data first
-            const notesWrapper = document.getElementById('notesWrapper');
-            const notesSection = document.getElementById('notesSection');
-            const refinedNotes = report.refinedData?.notes;
-            const originalNotes = report.additionalNotes || '';
-
-            if (refinedNotes || originalNotes) {
-                notesWrapper.classList.remove('hidden');
-                if (refinedNotes) {
-                    notesSection.innerHTML = `<p class="text-slate-700">${refinedNotes.replace(/\n/g, '<br>')}</p>`;
-                } else {
-                    notesSection.innerHTML = `<p class="text-slate-700">${originalNotes.replace(/\n/g, '<br>')}</p>`;
-                }
-            } else {
-                notesWrapper.classList.add('hidden');
-            }
-
-            // Signature line
-            document.getElementById('signatureLine').querySelector('span').textContent = reporterName;
-
-            // Page 3: Photos (conditional)
-            const page3 = document.getElementById('page3');
-            const photosGrid = document.getElementById('photosGrid');
-
-            if (report.photos && report.photos.length > 0) {
-                page3.classList.remove('hidden');
-                photosGrid.innerHTML = report.photos.map(p => `
-                    <div class="border border-slate-300 rounded overflow-hidden">
-                        <img src="${p.url}" class="w-full h-40 object-cover" alt="${p.caption || 'Site photo'}">
-                        <div class="p-2 bg-slate-50 text-[9px]">
-                            <div class="flex justify-between items-start mb-1">
-                                <span class="font-bold text-slate-600">${p.date || '--'}</span>
-                                <span class="text-slate-400">${p.time || ''}</span>
-                            </div>
-                            ${p.caption
-                                ? `<p class="text-slate-600 italic text-[8px] leading-relaxed">${p.caption}</p>`
-                                : `<p class="text-slate-400 italic text-[8px]">No caption</p>`}
-                            ${p.gps ? `<p class="text-slate-400 mt-1 text-[8px]"><i class="fas fa-map-marker-alt mr-1"></i>${p.gps.lat.toFixed(5)}, ${p.gps.lng.toFixed(5)}</p>` : ''}
-                        </div>
-                    </div>
-                `).join('');
-
-                // Update page counts
-                document.getElementById('totalPages').textContent = '3';
-                document.querySelectorAll('.totalPages').forEach(el => el.textContent = '3');
-            } else {
-                page3.classList.add('hidden');
-                document.getElementById('totalPages').textContent = '2';
-                document.querySelectorAll('.totalPages').forEach(el => el.textContent = '2');
-            }
-        }
-
-        // ============ SUBMIT REPORT ============
-
-        // Show toast notification
-        function showToast(message, type = 'success') {
-            const container = document.getElementById('toast-container');
-            const toast = document.createElement('div');
-            const colors = {
-                success: 'bg-emerald-600',
-                error: 'bg-red-600',
-                warning: 'bg-orange-500',
-                info: 'bg-blue-600'
-            };
-            const icons = {
-                success: 'fa-check-circle',
-                error: 'fa-exclamation-circle',
-                warning: 'fa-exclamation-triangle',
-                info: 'fa-info-circle'
-            };
-            toast.className = `${colors[type]} text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 mb-2 animate-fade-in`;
-            toast.innerHTML = `<i class="fas ${icons[type]}"></i><span class="font-bold text-sm">${message}</span>`;
-            container.appendChild(toast);
-            setTimeout(() => {
-                toast.classList.add('opacity-0', 'transition-opacity');
-                setTimeout(() => toast.remove(), 300);
-            }, 4000);
-        }
-
-        // Show confirmation modal
-        function showSubmitConfirmation() {
-            const report = getReport();
-
-            // Check if already submitted
-            if (report.meta?.submitted) {
-                showToast('This report has already been submitted', 'warning');
-                return;
-            }
-
-            document.getElementById('submit-modal').classList.remove('hidden');
-        }
-
-        // Hide confirmation modal
-        function hideSubmitConfirmation() {
-            document.getElementById('submit-modal').classList.add('hidden');
-        }
-
-        // Gather all report data for submission
-        function gatherReportData() {
-            const report = getReport();
-            const o = report.overview || {};
-            const w = o.weather || {};
-            const safety = report.safety || { hasIncidents: false, notes: [] };
-            const naMarked = report.meta?.naMarked || {};
-
-            // Get refined or original text for each section
-            const getTextContent = (section, originalData) => {
-                if (naMarked[section]) return 'N/A';
-                return report.refinedData?.[section] || originalData || '';
-            };
-
-            // Prepare activities text
-            let workSummaryText = '';
-            if (report.refinedData?.activities) {
-                workSummaryText = report.refinedData.activities;
-            } else if (report.activities?.length > 0) {
-                workSummaryText = report.activities.map(a => a.narrative).join('\n\n');
-            }
-
-            // Prepare issues text
-            let issuesText = getTextContent('issues', report.generalIssues?.join('\n\n') || '');
-
-            // Prepare inspections text
-            let inspectionsText = getTextContent('inspections', report.qaqcNotes?.join('\n\n') || '');
-
-            // Prepare visitors text
-            let visitorsText = '';
-            if (naMarked.visitors) {
-                visitorsText = 'N/A';
-            } else if (report.refinedData?.visitors) {
-                visitorsText = report.refinedData.visitors;
-            } else {
-                const visitorsContent = [...(report.visitorsRemarks || []), ...(report.communications || [])];
-                visitorsText = visitorsContent.join('\n\n');
-            }
-
-            // Prepare safety text
-            let safetyNotes = '';
-            if (report.refinedData?.safety) {
-                safetyNotes = report.refinedData.safety;
-            } else if (safety.notes?.length > 0) {
-                safetyNotes = safety.notes.join('\n\n');
-            }
-
-            // Prepare additional notes
-            let additionalNotes = report.refinedData?.notes || report.additionalNotes || '';
-
-            // Prepare photos array with base64 data
-            const photos = (report.photos || []).map(p => ({
-                id: p.id || `photo_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-                base64: p.url || '',
-                timestamp: p.timestamp || null,
-                gps: p.gps || null,
-                caption: p.caption || ''
-            }));
-
-            return {
-                submittedAt: new Date().toISOString(),
-                reporter: {
-                    name: report.reporter?.name || o.completedBy || ''
-                },
-                project: {
-                    name: report.project?.name || o.projectName || '',
-                    dayNumber: report.project?.dayNumber || null
-                },
-                date: o.date || new Date().toLocaleDateString(),
-                startTime: o.startTime || '',
-                endTime: o.endTime || '',
-                shiftDuration: o.shiftDuration || '',
-                weather: {
-                    highTemp: w.highTemp || '',
-                    lowTemp: w.lowTemp || '',
-                    precipitation: w.precipitation || '',
-                    generalCondition: w.generalCondition || '',
-                    jobSiteCondition: w.jobSiteCondition || 'Dry'
-                },
-                workSummary: workSummaryText,
-                issues: issuesText,
-                inspections: inspectionsText,
+                issues: '',
+                qaqc: '',
                 safety: {
-                    hasIncidents: safety.hasIncidents || false,
-                    notes: safetyNotes
+                    hasIncident: false,
+                    notes: ''
                 },
-                visitors: visitorsText,
-                additionalNotes: additionalNotes,
-                photos: photos
+                communications: '',
+                visitors: '',
+                photos: [],
+                signature: {
+                    name: '',
+                    title: '',
+                    company: ''
+                },
+                // AI-generated content (populated by AI processing)
+                aiGenerated: null,
+                // User edits (tracked separately)
+                userEdits: {},
+                // Field notes from capture
+                fieldNotes: { freeformNotes: '' },
+                guidedNotes: { workSummary: '' }
             };
         }
 
-        // Submit report to webhook
-        async function submitReport() {
-            const submitBtn = document.getElementById('submit-report-btn');
-            const confirmBtn = document.getElementById('confirm-submit-btn');
-            const originalBtnHtml = submitBtn.innerHTML;
-            const originalConfirmHtml = confirmBtn.innerHTML;
-
-            // Check if offline first
-            if (!navigator.onLine) {
-                hideSubmitConfirmation();
-                showToast('You are offline - Please connect to the internet to submit your report', 'error');
-                return;
+        // ============ DATA MERGING ============
+        /**
+         * Get value with priority: userEdits > aiGenerated > fieldNotes > defaults
+         */
+        function getValue(path, defaultValue = '') {
+            // Check user edits first
+            if (userEdits[path] !== undefined) {
+                return userEdits[path];
             }
 
-            // Set loading state
-            submitBtn.disabled = true;
-            confirmBtn.disabled = true;
-            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Submitting...';
-            confirmBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Submitting...';
-            submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
-            confirmBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            // Check AI-generated content
+            if (report.aiGenerated) {
+                const aiValue = getNestedValue(report.aiGenerated, path);
+                if (aiValue !== undefined && aiValue !== null && aiValue !== '') {
+                    return aiValue;
+                }
+            }
 
+            // Check existing report data
+            const reportValue = getNestedValue(report, path);
+            if (reportValue !== undefined && reportValue !== null && reportValue !== '') {
+                return reportValue;
+            }
+
+            return defaultValue;
+        }
+
+        function getNestedValue(obj, path) {
+            return path.split('.').reduce((o, k) => (o || {})[k], obj);
+        }
+
+        function setNestedValue(obj, path, value) {
+            const keys = path.split('.');
+            const lastKey = keys.pop();
+            const target = keys.reduce((o, k) => {
+                if (!o[k]) o[k] = {};
+                return o[k];
+            }, obj);
+            target[lastKey] = value;
+        }
+
+        // ============ POPULATE FIELDS ============
+        function populateAllFields() {
+            // Project Overview
+            document.getElementById('projectName').value = getValue('overview.projectName', activeProject?.name || '');
+            document.getElementById('projectNumber').value = getValue('overview.projectNumber', activeProject?.projectNumber || '');
+            document.getElementById('projectLocation').value = getValue('overview.location', activeProject?.location || '');
+
+            // Date
+            const dateStr = getValue('overview.date', new Date().toLocaleDateString());
+            const dateInput = document.getElementById('reportDate');
             try {
-                const payload = gatherReportData();
+                const d = new Date(dateStr);
+                dateInput.value = d.toISOString().split('T')[0];
+            } catch (e) {
+                dateInput.value = new Date().toISOString().split('T')[0];
+            }
 
-                // Create abort controller for timeout
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout for photos
+            document.getElementById('contractDay').value = getValue('overview.contractDay', '');
+            document.getElementById('completedBy').value = getValue('overview.completedBy', '');
 
-                const response = await fetch(N8N_SUBMIT_WEBHOOK, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(payload),
-                    signal: controller.signal
-                });
+            // Weather
+            document.getElementById('weatherHigh').value = getValue('overview.weather.highTemp', '');
+            document.getElementById('weatherLow').value = getValue('overview.weather.lowTemp', '');
+            document.getElementById('weatherPrecip').value = getValue('overview.weather.precipitation', '');
+            document.getElementById('weatherCondition').value = getValue('overview.weather.generalCondition', '');
+            document.getElementById('weatherJobSite').value = getValue('overview.weather.jobSiteCondition', '');
+            document.getElementById('weatherAdverse').value = getValue('overview.weather.adverseConditions', '');
 
-                clearTimeout(timeoutId);
+            // Text sections
+            document.getElementById('issuesText').value = getValue('issues', '');
+            document.getElementById('qaqcText').value = getValue('qaqc', '');
+            document.getElementById('safetyText').value = getValue('safety.notes', '');
+            document.getElementById('communicationsText').value = getValue('communications', '');
+            document.getElementById('visitorsText').value = getValue('visitors', '');
 
-                if (!response.ok) {
-                    throw new Error(`Server error: ${response.status} ${response.statusText}`);
+            // Safety incident toggle
+            const hasIncident = getValue('safety.hasIncident', false);
+            document.getElementById('safetyNoIncident').checked = !hasIncident;
+            document.getElementById('safetyHasIncident').checked = hasIncident;
+
+            // Signature
+            document.getElementById('signatureName').value = getValue('signature.name', '');
+            document.getElementById('signatureTitle').value = getValue('signature.title', '');
+            document.getElementById('signatureCompany').value = getValue('signature.company', '');
+            document.getElementById('signatureDate').textContent = new Date().toLocaleDateString();
+
+            // Render dynamic sections
+            renderWorkSummary();
+            renderPersonnelTable();
+            renderEquipmentTable();
+            renderPhotos();
+
+            // Mark user-edited fields
+            markUserEditedFields();
+        }
+
+        function markUserEditedFields() {
+            Object.keys(userEdits).forEach(path => {
+                const fieldId = pathToFieldId(path);
+                const field = document.getElementById(fieldId);
+                if (field) {
+                    field.classList.add('user-edited');
                 }
-
-                // Mark report as submitted
-                const report = getReport();
-                if (!report.meta) report.meta = {};
-                report.meta.submitted = true;
-                report.meta.submittedAt = new Date().toISOString();
-
-                // Save updated report with project-specific key
-                const reportJson = JSON.stringify(report);
-                const key = getReportKey();
-                localStorage.setItem(key, reportJson);
-                localStorage.setItem('fieldvoice_report', reportJson);
-
-                // Update button to show success
-                submitBtn.innerHTML = '<i class="fas fa-check mr-1"></i> Submitted';
-                submitBtn.classList.remove('bg-orange-600', 'hover:bg-orange-700');
-                submitBtn.classList.add('bg-emerald-600', 'cursor-default');
-                submitBtn.disabled = true;
-
-                hideSubmitConfirmation();
-                showToast('Report submitted successfully!', 'success');
-
-            } catch (error) {
-                console.error('Submit error:', error);
-
-                // Restore button state
-                submitBtn.disabled = false;
-                confirmBtn.disabled = false;
-                submitBtn.innerHTML = originalBtnHtml;
-                confirmBtn.innerHTML = originalConfirmHtml;
-                submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-                confirmBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-
-                let errorMessage = 'Failed to submit report';
-                if (error.name === 'AbortError') {
-                    errorMessage = 'Request timed out - please try again';
-                } else if (error.message.includes('fetch')) {
-                    errorMessage = 'Network error - check your connection';
-                } else if (error.message.includes('Server error')) {
-                    errorMessage = error.message;
-                }
-
-                hideSubmitConfirmation();
-                showToast(errorMessage, 'error');
-            }
-        }
-
-        // Check if report was already submitted and update button
-        function checkSubmittedStatus() {
-            const report = getReport();
-            if (report.meta?.submitted) {
-                const submitBtn = document.getElementById('submit-report-btn');
-                submitBtn.innerHTML = '<i class="fas fa-check mr-1"></i> Submitted';
-                submitBtn.classList.remove('bg-orange-600', 'hover:bg-orange-700');
-                submitBtn.classList.add('bg-emerald-600', 'cursor-default');
-                submitBtn.disabled = true;
-            }
-        }
-
-        // ============ MARK REPORT AS VIEWED ============
-        function markReportAsViewed() {
-            const report = getReport();
-            if (report && !report.meta?.reportViewed) {
-                if (!report.meta) report.meta = {};
-                report.meta.reportViewed = true;
-                const reportJson = JSON.stringify(report);
-                const key = getReportKey();
-                localStorage.setItem(key, reportJson);
-                localStorage.setItem('fieldvoice_report', reportJson);
-            }
-        }
-
-        // ============ INIT ============
-        document.addEventListener('DOMContentLoaded', () => {
-            // Load active project first (needed for project-specific report keys)
-            loadActiveProject();
-
-            checkReadonlyMode();
-            renderReport();
-            checkSubmittedStatus();
-            // Only mark as viewed if not in readonly mode (viewing from archives)
-            if (!isReadonlyMode) {
-                markReportAsViewed();
-            }
-        });
-    </script>
-
-    <!-- PWA Navigation Fix - Prevent Safari from breaking out of standalone mode -->
-    <script>
-        (function() {
-            // Only apply fix when running as installed PWA
-            if (window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches) {
-                document.addEventListener('click', function(e) {
-                    const link = e.target.closest('a');
-                    if (link && link.href && link.href.startsWith(window.location.origin)) {
-                        // Internal link - prevent default and use location.href
-                        e.preventDefault();
-                        window.location.href = link.href;
-                    }
-                }, true);
-            }
-        })();
-    </script>
-
-    <!-- PWA Service Worker Registration & Offline Banner -->
-    <div id="offline-banner" class="fixed top-0 left-0 right-0 bg-yellow-500 text-yellow-900 text-center py-2 px-4 font-bold text-sm z-[9999] transform -translate-y-full transition-transform duration-300 print-hidden" style="display: none;">
-        <i class="fas fa-wifi-slash mr-2"></i>You are offline - Some features may be unavailable
-    </div>
-    <script>
-        // Service Worker Registration
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./sw.js')
-                    .then(registration => {
-                        console.log('[PWA] Service Worker registered:', registration.scope);
-
-                        // Check for updates
-                        registration.addEventListener('updatefound', () => {
-                            const newWorker = registration.installing;
-                            newWorker.addEventListener('statechange', () => {
-                                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                                    console.log('[PWA] New version available');
-                                }
-                            });
-                        });
-                    })
-                    .catch(error => {
-                        console.error('[PWA] Service Worker registration failed:', error);
-                    });
             });
         }
 
-        // Offline/Online Event Handlers
-        const offlineBanner = document.getElementById('offline-banner');
+        function pathToFieldId(path) {
+            // Convert paths like 'overview.projectName' to 'projectName'
+            const mapping = {
+                'overview.projectName': 'projectName',
+                'overview.projectNumber': 'projectNumber',
+                'overview.location': 'projectLocation',
+                'overview.contractDay': 'contractDay',
+                'overview.completedBy': 'completedBy',
+                'overview.weather.highTemp': 'weatherHigh',
+                'overview.weather.lowTemp': 'weatherLow',
+                'overview.weather.precipitation': 'weatherPrecip',
+                'overview.weather.generalCondition': 'weatherCondition',
+                'overview.weather.jobSiteCondition': 'weatherJobSite',
+                'overview.weather.adverseConditions': 'weatherAdverse',
+                'issues': 'issuesText',
+                'qaqc': 'qaqcText',
+                'safety.notes': 'safetyText',
+                'communications': 'communicationsText',
+                'visitors': 'visitorsText',
+                'signature.name': 'signatureName',
+                'signature.title': 'signatureTitle',
+                'signature.company': 'signatureCompany'
+            };
+            return mapping[path] || path;
+        }
 
-        function showOfflineBanner() {
-            if (offlineBanner) {
-                offlineBanner.style.display = 'block';
-                setTimeout(() => {
-                    offlineBanner.style.transform = 'translateY(0)';
-                }, 10);
+        // ============ RENDER WORK SUMMARY ============
+        function renderWorkSummary() {
+            const container = document.getElementById('workSummaryContainer');
+
+            if (projectContractors.length === 0) {
+                // Show simplified work summary if no contractors defined
+                container.innerHTML = `
+                    <div class="bg-slate-50 border border-slate-200 p-4 rounded">
+                        <p class="text-xs font-bold text-slate-500 uppercase mb-2">Work Summary</p>
+                        <textarea id="generalWorkSummary" class="editable-field auto-expand w-full px-3 py-2 text-sm"
+                            placeholder="Describe all work performed today..."
+                            data-path="guidedNotes.workSummary">${getValue('guidedNotes.workSummary', '')}</textarea>
+                        <p class="text-xs text-slate-400 mt-1">No project contractors defined. Add contractors in Project Settings.</p>
+                    </div>
+                `;
+                initAutoExpandTextareas();
+                return;
+            }
+
+            // Render contractor cards
+            container.innerHTML = projectContractors.map((contractor, index) => {
+                const activity = getContractorActivity(contractor.id);
+                const noWork = activity?.noWork ?? true;
+                const narrative = activity?.narrative || '';
+                const equipment = activity?.equipmentUsed || '';
+                const crew = activity?.crew || '';
+
+                const typeLabel = contractor.type === 'prime' ? 'PRIME' : 'SUB';
+                const borderColor = contractor.type === 'prime' ? 'border-safety-green' : 'border-dot-blue';
+                const badgeBg = contractor.type === 'prime' ? 'bg-safety-green' : 'bg-dot-blue';
+
+                return `
+                    <div class="contractor-card rounded ${noWork && !narrative ? 'no-work' : 'has-content'}" data-contractor-id="${contractor.id}">
+                        <div class="p-4">
+                            <div class="flex items-center gap-3 mb-3">
+                                <span class="${badgeBg} text-white text-[10px] font-bold px-2 py-0.5 uppercase">${typeLabel}</span>
+                                <span class="font-bold text-slate-800">${escapeHtml(contractor.name)}</span>
+                                ${contractor.trades ? `<span class="text-xs text-slate-500">(${escapeHtml(contractor.trades)})</span>` : ''}
+                            </div>
+
+                            <label class="flex items-center gap-2 p-2 bg-slate-100 border border-slate-200 cursor-pointer mb-3">
+                                <input type="checkbox" class="w-4 h-4 no-work-checkbox"
+                                    data-contractor-id="${contractor.id}"
+                                    ${noWork ? 'checked' : ''}
+                                    onchange="toggleNoWork('${contractor.id}', this.checked)">
+                                <span class="text-sm text-slate-600">No work performed today</span>
+                            </label>
+
+                            <div class="work-fields ${noWork ? 'hidden' : ''}" data-contractor-id="${contractor.id}">
+                                <div class="mb-3">
+                                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Work Narrative</label>
+                                    <textarea class="editable-field auto-expand w-full px-3 py-2 text-sm contractor-narrative"
+                                        data-contractor-id="${contractor.id}"
+                                        placeholder="Describe work performed by ${contractor.name}...">${escapeHtml(narrative)}</textarea>
+                                </div>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <div>
+                                        <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Equipment Used</label>
+                                        <input type="text" class="editable-field w-full px-3 py-2 text-sm contractor-equipment"
+                                            data-contractor-id="${contractor.id}"
+                                            placeholder="e.g., Excavator (1), Dump Truck (2)"
+                                            value="${escapeHtml(equipment)}">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Crew</label>
+                                        <input type="text" class="editable-field w-full px-3 py-2 text-sm contractor-crew"
+                                            data-contractor-id="${contractor.id}"
+                                            placeholder="e.g., Foreman (1), Laborers (4)"
+                                            value="${escapeHtml(crew)}">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            initAutoExpandTextareas();
+            setupContractorListeners();
+        }
+
+        function getContractorActivity(contractorId) {
+            if (!report.activities) return null;
+            return report.activities.find(a => a.contractorId === contractorId);
+        }
+
+        function toggleNoWork(contractorId, isNoWork) {
+            const workFields = document.querySelector(`.work-fields[data-contractor-id="${contractorId}"]`);
+            const card = document.querySelector(`.contractor-card[data-contractor-id="${contractorId}"]`);
+
+            if (isNoWork) {
+                workFields.classList.add('hidden');
+                card.classList.add('no-work');
+                card.classList.remove('has-content');
+            } else {
+                workFields.classList.remove('hidden');
+                card.classList.remove('no-work');
+                card.classList.add('has-content');
+                // Focus narrative field
+                const narrative = workFields.querySelector('.contractor-narrative');
+                if (narrative) setTimeout(() => narrative.focus(), 100);
+            }
+
+            updateContractorActivity(contractorId);
+        }
+
+        function setupContractorListeners() {
+            // Narrative textareas
+            document.querySelectorAll('.contractor-narrative').forEach(el => {
+                el.addEventListener('blur', () => {
+                    updateContractorActivity(el.dataset.contractorId);
+                });
+            });
+
+            // Equipment inputs
+            document.querySelectorAll('.contractor-equipment').forEach(el => {
+                el.addEventListener('blur', () => {
+                    updateContractorActivity(el.dataset.contractorId);
+                });
+            });
+
+            // Crew inputs
+            document.querySelectorAll('.contractor-crew').forEach(el => {
+                el.addEventListener('blur', () => {
+                    updateContractorActivity(el.dataset.contractorId);
+                });
+            });
+        }
+
+        function updateContractorActivity(contractorId) {
+            if (!report.activities) report.activities = [];
+
+            const checkbox = document.querySelector(`.no-work-checkbox[data-contractor-id="${contractorId}"]`);
+            const narrative = document.querySelector(`.contractor-narrative[data-contractor-id="${contractorId}"]`);
+            const equipment = document.querySelector(`.contractor-equipment[data-contractor-id="${contractorId}"]`);
+            const crew = document.querySelector(`.contractor-crew[data-contractor-id="${contractorId}"]`);
+
+            let activity = report.activities.find(a => a.contractorId === contractorId);
+            if (!activity) {
+                activity = { contractorId };
+                report.activities.push(activity);
+            }
+
+            activity.noWork = checkbox?.checked ?? true;
+            activity.narrative = narrative?.value?.trim() || '';
+            activity.equipmentUsed = equipment?.value?.trim() || '';
+            activity.crew = crew?.value?.trim() || '';
+
+            scheduleSave();
+        }
+
+        // ============ RENDER PERSONNEL TABLE ============
+        function renderPersonnelTable() {
+            const tbody = document.getElementById('personnelTableBody');
+
+            if (projectContractors.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="9" class="text-center text-slate-400 py-4">
+                            No contractors defined. Add contractors in Project Settings.
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tbody.innerHTML = projectContractors.map(contractor => {
+                const ops = getContractorOperations(contractor.id);
+                return `
+                    <tr data-contractor-id="${contractor.id}">
+                        <td class="font-medium text-xs">${escapeHtml(contractor.abbreviation || contractor.name)}</td>
+                        <td class="text-xs">${escapeHtml(contractor.trades || '-')}</td>
+                        <td><input type="number" class="personnel-input" data-contractor-id="${contractor.id}" data-field="superintendents" value="${ops?.superintendents || ''}" min="0" placeholder="-"></td>
+                        <td><input type="number" class="personnel-input" data-contractor-id="${contractor.id}" data-field="foremen" value="${ops?.foremen || ''}" min="0" placeholder="-"></td>
+                        <td><input type="number" class="personnel-input" data-contractor-id="${contractor.id}" data-field="operators" value="${ops?.operators || ''}" min="0" placeholder="-"></td>
+                        <td><input type="number" class="personnel-input" data-contractor-id="${contractor.id}" data-field="laborers" value="${ops?.laborers || ''}" min="0" placeholder="-"></td>
+                        <td><input type="number" class="personnel-input" data-contractor-id="${contractor.id}" data-field="surveyors" value="${ops?.surveyors || ''}" min="0" placeholder="-"></td>
+                        <td><input type="number" class="personnel-input" data-contractor-id="${contractor.id}" data-field="others" value="${ops?.others || ''}" min="0" placeholder="-"></td>
+                        <td class="text-center font-bold row-total">0</td>
+                    </tr>
+                `;
+            }).join('');
+
+            // Setup listeners
+            document.querySelectorAll('.personnel-input').forEach(input => {
+                input.addEventListener('change', () => {
+                    updatePersonnelRow(input.dataset.contractorId);
+                    updatePersonnelTotals();
+                });
+            });
+
+            updatePersonnelTotals();
+        }
+
+        function getContractorOperations(contractorId) {
+            if (!report.operations) return null;
+            return report.operations.find(o => o.contractorId === contractorId);
+        }
+
+        function updatePersonnelRow(contractorId) {
+            if (!report.operations) report.operations = [];
+
+            let ops = report.operations.find(o => o.contractorId === contractorId);
+            if (!ops) {
+                ops = { contractorId };
+                report.operations.push(ops);
+            }
+
+            const row = document.querySelector(`tr[data-contractor-id="${contractorId}"]`);
+            const inputs = row.querySelectorAll('.personnel-input');
+
+            let rowTotal = 0;
+            inputs.forEach(input => {
+                const value = parseInt(input.value) || 0;
+                ops[input.dataset.field] = value || null;
+                rowTotal += value;
+            });
+
+            row.querySelector('.row-total').textContent = rowTotal || '-';
+            scheduleSave();
+        }
+
+        function updatePersonnelTotals() {
+            const fields = ['superintendents', 'foremen', 'operators', 'laborers', 'surveyors', 'others'];
+            const totals = { superintendents: 0, foremen: 0, operators: 0, laborers: 0, surveyors: 0, others: 0 };
+            let grandTotal = 0;
+
+            document.querySelectorAll('.personnel-input').forEach(input => {
+                const value = parseInt(input.value) || 0;
+                totals[input.dataset.field] += value;
+                grandTotal += value;
+            });
+
+            document.getElementById('totalSuper').textContent = totals.superintendents || '-';
+            document.getElementById('totalForeman').textContent = totals.foremen || '-';
+            document.getElementById('totalOperators').textContent = totals.operators || '-';
+            document.getElementById('totalLaborers').textContent = totals.laborers || '-';
+            document.getElementById('totalSurveyors').textContent = totals.surveyors || '-';
+            document.getElementById('totalOthers').textContent = totals.others || '-';
+            document.getElementById('totalAll').textContent = grandTotal || '-';
+        }
+
+        // ============ RENDER EQUIPMENT TABLE ============
+        function renderEquipmentTable() {
+            const tbody = document.getElementById('equipmentTableBody');
+
+            if (!report.equipment || report.equipment.length === 0) {
+                // Show empty state with one blank row
+                tbody.innerHTML = `
+                    <tr data-equipment-index="0">
+                        <td>
+                            <select class="equipment-contractor w-full text-xs p-1">
+                                <option value="">Select...</option>
+                                ${projectContractors.map(c => `<option value="${c.id}">${escapeHtml(c.abbreviation || c.name)}</option>`).join('')}
+                            </select>
+                        </td>
+                        <td><input type="text" class="equipment-type w-full text-xs" placeholder="e.g., CAT 320 Excavator"></td>
+                        <td><input type="number" class="equipment-qty w-full text-xs text-center" value="1" min="1"></td>
+                        <td>
+                            <select class="equipment-status w-full text-xs p-1">
+                                <option value="IDLE">IDLE</option>
+                                ${[1,2,3,4,5,6,7,8,9,10].map(h => `<option value="${h} hrs">${h} hrs utilized</option>`).join('')}
+                            </select>
+                        </td>
+                    </tr>
+                `;
+                setupEquipmentListeners();
+                return;
+            }
+
+            tbody.innerHTML = report.equipment.map((item, index) => `
+                <tr data-equipment-index="${index}">
+                    <td>
+                        <select class="equipment-contractor w-full text-xs p-1">
+                            <option value="">Select...</option>
+                            ${projectContractors.map(c => `<option value="${c.id}" ${item.contractorId === c.id ? 'selected' : ''}>${escapeHtml(c.abbreviation || c.name)}</option>`).join('')}
+                        </select>
+                    </td>
+                    <td><input type="text" class="equipment-type w-full text-xs" value="${escapeHtml(item.type || '')}" placeholder="e.g., CAT 320 Excavator"></td>
+                    <td><input type="number" class="equipment-qty w-full text-xs text-center" value="${item.qty || 1}" min="1"></td>
+                    <td>
+                        <select class="equipment-status w-full text-xs p-1">
+                            <option value="IDLE" ${item.status === 'IDLE' ? 'selected' : ''}>IDLE</option>
+                            ${[1,2,3,4,5,6,7,8,9,10].map(h => `<option value="${h} hrs" ${item.status === `${h} hrs` ? 'selected' : ''}>${h} hrs utilized</option>`).join('')}
+                        </select>
+                    </td>
+                </tr>
+            `).join('');
+
+            setupEquipmentListeners();
+        }
+
+        function setupEquipmentListeners() {
+            document.querySelectorAll('#equipmentTableBody tr').forEach(row => {
+                row.querySelectorAll('input, select').forEach(input => {
+                    input.addEventListener('change', () => updateEquipmentRow(row));
+                });
+            });
+        }
+
+        function updateEquipmentRow(row) {
+            const index = parseInt(row.dataset.equipmentIndex);
+            if (!report.equipment) report.equipment = [];
+
+            const item = {
+                contractorId: row.querySelector('.equipment-contractor').value,
+                type: row.querySelector('.equipment-type').value.trim(),
+                qty: parseInt(row.querySelector('.equipment-qty').value) || 1,
+                status: row.querySelector('.equipment-status').value
+            };
+
+            if (index < report.equipment.length) {
+                report.equipment[index] = item;
+            } else {
+                report.equipment.push(item);
+            }
+
+            scheduleSave();
+        }
+
+        function addEquipmentRow() {
+            const tbody = document.getElementById('equipmentTableBody');
+            const newIndex = tbody.querySelectorAll('tr').length;
+
+            const newRow = document.createElement('tr');
+            newRow.dataset.equipmentIndex = newIndex;
+            newRow.innerHTML = `
+                <td>
+                    <select class="equipment-contractor w-full text-xs p-1">
+                        <option value="">Select...</option>
+                        ${projectContractors.map(c => `<option value="${c.id}">${escapeHtml(c.abbreviation || c.name)}</option>`).join('')}
+                    </select>
+                </td>
+                <td><input type="text" class="equipment-type w-full text-xs" placeholder="e.g., CAT 320 Excavator"></td>
+                <td><input type="number" class="equipment-qty w-full text-xs text-center" value="1" min="1"></td>
+                <td>
+                    <select class="equipment-status w-full text-xs p-1">
+                        <option value="IDLE">IDLE</option>
+                        ${[1,2,3,4,5,6,7,8,9,10].map(h => `<option value="${h} hrs">${h} hrs utilized</option>`).join('')}
+                    </select>
+                </td>
+            `;
+
+            tbody.appendChild(newRow);
+
+            // Setup listeners for new row
+            newRow.querySelectorAll('input, select').forEach(input => {
+                input.addEventListener('change', () => updateEquipmentRow(newRow));
+            });
+
+            // Focus the type input
+            newRow.querySelector('.equipment-type').focus();
+        }
+
+        // ============ RENDER PHOTOS ============
+        function renderPhotos() {
+            const container = document.getElementById('photosContainer');
+            const photos = report.photos || [];
+
+            document.getElementById('photoCount').textContent = `${photos.length} photo${photos.length !== 1 ? 's' : ''}`;
+
+            if (photos.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center text-slate-400 py-8">
+                        <i class="fas fa-images text-4xl mb-2"></i>
+                        <p class="text-sm">No photos captured</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = photos.map((photo, index) => `
+                <div class="photo-item mb-6 border border-slate-200 rounded overflow-hidden">
+                    <img src="${photo.url}" alt="Progress photo ${index + 1}" class="w-full">
+                    <div class="p-3 bg-slate-50">
+                        <div class="flex items-center gap-2 text-xs text-slate-500 mb-2">
+                            <span><i class="fas fa-clock mr-1"></i>${photo.time || '--'}</span>
+                            ${photo.gps ? `<span><i class="fas fa-map-marker-alt mr-1"></i>${photo.gps.lat.toFixed(4)}, ${photo.gps.lng.toFixed(4)}</span>` : ''}
+                        </div>
+                        <textarea class="editable-field auto-expand w-full px-3 py-2 text-sm photo-caption"
+                            data-photo-index="${index}"
+                            placeholder="Add caption...">${escapeHtml(photo.caption || '')}</textarea>
+                    </div>
+                </div>
+            `).join('');
+
+            // Setup caption listeners
+            document.querySelectorAll('.photo-caption').forEach(textarea => {
+                textarea.addEventListener('blur', () => {
+                    const index = parseInt(textarea.dataset.photoIndex);
+                    if (report.photos[index]) {
+                        report.photos[index].caption = textarea.value.trim();
+                        scheduleSave();
+                    }
+                });
+            });
+
+            initAutoExpandTextareas();
+        }
+
+        // ============ AUTO-SAVE ============
+        function setupAutoSave() {
+            // Field mappings for auto-save
+            const fieldMappings = {
+                'projectName': 'overview.projectName',
+                'projectNumber': 'overview.projectNumber',
+                'projectLocation': 'overview.location',
+                'reportDate': 'overview.date',
+                'contractDay': 'overview.contractDay',
+                'completedBy': 'overview.completedBy',
+                'weatherHigh': 'overview.weather.highTemp',
+                'weatherLow': 'overview.weather.lowTemp',
+                'weatherPrecip': 'overview.weather.precipitation',
+                'weatherCondition': 'overview.weather.generalCondition',
+                'weatherJobSite': 'overview.weather.jobSiteCondition',
+                'weatherAdverse': 'overview.weather.adverseConditions',
+                'issuesText': 'issues',
+                'qaqcText': 'qaqc',
+                'safetyText': 'safety.notes',
+                'communicationsText': 'communications',
+                'visitorsText': 'visitors',
+                'signatureName': 'signature.name',
+                'signatureTitle': 'signature.title',
+                'signatureCompany': 'signature.company'
+            };
+
+            Object.entries(fieldMappings).forEach(([fieldId, path]) => {
+                const field = document.getElementById(fieldId);
+                if (!field) return;
+
+                field.addEventListener('blur', () => {
+                    const value = field.value;
+                    setNestedValue(report, path, value);
+                    userEdits[path] = value;
+                    report.userEdits = userEdits;
+                    field.classList.add('user-edited');
+                    scheduleSave();
+                });
+            });
+
+            // Safety incident toggle
+            document.querySelectorAll('input[name="safetyIncident"]').forEach(radio => {
+                radio.addEventListener('change', () => {
+                    const hasIncident = document.getElementById('safetyHasIncident').checked;
+                    report.safety = report.safety || {};
+                    report.safety.hasIncident = hasIncident;
+                    userEdits['safety.hasIncident'] = hasIncident;
+                    report.userEdits = userEdits;
+                    scheduleSave();
+                });
+            });
+
+            // General work summary (when no contractors)
+            const generalSummary = document.getElementById('generalWorkSummary');
+            if (generalSummary) {
+                generalSummary.addEventListener('blur', () => {
+                    setNestedValue(report, 'guidedNotes.workSummary', generalSummary.value);
+                    scheduleSave();
+                });
             }
         }
 
-        function hideOfflineBanner() {
-            if (offlineBanner) {
-                offlineBanner.style.transform = 'translateY(-100%)';
-                setTimeout(() => {
-                    offlineBanner.style.display = 'none';
-                }, 300);
+        function scheduleSave() {
+            if (saveTimeout) clearTimeout(saveTimeout);
+            saveTimeout = setTimeout(() => {
+                saveReport();
+            }, 500);
+        }
+
+        function saveReport() {
+            try {
+                const key = getReportKey();
+                report.meta = report.meta || {};
+                report.meta.lastSaved = new Date().toISOString();
+                localStorage.setItem(key, JSON.stringify(report));
+
+                // Also save to legacy key
+                localStorage.setItem('fieldvoice_report', JSON.stringify(report));
+
+                showSaveIndicator();
+            } catch (err) {
+                console.error('Failed to save report:', err);
+                if (err.name === 'QuotaExceededError') {
+                    alert('Storage full! Try removing some photos.');
+                }
             }
         }
 
-        window.addEventListener('online', hideOfflineBanner);
-        window.addEventListener('offline', showOfflineBanner);
+        function showSaveIndicator() {
+            const indicator = document.getElementById('saveIndicator');
+            indicator.classList.add('visible');
+            setTimeout(() => {
+                indicator.classList.remove('visible');
+            }, 2000);
+        }
 
-        // Check initial state
-        if (!navigator.onLine) {
-            showOfflineBanner();
+        // ============ AUTO-EXPAND TEXTAREAS ============
+        function initAutoExpandTextareas() {
+            document.querySelectorAll('.auto-expand').forEach(textarea => {
+                if (textarea.dataset.autoExpandInit) return;
+                textarea.dataset.autoExpandInit = 'true';
+
+                const resize = () => {
+                    textarea.style.height = 'auto';
+                    const newHeight = Math.max(72, Math.min(textarea.scrollHeight, 400));
+                    textarea.style.height = newHeight + 'px';
+                    textarea.classList.toggle('scrollable', textarea.scrollHeight > 400);
+                };
+
+                textarea.addEventListener('input', resize);
+                textarea.addEventListener('focus', resize);
+                textarea.addEventListener('blur', resize);
+                resize();
+            });
+        }
+
+        // ============ UI HELPERS ============
+        function updateHeaderDate() {
+            const dateStr = new Date().toLocaleDateString('en-US', {
+                weekday: 'short',
+                month: 'short',
+                day: 'numeric'
+            });
+            document.getElementById('headerDate').textContent = dateStr;
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        // ============ SUBMIT ============
+        function showSubmitModal() {
+            document.getElementById('submitModal').classList.remove('hidden');
+        }
+
+        function hideSubmitModal() {
+            document.getElementById('submitModal').classList.add('hidden');
+        }
+
+        function confirmSubmit() {
+            // Save final version
+            report.meta.submitted = true;
+            report.meta.submittedAt = new Date().toISOString();
+            saveReport();
+
+            // Archive the report
+            const key = getReportKey();
+            const timestamp = Date.now();
+            const archiveKey = `${key}_submitted_${timestamp}`;
+            localStorage.setItem(archiveKey, JSON.stringify(report));
+
+            hideSubmitModal();
+            alert('Report submitted successfully!');
+            window.location.href = 'index.html';
+        }
+
+        // ============ EXPORT ============
+        function exportPDF() {
+            // TODO: Implement PDF export
+            alert('PDF export coming soon!');
         }
     </script>
 </body>
