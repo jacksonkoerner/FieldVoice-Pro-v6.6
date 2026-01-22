@@ -266,6 +266,153 @@
         input[type="number"]::-webkit-outer-spin-button {
             opacity: 1;
         }
+        /* Debug Panel Styles */
+        .debug-panel {
+            background: #f8fafc;
+            border: 2px solid #94a3b8;
+            border-radius: 0.5rem;
+            margin-top: 1rem;
+        }
+        .debug-panel-header {
+            background: #64748b;
+            color: white;
+            padding: 0.75rem 1rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-radius: 0.375rem 0.375rem 0 0;
+        }
+        .debug-panel-header:hover {
+            background: #475569;
+        }
+        .debug-panel.collapsed .debug-panel-header {
+            border-radius: 0.375rem;
+        }
+        .debug-panel-content {
+            padding: 1rem;
+            display: none;
+        }
+        .debug-panel.expanded .debug-panel-content {
+            display: block;
+        }
+        .debug-section {
+            margin-bottom: 1rem;
+            border: 1px solid #e2e8f0;
+            border-radius: 0.375rem;
+            background: white;
+        }
+        .debug-section-header {
+            background: #f1f5f9;
+            padding: 0.5rem 0.75rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: #475569;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .debug-section-header:hover {
+            background: #e2e8f0;
+        }
+        .debug-section-content {
+            display: none;
+            padding: 0.75rem;
+            border-top: 1px solid #e2e8f0;
+        }
+        .debug-section.expanded .debug-section-content {
+            display: block;
+        }
+        .debug-json {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 0.75rem;
+            border-radius: 0.25rem;
+            font-size: 0.7rem;
+            font-family: 'Courier New', monospace;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-break: break-word;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .debug-issue {
+            padding: 0.5rem 0.75rem;
+            border-left: 3px solid;
+            margin-bottom: 0.5rem;
+            font-size: 0.75rem;
+            background: #fef9c3;
+        }
+        .debug-issue.schema { border-color: #f59e0b; }
+        .debug-issue.empty { border-color: #3b82f6; }
+        .debug-issue.type { border-color: #ef4444; }
+        .debug-issue.contractor { border-color: #8b5cf6; }
+        .debug-issue-type {
+            font-weight: 700;
+            text-transform: uppercase;
+            font-size: 0.65rem;
+            margin-bottom: 0.25rem;
+        }
+        .debug-buttons {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+        .debug-btn {
+            padding: 0.5rem 1rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            border: none;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .debug-btn-json {
+            background: #1e3a5f;
+            color: white;
+        }
+        .debug-btn-json:hover {
+            background: #0f2942;
+        }
+        .debug-btn-md {
+            background: #64748b;
+            color: white;
+        }
+        .debug-btn-md:hover {
+            background: #475569;
+        }
+        /* Debug Banner */
+        .debug-banner {
+            background: #fef3c7;
+            border-bottom: 1px solid #f59e0b;
+            padding: 0.5rem 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+        }
+        .debug-banner:hover {
+            background: #fde68a;
+        }
+        .debug-banner-text {
+            color: #92400e;
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+        .debug-banner-dismiss {
+            color: #92400e;
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 0.25rem;
+            font-size: 1rem;
+        }
+        .debug-banner-dismiss:hover {
+            color: #78350f;
+        }
     </style>
 </head>
 <body class="bg-slate-100 min-h-screen">
@@ -321,6 +468,19 @@
             </div>
             <button id="retryRefine" onclick="retryRefineProcessing()" class="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white text-xs font-bold uppercase transition-colors">
                 Retry Now
+            </button>
+        </div>
+    </div>
+
+    <!-- DEBUG ISSUE BANNER -->
+    <div id="debugIssueBanner" class="hidden max-w-4xl mx-auto">
+        <div class="debug-banner" onclick="scrollToDebugPanel()">
+            <span class="debug-banner-text">
+                <i class="fas fa-exclamation-triangle mr-2"></i>
+                Field mapping issues detected — see Debug Tool below
+            </span>
+            <button class="debug-banner-dismiss" onclick="dismissDebugBanner(event)" title="Dismiss">
+                <i class="fas fa-times"></i>
             </button>
         </div>
     </div>
@@ -733,6 +893,83 @@
             </div>
         </section>
 
+        <!-- 12. DEBUG TOOL PANEL -->
+        <section id="debugPanel" class="debug-panel collapsed mx-4 mb-4">
+            <div class="debug-panel-header" onclick="toggleDebugPanel()">
+                <span class="font-bold text-sm">
+                    <i class="fas fa-tools mr-2"></i>Debug Tool
+                </span>
+                <i id="debugPanelChevron" class="fas fa-chevron-down"></i>
+            </div>
+            <div class="debug-panel-content">
+                <!-- AI Response Data Section -->
+                <div id="debugSectionAI" class="debug-section">
+                    <div class="debug-section-header" onclick="toggleDebugSection('AI')">
+                        <span>AI Response Data</span>
+                        <i class="fas fa-chevron-down debug-chevron"></i>
+                    </div>
+                    <div class="debug-section-content">
+                        <pre id="debugAIContent" class="debug-json">No AI response data</pre>
+                    </div>
+                </div>
+
+                <!-- Field Notes Section -->
+                <div id="debugSectionFieldNotes" class="debug-section">
+                    <div class="debug-section-header" onclick="toggleDebugSection('FieldNotes')">
+                        <span>Field Notes (Raw Capture)</span>
+                        <i class="fas fa-chevron-down debug-chevron"></i>
+                    </div>
+                    <div class="debug-section-content">
+                        <pre id="debugFieldNotesContent" class="debug-json">No field notes data</pre>
+                    </div>
+                </div>
+
+                <!-- User Edits Section -->
+                <div id="debugSectionUserEdits" class="debug-section">
+                    <div class="debug-section-header" onclick="toggleDebugSection('UserEdits')">
+                        <span>User Edits</span>
+                        <i class="fas fa-chevron-down debug-chevron"></i>
+                    </div>
+                    <div class="debug-section-content">
+                        <pre id="debugUserEditsContent" class="debug-json">No user edits</pre>
+                    </div>
+                </div>
+
+                <!-- Current Report State Section -->
+                <div id="debugSectionCurrentState" class="debug-section">
+                    <div class="debug-section-header" onclick="toggleDebugSection('CurrentState')">
+                        <span>Current Report State</span>
+                        <i class="fas fa-chevron-down debug-chevron"></i>
+                    </div>
+                    <div class="debug-section-content">
+                        <pre id="debugCurrentStateContent" class="debug-json">No current state data</pre>
+                    </div>
+                </div>
+
+                <!-- Field Mapping Issues Section -->
+                <div id="debugSectionIssues" class="debug-section">
+                    <div class="debug-section-header" onclick="toggleDebugSection('Issues')">
+                        <span>Field Mapping Issues</span>
+                        <span id="debugIssueCount" class="ml-2 px-2 py-0.5 bg-yellow-500 text-white text-xs rounded-full">0</span>
+                        <i class="fas fa-chevron-down debug-chevron ml-auto"></i>
+                    </div>
+                    <div class="debug-section-content">
+                        <div id="debugIssuesContent">No issues detected</div>
+                    </div>
+                </div>
+
+                <!-- Download Buttons -->
+                <div class="debug-buttons">
+                    <button onclick="downloadDebugJSON()" class="debug-btn debug-btn-json">
+                        <i class="fas fa-download mr-1"></i> Download JSON
+                    </button>
+                    <button onclick="downloadDebugMarkdown()" class="debug-btn debug-btn-md">
+                        <i class="fas fa-file-alt mr-1"></i> Download Report
+                    </button>
+                </div>
+            </div>
+        </section>
+
         </div><!-- END formViewContent -->
 
     </main>
@@ -813,6 +1050,9 @@
 
             // Update header date
             updateHeaderDate();
+
+            // Initialize debug panel
+            initializeDebugPanel();
         });
 
         // ============ TAB SWITCHING ============
@@ -2171,6 +2411,448 @@
             hideSubmitModal();
             alert('Report submitted successfully!');
             window.location.href = 'index.html';
+        }
+
+        // ============ DEBUG TOOL ============
+        let fieldMappingIssues = [];
+        let debugBannerDismissed = false;
+
+        /**
+         * Detect field mapping mismatches between AI response and expected structure
+         * Returns array of issue objects: { type: 'schema'|'empty'|'type'|'contractor', field: string, message: string }
+         */
+        function detectFieldMismatches() {
+            const issues = [];
+            const ai = report.aiGenerated;
+
+            if (!ai) {
+                return issues; // No AI data to check
+            }
+
+            // Expected top-level keys in aiGenerated
+            const expectedTopLevelKeys = [
+                'activities', 'generalIssues', 'qaqcNotes', 'safety',
+                'contractorCommunications', 'visitorsRemarks', 'operations', 'equipment'
+            ];
+
+            // a) Schema mismatches - check for unexpected top-level keys
+            Object.keys(ai).forEach(key => {
+                if (!expectedTopLevelKeys.includes(key)) {
+                    issues.push({
+                        type: 'schema',
+                        field: `aiGenerated.${key}`,
+                        message: `Unexpected top-level key "${key}" in AI response`
+                    });
+                }
+            });
+
+            // Check activities structure
+            if (ai.activities && Array.isArray(ai.activities)) {
+                ai.activities.forEach((activity, index) => {
+                    const expectedActivityKeys = ['contractorId', 'narrative', 'noWork', 'equipmentUsed', 'crew'];
+                    Object.keys(activity).forEach(key => {
+                        if (!expectedActivityKeys.includes(key)) {
+                            issues.push({
+                                type: 'schema',
+                                field: `aiGenerated.activities[${index}].${key}`,
+                                message: `Unexpected key "${key}" in activity at index ${index}`
+                            });
+                        }
+                    });
+                });
+            }
+
+            // Check safety structure
+            if (ai.safety && typeof ai.safety === 'object') {
+                const expectedSafetyKeys = ['notes', 'hasIncident', 'noIncidents'];
+                Object.keys(ai.safety).forEach(key => {
+                    if (!expectedSafetyKeys.includes(key)) {
+                        issues.push({
+                            type: 'schema',
+                            field: `aiGenerated.safety.${key}`,
+                            message: `Unexpected key "${key}" in safety section`
+                        });
+                    }
+                });
+            }
+
+            // Check operations structure
+            if (ai.operations && Array.isArray(ai.operations)) {
+                ai.operations.forEach((op, index) => {
+                    const expectedOpKeys = ['contractorId', 'superintendents', 'foremen', 'operators', 'laborers', 'surveyors', 'others'];
+                    Object.keys(op).forEach(key => {
+                        if (!expectedOpKeys.includes(key)) {
+                            issues.push({
+                                type: 'schema',
+                                field: `aiGenerated.operations[${index}].${key}`,
+                                message: `Unexpected key "${key}" in operations at index ${index}`
+                            });
+                        }
+                    });
+                });
+            }
+
+            // b) Empty responses - AI returned null/empty when fieldNotes had content
+            const fieldNotes = report.fieldNotes || {};
+            const guidedNotes = report.guidedNotes || {};
+
+            // Check if AI generalIssues is empty but guidedNotes.issues has content
+            if (guidedNotes.issues && guidedNotes.issues.trim()) {
+                const aiIssues = ai.generalIssues;
+                if (!aiIssues || (Array.isArray(aiIssues) && aiIssues.length === 0) || aiIssues === '') {
+                    issues.push({
+                        type: 'empty',
+                        field: 'aiGenerated.generalIssues',
+                        message: 'AI returned empty generalIssues but guidedNotes.issues has content'
+                    });
+                }
+            }
+
+            // Check if AI safety.notes is empty but guidedNotes.safety has content
+            if (guidedNotes.safety && guidedNotes.safety.trim()) {
+                const aiSafetyNotes = ai.safety?.notes;
+                if (!aiSafetyNotes || (Array.isArray(aiSafetyNotes) && aiSafetyNotes.length === 0) || aiSafetyNotes === '') {
+                    issues.push({
+                        type: 'empty',
+                        field: 'aiGenerated.safety.notes',
+                        message: 'AI returned empty safety.notes but guidedNotes.safety has content'
+                    });
+                }
+            }
+
+            // Check if AI activities is empty but guidedNotes.workSummary has content
+            if (guidedNotes.workSummary && guidedNotes.workSummary.trim()) {
+                const aiActivities = ai.activities;
+                if (!aiActivities || (Array.isArray(aiActivities) && aiActivities.length === 0)) {
+                    issues.push({
+                        type: 'empty',
+                        field: 'aiGenerated.activities',
+                        message: 'AI returned empty activities but guidedNotes.workSummary has content'
+                    });
+                }
+            }
+
+            // c) Type mismatches - expected array but got string or vice versa
+            const arrayFields = ['generalIssues', 'qaqcNotes', 'activities', 'operations', 'equipment'];
+            arrayFields.forEach(fieldName => {
+                const value = ai[fieldName];
+                if (value !== undefined && value !== null) {
+                    if (typeof value === 'string' && value.trim() !== '') {
+                        issues.push({
+                            type: 'type',
+                            field: `aiGenerated.${fieldName}`,
+                            message: `Expected array for "${fieldName}" but got string`
+                        });
+                    }
+                }
+            });
+
+            // Check safety.notes - should be array or string
+            if (ai.safety?.notes !== undefined && ai.safety?.notes !== null) {
+                // This is acceptable as either array or string, but flag if it's something else
+                const notesType = typeof ai.safety.notes;
+                if (notesType !== 'string' && !Array.isArray(ai.safety.notes)) {
+                    issues.push({
+                        type: 'type',
+                        field: 'aiGenerated.safety.notes',
+                        message: `Expected array or string for "safety.notes" but got ${notesType}`
+                    });
+                }
+            }
+
+            // d) ContractorId mismatches - AI contractorId doesn't match any project contractor
+            const validContractorIds = projectContractors.map(c => c.id);
+
+            if (ai.activities && Array.isArray(ai.activities)) {
+                ai.activities.forEach((activity, index) => {
+                    if (activity.contractorId && !validContractorIds.includes(activity.contractorId)) {
+                        issues.push({
+                            type: 'contractor',
+                            field: `aiGenerated.activities[${index}].contractorId`,
+                            message: `ContractorId "${activity.contractorId}" doesn't match any project contractor`
+                        });
+                    }
+                });
+            }
+
+            if (ai.operations && Array.isArray(ai.operations)) {
+                ai.operations.forEach((op, index) => {
+                    if (op.contractorId && !validContractorIds.includes(op.contractorId)) {
+                        issues.push({
+                            type: 'contractor',
+                            field: `aiGenerated.operations[${index}].contractorId`,
+                            message: `ContractorId "${op.contractorId}" doesn't match any project contractor`
+                        });
+                    }
+                });
+            }
+
+            if (ai.equipment && Array.isArray(ai.equipment)) {
+                ai.equipment.forEach((equip, index) => {
+                    if (equip.contractorId && !validContractorIds.includes(equip.contractorId)) {
+                        issues.push({
+                            type: 'contractor',
+                            field: `aiGenerated.equipment[${index}].contractorId`,
+                            message: `ContractorId "${equip.contractorId}" doesn't match any project contractor`
+                        });
+                    }
+                });
+            }
+
+            return issues;
+        }
+
+        /**
+         * Initialize debug panel with current data
+         */
+        function initializeDebugPanel() {
+            // Detect issues
+            fieldMappingIssues = detectFieldMismatches();
+
+            // Update AI Response Data section
+            const aiContent = document.getElementById('debugAIContent');
+            if (report.aiGenerated) {
+                aiContent.textContent = JSON.stringify(report.aiGenerated, null, 2);
+            } else {
+                aiContent.textContent = 'No AI response data';
+            }
+
+            // Update Field Notes section
+            const fieldNotesContent = document.getElementById('debugFieldNotesContent');
+            const fieldNotesData = {
+                fieldNotes: report.fieldNotes || {},
+                guidedNotes: report.guidedNotes || {}
+            };
+            fieldNotesContent.textContent = JSON.stringify(fieldNotesData, null, 2);
+
+            // Update User Edits section
+            const userEditsContent = document.getElementById('debugUserEditsContent');
+            if (report.userEdits && Object.keys(report.userEdits).length > 0) {
+                userEditsContent.textContent = JSON.stringify(report.userEdits, null, 2);
+            } else {
+                userEditsContent.textContent = 'No user edits';
+            }
+
+            // Update Current State section
+            const currentStateContent = document.getElementById('debugCurrentStateContent');
+            const currentState = {
+                activities: report.activities || [],
+                operations: report.operations || [],
+                equipment: report.equipment || []
+            };
+            currentStateContent.textContent = JSON.stringify(currentState, null, 2);
+
+            // Update Issues section
+            updateDebugIssues();
+
+            // Show/hide banner based on issues
+            if (fieldMappingIssues.length > 0 && !debugBannerDismissed) {
+                document.getElementById('debugIssueBanner').classList.remove('hidden');
+            }
+        }
+
+        /**
+         * Update the debug issues display
+         */
+        function updateDebugIssues() {
+            const issuesContainer = document.getElementById('debugIssuesContent');
+            const issueCount = document.getElementById('debugIssueCount');
+
+            issueCount.textContent = fieldMappingIssues.length;
+
+            if (fieldMappingIssues.length === 0) {
+                issuesContainer.innerHTML = '<p class="text-sm text-green-600"><i class="fas fa-check-circle mr-1"></i>No issues detected</p>';
+                issueCount.classList.remove('bg-yellow-500');
+                issueCount.classList.add('bg-green-500');
+            } else {
+                issueCount.classList.remove('bg-green-500');
+                issueCount.classList.add('bg-yellow-500');
+                issuesContainer.innerHTML = fieldMappingIssues.map(issue => `
+                    <div class="debug-issue ${issue.type}">
+                        <div class="debug-issue-type">${escapeHtml(issue.type)}</div>
+                        <div class="font-medium text-slate-700">${escapeHtml(issue.field)}</div>
+                        <div class="text-slate-600">${escapeHtml(issue.message)}</div>
+                    </div>
+                `).join('');
+            }
+        }
+
+        /**
+         * Toggle debug panel expanded/collapsed
+         */
+        function toggleDebugPanel() {
+            const panel = document.getElementById('debugPanel');
+            const chevron = document.getElementById('debugPanelChevron');
+
+            panel.classList.toggle('collapsed');
+            panel.classList.toggle('expanded');
+
+            if (panel.classList.contains('expanded')) {
+                chevron.classList.remove('fa-chevron-down');
+                chevron.classList.add('fa-chevron-up');
+            } else {
+                chevron.classList.remove('fa-chevron-up');
+                chevron.classList.add('fa-chevron-down');
+            }
+        }
+
+        /**
+         * Toggle debug section expanded/collapsed
+         */
+        function toggleDebugSection(sectionName) {
+            const section = document.getElementById(`debugSection${sectionName}`);
+            const chevron = section.querySelector('.debug-chevron');
+
+            section.classList.toggle('expanded');
+
+            if (section.classList.contains('expanded')) {
+                chevron.classList.remove('fa-chevron-down');
+                chevron.classList.add('fa-chevron-up');
+            } else {
+                chevron.classList.remove('fa-chevron-up');
+                chevron.classList.add('fa-chevron-down');
+            }
+        }
+
+        /**
+         * Scroll to debug panel and expand it
+         */
+        function scrollToDebugPanel() {
+            const panel = document.getElementById('debugPanel');
+
+            // Expand the panel if collapsed
+            if (panel.classList.contains('collapsed')) {
+                toggleDebugPanel();
+            }
+
+            // Scroll to panel
+            panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        /**
+         * Dismiss the debug banner
+         */
+        function dismissDebugBanner(event) {
+            event.stopPropagation();
+            debugBannerDismissed = true;
+            document.getElementById('debugIssueBanner').classList.add('hidden');
+        }
+
+        /**
+         * Format timestamp for filenames
+         */
+        function formatDebugTimestamp() {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+            return `${year}-${month}-${day}-${hours}${minutes}${seconds}`;
+        }
+
+        /**
+         * Download debug data as JSON
+         */
+        function downloadDebugJSON() {
+            const debugData = {
+                exportedAt: new Date().toISOString(),
+                reportDate: report.overview?.date || '',
+                projectName: activeProject?.name || '',
+                aiGenerated: report.aiGenerated || null,
+                fieldNotes: report.fieldNotes || {},
+                guidedNotes: report.guidedNotes || {},
+                userEdits: report.userEdits || {},
+                currentState: {
+                    activities: report.activities || [],
+                    operations: report.operations || [],
+                    equipment: report.equipment || []
+                },
+                detectedIssues: fieldMappingIssues
+            };
+
+            const blob = new Blob([JSON.stringify(debugData, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const filename = `fieldvoice-debug-${formatDebugTimestamp()}.json`;
+
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        /**
+         * Download debug data as Markdown
+         */
+        function downloadDebugMarkdown() {
+            const timestamp = new Date().toISOString();
+            const reportDate = report.overview?.date || 'Unknown';
+            const projectName = activeProject?.name || 'Unknown';
+
+            let md = `# FieldVoice Debug Export\n\n`;
+            md += `**Exported:** ${timestamp}\n`;
+            md += `**Report Date:** ${reportDate}\n`;
+            md += `**Project:** ${projectName}\n\n`;
+
+            // Detected Issues
+            md += `## Detected Issues\n\n`;
+            if (fieldMappingIssues.length === 0) {
+                md += `No issues detected.\n\n`;
+            } else {
+                fieldMappingIssues.forEach((issue, index) => {
+                    md += `### Issue ${index + 1}: ${issue.type.toUpperCase()}\n`;
+                    md += `- **Field:** ${issue.field}\n`;
+                    md += `- **Message:** ${issue.message}\n\n`;
+                });
+            }
+
+            // AI Generated Data
+            md += `## AI Generated Data\n\n`;
+            if (report.aiGenerated) {
+                md += `\`\`\`json\n${JSON.stringify(report.aiGenerated, null, 2)}\n\`\`\`\n\n`;
+            } else {
+                md += `No AI response data.\n\n`;
+            }
+
+            // Raw Field Notes
+            md += `## Raw Field Notes\n\n`;
+            md += `### Field Notes\n`;
+            md += `\`\`\`json\n${JSON.stringify(report.fieldNotes || {}, null, 2)}\n\`\`\`\n\n`;
+            md += `### Guided Notes\n`;
+            md += `\`\`\`json\n${JSON.stringify(report.guidedNotes || {}, null, 2)}\n\`\`\`\n\n`;
+
+            // User Edits
+            md += `## User Edits\n\n`;
+            if (report.userEdits && Object.keys(report.userEdits).length > 0) {
+                md += `\`\`\`json\n${JSON.stringify(report.userEdits, null, 2)}\n\`\`\`\n\n`;
+            } else {
+                md += `No user edits.\n\n`;
+            }
+
+            // Current Report State
+            md += `## Current Report State\n\n`;
+            md += `### Activities\n`;
+            md += `\`\`\`json\n${JSON.stringify(report.activities || [], null, 2)}\n\`\`\`\n\n`;
+            md += `### Operations\n`;
+            md += `\`\`\`json\n${JSON.stringify(report.operations || [], null, 2)}\n\`\`\`\n\n`;
+            md += `### Equipment\n`;
+            md += `\`\`\`json\n${JSON.stringify(report.equipment || [], null, 2)}\n\`\`\`\n\n`;
+
+            const blob = new Blob([md], { type: 'text/markdown' });
+            const url = URL.createObjectURL(blob);
+            const filename = `fieldvoice-debug-${formatDebugTimestamp()}.md`;
+
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
         }
 
         // ============ EXPORT ============
