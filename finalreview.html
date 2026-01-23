@@ -106,8 +106,7 @@
         .page-container {
             max-width: 8.5in;
             margin: 20px auto;
-            background: white;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+            background: transparent;
             overflow-x: hidden;
         }
 
@@ -120,6 +119,12 @@
             position: relative;
             box-sizing: border-box;
             overflow-x: hidden;
+            margin-bottom: 50px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        .page:last-child {
+            margin-bottom: 0;
         }
 
         .page-break {
@@ -196,6 +201,8 @@
             min-width: 500px;
             border-collapse: collapse;
             font-size: 9pt;
+            border: 1px solid #000;
+            border-top: none;
         }
 
         .overview-table td {
@@ -286,6 +293,7 @@
         /* ============ OPERATIONS TABLE ============ */
         .ops-table {
             width: 100%;
+            min-width: 500px;
             border-collapse: collapse;
             font-size: 8pt;
             margin: 0;
@@ -319,6 +327,7 @@
         /* ============ EQUIPMENT TABLE ============ */
         .equip-table {
             width: 100%;
+            min-width: 500px;
             border-collapse: collapse;
             font-size: 8pt;
             margin: 0;
@@ -520,6 +529,7 @@
                 max-width: none;
                 margin: 0;
                 box-shadow: none;
+                background: white;
             }
 
             .page {
@@ -527,11 +537,17 @@
                 min-height: auto;
                 padding: 0.4in 0.5in;
                 margin: 0;
+                box-shadow: none;
+                border-radius: 0;
             }
 
             .page-break {
                 page-break-after: always;
                 break-after: page;
+            }
+
+            .overview-wrapper {
+                overflow: visible;
             }
 
             .section-header {
@@ -567,14 +583,14 @@
         /* ============ RESPONSIVE (screen only) ============ */
         @media screen and (max-width: 900px) {
             body {
-                background: white;
+                background: #e5e5e5;
             }
 
             .page-container {
                 margin: 0;
-                box-shadow: none;
                 max-width: 100%;
-                overflow-x: auto;
+                overflow-x: visible;
+                padding: 16px;
             }
 
             .page {
@@ -582,6 +598,9 @@
                 min-width: 360px;
                 padding: 12px;
                 min-height: auto;
+                margin-bottom: 30px;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+                border-radius: 4px;
             }
 
             .report-header {
@@ -612,6 +631,8 @@
 
             .overview-wrapper {
                 overflow-x: auto;
+                margin: 0 -12px;
+                padding: 0 12px;
             }
 
             .ops-table,
@@ -796,6 +817,7 @@
 
             <!-- Daily Operations Table -->
             <div class="section-header">Daily Operations</div>
+            <div class="overview-wrapper">
             <table class="ops-table">
                 <thead>
                     <tr>
@@ -813,9 +835,11 @@
                     <!-- Rows will be inserted here -->
                 </tbody>
             </table>
+            </div>
 
             <!-- Equipment Table -->
             <div class="section-header">Mobilized Equipment & Daily Utilization</div>
+            <div class="overview-wrapper">
             <table class="equip-table">
                 <thead>
                     <tr>
@@ -829,6 +853,7 @@
                     <!-- Rows will be inserted here -->
                 </tbody>
             </table>
+            </div>
 
             <!-- Issues Section -->
             <div class="section-header">General Issues; Unforeseen Conditions; Notices Given</div>
