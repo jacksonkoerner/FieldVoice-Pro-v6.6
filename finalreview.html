@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Final Review - DOT RPR Daily Report</title>
+    <title>RPR Daily Report - FieldVoice Pro</title>
 
     <!-- PWA Meta Tags -->
     <link rel="manifest" href="./manifest.json">
@@ -11,7 +11,7 @@
     <link rel="icon" type="image/png" sizes="32x32" href="./assets/favicon-32x32.png">
     <link rel="icon" type="image/png" sizes="16x16" href="./assets/favicon-16x16.png">
     <link rel="apple-touch-icon" sizes="180x180" href="./assets/apple-touch-icon.png">
-    <meta name="theme-color" content="#4a7c59">
+    <meta name="theme-color" content="#0a1628">
 
     <!-- iOS PWA Meta Tags -->
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -20,843 +20,861 @@
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
+        /* ============ BASE STYLES ============ */
         * {
-            box-sizing: border-box;
-        }
-        body {
-            font-family: Arial, Helvetica, sans-serif;
-            font-size: 11px;
-            line-height: 1.3;
             margin: 0;
             padding: 0;
-            background: #f5f5f5;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 10pt;
+            line-height: 1.3;
             color: #000;
-        }
-
-        /* Page container */
-        .page {
-            width: 8.5in;
-            min-height: 11in;
-            margin: 0 auto;
-            background: white;
-            padding: 0.4in;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-
-        /* Header area */
-        .report-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 12px;
-            padding-bottom: 8px;
-            border-bottom: 2px solid #4a7c59;
-        }
-        .header-logo {
-            width: 100px;
-            height: 100px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .header-logo img {
-            max-width: 100%;
-            max-height: 100%;
-            object-fit: contain;
-        }
-        .header-logo-placeholder {
-            width: 100px;
-            height: 100px;
-            border: 2px solid #4a7c59;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            text-align: center;
-            font-size: 8px;
-            font-weight: bold;
-            color: #4a7c59;
-            padding: 8px;
-        }
-        .header-title {
-            text-align: right;
-        }
-        .header-title h1 {
-            font-size: 28px;
-            font-weight: bold;
-            color: #4a7c59;
-            margin: 0;
-            letter-spacing: 1px;
-        }
-
-        /* Section headers */
-        .section-header {
-            background: #4a7c59;
-            color: white;
-            font-weight: bold;
-            text-transform: uppercase;
-            text-align: center;
-            padding: 6px 10px;
-            font-size: 11px;
-            letter-spacing: 0.5px;
-            margin: 0;
-        }
-        .section-header.red {
-            background: #b91c1c;
-        }
-        .section-header.blue {
-            background: #1e40af;
-        }
-        .section-header.purple {
-            background: #6b21a8;
-        }
-        .section-header.amber {
-            background: #d97706;
-        }
-        .section-header.navy {
-            background: #1e3a5f;
-        }
-
-        /* Form table styles */
-        .form-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 12px;
-        }
-        .form-table td,
-        .form-table th {
-            border: 1px solid #000;
-            padding: 4px 6px;
-            vertical-align: middle;
-        }
-        .form-table .label {
-            background: #e5e5e5;
-            font-weight: bold;
-            text-transform: uppercase;
-            font-size: 9px;
-            width: 18%;
-            white-space: nowrap;
-        }
-        .form-table .value {
-            background: white;
-            width: 32%;
-            font-size: 10px;
-        }
-        .form-table .weather-label {
-            background: #e5e5e5;
-            font-weight: bold;
-            text-transform: uppercase;
-            font-size: 9px;
-            vertical-align: top;
-            width: 12%;
-        }
-        .form-table .weather-data {
-            background: white;
-            font-size: 10px;
-            line-height: 1.5;
-        }
-        .form-table .signature-area {
-            background: white;
-            vertical-align: bottom;
-            text-align: center;
-        }
-        .signature-line {
-            border-bottom: 1px solid #000;
-            padding-bottom: 2px;
-            margin-bottom: 2px;
-            min-height: 20px;
-        }
-        .signature-name {
-            font-style: italic;
-            font-size: 10px;
-        }
-        .signature-note {
-            font-size: 8px;
-            color: #666;
-        }
-
-        /* Daily Work Summary styles */
-        .work-summary-intro {
-            font-weight: bold;
-            font-size: 10px;
-            margin: 8px 0;
-            text-decoration: underline;
-        }
-        .contractor-block {
-            margin-bottom: 12px;
-            page-break-inside: avoid;
-        }
-        .contractor-header {
-            font-weight: bold;
-            font-size: 11px;
-            margin-bottom: 4px;
-        }
-        .contractor-narrative {
-            margin-bottom: 4px;
-            font-size: 10px;
-            text-align: justify;
-        }
-        .contractor-details {
-            font-size: 10px;
-        }
-        .contractor-details strong {
-            font-weight: bold;
-        }
-
-        /* Data table styles */
-        .data-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 12px;
-            font-size: 10px;
-        }
-        .data-table th {
-            background: #e5e5e5;
-            border: 1px solid #000;
-            padding: 4px 6px;
-            font-weight: bold;
-            text-transform: uppercase;
-            font-size: 9px;
-            text-align: center;
-        }
-        .data-table td {
-            border: 1px solid #000;
-            padding: 4px 6px;
-            vertical-align: top;
-        }
-        .data-table .totals-row {
             background: #f0f0f0;
-            font-weight: bold;
-        }
-        .data-table .text-center {
-            text-align: center;
+            padding-top: env(safe-area-inset-top);
+            padding-bottom: env(safe-area-inset-bottom);
         }
 
-        /* Text section styles */
-        .text-section {
-            border: 1px solid #000;
-            margin-bottom: 12px;
-        }
-        .text-section-content {
-            padding: 8px;
-            min-height: 40px;
-            font-size: 10px;
-        }
-
-        /* Safety checkbox styles */
-        .safety-checkbox {
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-            margin-right: 16px;
-        }
-        .checkbox-box {
-            width: 14px;
-            height: 14px;
-            border: 1px solid #000;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: bold;
-            font-size: 10px;
-        }
-
-        /* Photo styles */
-        .photo-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
-        }
-        .photo-item {
-            border: 1px solid #000;
-            page-break-inside: avoid;
-        }
-        .photo-item-header {
-            background: #e5e5e5;
-            padding: 4px 8px;
-            font-weight: bold;
-            font-size: 9px;
-            text-transform: uppercase;
-            border-bottom: 1px solid #000;
-        }
-        .photo-item-image {
-            background: #f5f5f5;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            min-height: 150px;
-        }
-        .photo-item-image img {
-            max-width: 100%;
-            max-height: 200px;
-            object-fit: contain;
-        }
-        .photo-item-caption {
-            padding: 6px 8px;
-            font-size: 9px;
-            border-top: 1px solid #000;
-            background: white;
-        }
-        .photo-meta {
-            color: #666;
-            margin-bottom: 4px;
-        }
-
-        /* Signature block at end */
-        .signature-block {
-            margin-top: 20px;
-            border: 1px solid #000;
-        }
-        .signature-block-content {
-            padding: 12px;
-        }
-        .signature-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr 1fr;
-            gap: 20px;
-            margin-bottom: 16px;
-        }
-        .signature-field label {
-            font-size: 9px;
-            font-weight: bold;
-            text-transform: uppercase;
-            color: #666;
-            display: block;
-            margin-bottom: 2px;
-        }
-        .signature-field span {
-            font-size: 11px;
-        }
-        .final-signature {
-            display: flex;
-            align-items: flex-end;
-            gap: 20px;
-            margin-top: 16px;
-        }
-        .final-signature-line {
-            flex: 1;
-        }
-        .final-signature-line .line {
-            border-bottom: 1px solid #000;
-            height: 30px;
-        }
-        .final-signature-line .label {
-            font-size: 9px;
-            color: #666;
-            margin-top: 2px;
-        }
-        .final-signature-date {
-            width: 120px;
-        }
-        .final-signature-date .line {
-            border-bottom: 1px solid #000;
-            height: 30px;
-            display: flex;
-            align-items: flex-end;
-            justify-content: center;
-            padding-bottom: 2px;
-            font-size: 10px;
-        }
-        .final-signature-date .label {
-            font-size: 9px;
-            color: #666;
-            margin-top: 2px;
-            text-align: center;
-        }
-
-        /* Toolbar - no print */
-        .toolbar {
-            position: fixed;
+        /* ============ SCREEN-ONLY HEADER ============ */
+        .screen-header {
+            position: sticky;
             top: 0;
-            left: 0;
-            right: 0;
-            background: #1e3a5f;
+            z-index: 100;
+            background: #0a1628;
             color: white;
-            padding: 10px 20px;
+            padding: 12px 16px;
             display: flex;
+            align-items: center;
             justify-content: space-between;
-            align-items: center;
-            z-index: 1000;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
         }
-        .toolbar-left {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-        .toolbar-btn {
-            background: #334155;
-            color: white;
-            border: none;
-            padding: 8px 16px;
-            font-size: 12px;
+
+        .screen-header h1 {
+            font-size: 14px;
             font-weight: bold;
             text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .screen-header .header-date {
+            font-size: 11px;
+            color: #94a3b8;
+            margin-top: 2px;
+        }
+
+        .header-buttons {
+            display: flex;
+            gap: 8px;
+        }
+
+        .header-btn {
+            padding: 8px 16px;
+            font-size: 11px;
+            font-weight: bold;
+            text-transform: uppercase;
+            border: none;
             cursor: pointer;
             display: flex;
             align-items: center;
             gap: 6px;
             text-decoration: none;
+            transition: background 0.2s;
         }
-        .toolbar-btn:hover {
-            background: #475569;
+
+        .btn-home {
+            background: transparent;
+            color: #94a3b8;
+            border: 1px solid #475569;
         }
-        .toolbar-btn.primary {
-            background: #4a7c59;
+        .btn-home:hover { background: #1e293b; color: white; }
+
+        .btn-edit {
+            background: #1e3a5f;
+            color: white;
         }
-        .toolbar-btn.primary:hover {
-            background: #3d6b4a;
+        .btn-edit:hover { background: #2d4a6f; }
+
+        .btn-print {
+            background: #16a34a;
+            color: white;
         }
-        .toolbar-btn.danger {
-            background: #b91c1c;
+        .btn-print:hover { background: #15803d; }
+
+        /* ============ PAGE CONTAINER ============ */
+        .page-container {
+            max-width: 8.5in;
+            margin: 20px auto;
+            background: white;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.15);
         }
-        .toolbar-btn.danger:hover {
-            background: #991b1b;
+
+        .page {
+            width: 8.5in;
+            min-height: 11in;
+            padding: 0.4in 0.5in;
+            background: white;
+            position: relative;
         }
-        .toolbar-title {
-            font-size: 14px;
+
+        .page-break {
+            page-break-after: always;
+            break-after: page;
+        }
+
+        /* ============ REPORT HEADER ============ */
+        .report-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            padding-bottom: 8px;
+            border-bottom: 3px solid #4a7c34;
+        }
+
+        .report-logo {
+            max-height: 50px;
+            max-width: 200px;
+        }
+
+        .report-logo-placeholder {
+            font-size: 11px;
+            font-weight: bold;
+            color: #1e3a5f;
+            text-transform: uppercase;
+        }
+
+        .report-title {
+            font-size: 18pt;
+            font-weight: bold;
+            color: #4a7c34;
+            text-align: right;
+        }
+
+        /* ============ SECTION HEADERS ============ */
+        .section-header {
+            background: #4a7c34;
+            color: white;
+            font-weight: bold;
+            text-align: center;
+            padding: 6px 10px;
+            font-size: 10pt;
+            text-transform: uppercase;
+            margin-top: 12px;
+        }
+
+        .section-header:first-child {
+            margin-top: 0;
+        }
+
+        /* ============ PROJECT OVERVIEW TABLE ============ */
+        .overview-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 9pt;
+        }
+
+        .overview-table td {
+            border: 1px solid #000;
+            padding: 4px 8px;
+            vertical-align: top;
+        }
+
+        .overview-table .label {
+            font-weight: bold;
+            background: #f5f5f5;
+            width: 140px;
+            white-space: nowrap;
+        }
+
+        .overview-table .value {
+            min-width: 150px;
+        }
+
+        /* Weather sub-table */
+        .weather-row td {
+            padding: 2px 8px;
+        }
+
+        .weather-label {
+            font-weight: bold;
+            background: #f5f5f5;
+            width: 140px;
+        }
+
+        .weather-sub {
+            padding-left: 20px !important;
+            background: #fafafa;
+        }
+
+        /* Signature area */
+        .signature-cell {
+            text-align: center;
+            vertical-align: middle;
+            height: 60px;
+        }
+
+        .signature-name {
+            font-size: 16pt;
+            font-family: 'Brush Script MT', cursive, Arial;
+            color: #1e3a5f;
+        }
+
+        .signature-details {
+            font-size: 7pt;
+            color: #666;
+            margin-top: 4px;
+        }
+
+        /* ============ DAILY WORK SUMMARY ============ */
+        .work-summary {
+            border: 1px solid #000;
+            padding: 10px;
+            margin-top: 0;
+            font-size: 9pt;
+        }
+
+        .contractor-block {
+            margin-bottom: 12px;
+        }
+
+        .contractor-block:last-child {
+            margin-bottom: 0;
+        }
+
+        .contractor-name {
+            font-weight: bold;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+
+        .contractor-narrative {
+            margin-bottom: 6px;
+        }
+
+        .contractor-details {
+            font-size: 8pt;
+            text-transform: uppercase;
+        }
+
+        /* ============ OPERATIONS TABLE ============ */
+        .ops-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 8pt;
+            margin-top: 0;
+        }
+
+        .ops-table th {
+            background: #f5f5f5;
+            border: 1px solid #000;
+            padding: 4px 6px;
+            font-weight: bold;
+            text-align: center;
+            text-transform: uppercase;
+            font-size: 7pt;
+        }
+
+        .ops-table td {
+            border: 1px solid #000;
+            padding: 4px 6px;
+            text-align: center;
+        }
+
+        .ops-table td:first-child,
+        .ops-table td:nth-child(2) {
+            text-align: left;
+        }
+
+        /* ============ EQUIPMENT TABLE ============ */
+        .equip-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 8pt;
+            margin-top: 0;
+        }
+
+        .equip-table th {
+            background: #f5f5f5;
+            border: 1px solid #000;
+            padding: 4px 6px;
+            font-weight: bold;
+            text-align: center;
+            text-transform: uppercase;
+            font-size: 7pt;
+        }
+
+        .equip-table td {
+            border: 1px solid #000;
+            padding: 3px 6px;
+            text-align: center;
+        }
+
+        .equip-table td:first-child,
+        .equip-table td:nth-child(2) {
+            text-align: left;
+        }
+
+        /* ============ TEXT SECTIONS ============ */
+        .text-section {
+            border: 1px solid #000;
+            border-top: none;
+            padding: 8px 10px;
+            min-height: 40px;
+            font-size: 9pt;
+        }
+
+        .text-section ul {
+            margin: 0;
+            padding-left: 20px;
+        }
+
+        .text-section li {
+            margin-bottom: 4px;
+        }
+
+        .text-section p {
+            margin: 0;
+        }
+
+        .na-text {
+            color: #666;
+        }
+
+        /* ============ SAFETY SECTION ============ */
+        .safety-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .safety-checkboxes {
+            display: flex;
+            gap: 20px;
+            font-size: 9pt;
+        }
+
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .checkbox-box {
+            width: 12px;
+            height: 12px;
+            border: 1px solid #000;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
             font-weight: bold;
         }
-        .toolbar-date {
-            font-size: 11px;
-            color: #94a3b8;
+
+        .checkbox-box.checked {
+            background: #000;
+            color: white;
         }
 
-        /* Page content with toolbar offset */
-        .page-wrapper {
-            padding-top: 60px;
-            padding-bottom: 20px;
+        /* ============ PHOTOS SECTION ============ */
+        .photos-header-info {
+            border: 1px solid #000;
+            border-bottom: none;
+            padding: 6px 10px;
+            font-size: 9pt;
         }
 
-        /* Page break */
-        .page-break {
-            page-break-before: always;
+        .photos-header-info table {
+            width: auto;
         }
 
-        /* Print styles */
+        .photos-header-info td {
+            padding: 2px 10px 2px 0;
+        }
+
+        .photos-header-info .photo-label {
+            font-weight: bold;
+        }
+
+        .photos-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            border: 1px solid #000;
+            border-top: none;
+        }
+
+        .photo-cell {
+            border: 1px solid #ccc;
+            padding: 8px;
+            min-height: 280px;
+        }
+
+        .photo-cell:nth-child(odd) {
+            border-right: 1px solid #000;
+        }
+
+        .photo-cell:nth-child(1),
+        .photo-cell:nth-child(2) {
+            border-top: 1px solid #000;
+        }
+
+        .photo-image {
+            width: 100%;
+            height: 200px;
+            background: #f5f5f5;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 8px;
+            overflow: hidden;
+        }
+
+        .photo-image img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+
+        .photo-image.empty {
+            color: #999;
+            font-size: 9pt;
+        }
+
+        .photo-meta {
+            font-size: 8pt;
+            margin-bottom: 4px;
+        }
+
+        .photo-meta span {
+            font-weight: bold;
+        }
+
+        .photo-caption {
+            font-size: 8pt;
+            font-style: italic;
+            color: #333;
+        }
+
+        /* ============ PAGE FOOTER ============ */
+        .page-footer {
+            position: absolute;
+            bottom: 0.3in;
+            left: 0.5in;
+            right: 0.5in;
+            text-align: center;
+            font-size: 8pt;
+            color: #666;
+            border-top: 1px solid #ccc;
+            padding-top: 4px;
+        }
+
+        /* ============ PRINT STYLES ============ */
         @media print {
             body {
                 background: white;
+                padding: 0;
+                margin: 0;
             }
-            .no-print {
+
+            .screen-header {
                 display: none !important;
             }
-            .page-wrapper {
-                padding-top: 0;
-            }
-            .page {
-                width: 100%;
+
+            .page-container {
+                max-width: none;
                 margin: 0;
-                padding: 0.3in;
                 box-shadow: none;
             }
+
+            .page {
+                width: 100%;
+                min-height: auto;
+                padding: 0.4in 0.5in;
+                margin: 0;
+            }
+
+            .page-break {
+                page-break-after: always;
+                break-after: page;
+            }
+
             .section-header {
                 -webkit-print-color-adjust: exact;
                 print-color-adjust: exact;
             }
-            .form-table .label,
-            .form-table .weather-label,
-            .data-table th,
-            .data-table .totals-row,
-            .photo-item-header {
+
+            .overview-table .label,
+            .ops-table th,
+            .equip-table th {
                 -webkit-print-color-adjust: exact;
                 print-color-adjust: exact;
             }
-            .photo-item {
-                page-break-inside: avoid;
+
+            .report-header {
+                border-bottom-color: #4a7c34;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
             }
-            .contractor-block {
-                page-break-inside: avoid;
+
+            .report-title {
+                color: #4a7c34;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
             }
+
             @page {
-                size: 8.5in 11in;
-                margin: 0.25in;
+                size: letter;
+                margin: 0;
             }
         }
 
-        /* Mobile responsive */
+        /* ============ RESPONSIVE (screen only) ============ */
         @media screen and (max-width: 900px) {
+            .page-container {
+                margin: 0;
+                box-shadow: none;
+            }
+
             .page {
                 width: 100%;
-                padding: 12px;
+                padding: 16px;
+                min-height: auto;
             }
-            .header-logo,
-            .header-logo-placeholder {
-                width: 70px;
-                height: 70px;
+
+            .overview-table .label {
+                width: 100px;
+                font-size: 8pt;
             }
-            .header-title h1 {
-                font-size: 18px;
+
+            .overview-table .value {
+                font-size: 8pt;
             }
-            .form-table .label,
-            .form-table .value {
-                width: auto;
+
+            .report-title {
+                font-size: 14pt;
             }
-            .photo-grid {
+
+            .photos-grid {
                 grid-template-columns: 1fr;
             }
-            .signature-grid {
-                grid-template-columns: 1fr;
-                gap: 12px;
+
+            .photo-cell {
+                border-right: 1px solid #ccc !important;
             }
         }
     </style>
 </head>
 <body>
-    <!-- TOOLBAR (no-print) -->
-    <div class="toolbar no-print">
-        <div class="toolbar-left">
-            <a id="editReportLink" href="#" class="toolbar-btn">
-                <i class="fas fa-edit"></i>
-                <span>Edit Report</span>
-            </a>
-            <div>
-                <div class="toolbar-title">DOT RPR Daily Report</div>
-                <div id="headerDate" class="toolbar-date"></div>
-            </div>
+    <!-- SCREEN-ONLY HEADER -->
+    <header class="screen-header">
+        <div>
+            <h1>RPR Daily Report</h1>
+            <div class="header-date" id="headerDate"></div>
         </div>
-        <div style="display: flex; gap: 8px;">
-            <button onclick="exportPDF()" class="toolbar-btn primary">
-                <i class="fas fa-file-pdf"></i>
-                <span>Export PDF</span>
-            </button>
-            <button onclick="showCancelModal()" class="toolbar-btn danger">
-                <i class="fas fa-times"></i>
-                <span>Cancel</span>
-            </button>
-            <a href="index.html" class="toolbar-btn">
+        <div class="header-buttons">
+            <a href="index.html" class="header-btn btn-home">
                 <i class="fas fa-home"></i>
+                <span>Home</span>
             </a>
+            <button onclick="goToEdit()" class="header-btn btn-edit">
+                <i class="fas fa-edit"></i>
+                <span>Edit</span>
+            </button>
+            <button onclick="printReport()" class="header-btn btn-print">
+                <i class="fas fa-print"></i>
+                <span>Print / PDF</span>
+            </button>
         </div>
-    </div>
+    </header>
 
-    <!-- PAGE WRAPPER -->
-    <div class="page-wrapper">
-        <!-- PAGE 1 -->
-        <div class="page" id="page1">
-            <!-- HEADER -->
+    <!-- PAGE CONTAINER -->
+    <div class="page-container">
+
+        <!-- ==================== PAGE 1 ==================== -->
+        <div class="page page-break" id="page1">
+            <!-- Report Header -->
             <div class="report-header">
-                <div class="header-logo" id="logoContainer">
-                    <div class="header-logo-placeholder" id="logoPlaceholder">
-                        LOUIS ARMSTRONG<br>NEW ORLEANS<br>INTERNATIONAL<br>AIRPORT
+                <div id="logoContainer">
+                    <div class="report-logo-placeholder" id="logoPlaceholder">
+                        LOUIS ARMSTRONG<br>NEW ORLEANS<br>INTERNATIONAL AIRPORT
                     </div>
+                    <img id="logoImage" class="report-logo" style="display:none;" alt="Project Logo">
                 </div>
-                <div class="header-title">
-                    <h1>RPR DAILY REPORT</h1>
-                </div>
+                <div class="report-title">RPR DAILY REPORT</div>
             </div>
 
-            <!-- PROJECT OVERVIEW SECTION -->
-            <div class="section-header">PROJECT OVERVIEW</div>
-            <table class="form-table">
-                <tbody>
-                    <tr>
-                        <td class="label">Project Name:</td>
-                        <td class="value" id="displayProjectName">--</td>
-                        <td class="label">Date:</td>
-                        <td class="value" id="displayDate">--</td>
-                    </tr>
-                    <tr>
-                        <td class="label">NOAB Project No.:</td>
-                        <td class="value" id="displayNoabProjectNo">--</td>
-                        <td class="label">Location:</td>
-                        <td class="value" id="displayLocation">--</td>
-                    </tr>
-                    <tr>
-                        <td class="label">CNO Solicitation No.:</td>
-                        <td class="value" id="displayCnoSolicitationNo">N/A</td>
-                        <td class="label">Engineer:</td>
-                        <td class="value" id="displayEngineer">--</td>
-                    </tr>
-                    <tr>
-                        <td class="label">Notice to Proceed:</td>
-                        <td class="value" id="displayNoticeToProceed">--</td>
-                        <td class="label">Contractor:</td>
-                        <td class="value" id="displayContractor">--</td>
-                    </tr>
-                    <tr>
-                        <td class="label">Contract Duration:</td>
-                        <td class="value" id="displayContractDuration">--</td>
-                        <td class="label">Start Time:</td>
-                        <td class="value" id="displayStartTime">--</td>
-                    </tr>
-                    <tr>
-                        <td class="label">Expected Completion:</td>
-                        <td class="value" id="displayExpectedCompletion">--</td>
-                        <td class="label">End Time:</td>
-                        <td class="value" id="displayEndTime">--</td>
-                    </tr>
-                    <tr>
-                        <td class="label">Contract Day #:</td>
-                        <td class="value" id="displayContractDay">--</td>
-                        <td class="label">Shift Duration:</td>
-                        <td class="value" id="displayShiftDuration">--</td>
-                    </tr>
-                    <tr>
-                        <td class="label">Weather Days:</td>
-                        <td class="value" id="displayWeatherDays">0</td>
-                        <td class="label">Completed By:</td>
-                        <td class="value" id="displayCompletedBy">--</td>
-                    </tr>
-                    <!-- Weather Block -->
-                    <tr>
-                        <td class="weather-label" rowspan="5">Weather:</td>
-                        <td class="weather-data" colspan="1">
-                            <span id="displayWeatherTemps">High Temp: --  Low Temp: --</span>
-                        </td>
-                        <td class="label" rowspan="5">Signature:</td>
-                        <td class="signature-area" rowspan="5">
-                            <div class="signature-line" id="displaySignatureInline"></div>
-                            <div class="signature-name" id="displaySignatureNameInline">--</div>
-                            <div class="signature-note">Digitally signed</div>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td class="weather-data">
-                            Precipitation: <span id="displayWeatherPrecip">0.00"</span>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td class="weather-data">
-                            General Condition: <span id="displayWeatherCondition">--</span>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td class="weather-data">
-                            Job Site Condition: <span id="displayWeatherJobSite">--</span>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td class="weather-data">
-                            Adverse Conditions: <span id="displayWeatherAdverse">N/A</span>
-                        </td>
-                    </tr>
-                </tbody>
+            <!-- Project Overview -->
+            <div class="section-header">Project Overview</div>
+            <table class="overview-table">
+                <tr>
+                    <td class="label">PROJECT NAME:</td>
+                    <td class="value" id="projectName"></td>
+                    <td class="label">DATE:</td>
+                    <td class="value" id="reportDate"></td>
+                </tr>
+                <tr>
+                    <td class="label">NOAB PROJECT NO.:</td>
+                    <td class="value" id="noabProjectNo"></td>
+                    <td class="label">LOCATION:</td>
+                    <td class="value" id="location"></td>
+                </tr>
+                <tr>
+                    <td class="label">CNO SOLICITATION NO.:</td>
+                    <td class="value" id="cnoSolicitationNo"></td>
+                    <td class="label">ENGINEER:</td>
+                    <td class="value" id="engineer"></td>
+                </tr>
+                <tr>
+                    <td class="label">NOTICE TO PROCEED:</td>
+                    <td class="value" id="noticeToProceed"></td>
+                    <td class="label">CONTRACTOR:</td>
+                    <td class="value" id="contractor"></td>
+                </tr>
+                <tr>
+                    <td class="label">CONTRACT DURATION:</td>
+                    <td class="value" id="contractDuration"></td>
+                    <td class="label">START TIME:</td>
+                    <td class="value" id="startTime"></td>
+                </tr>
+                <tr>
+                    <td class="label">EXPECTED COMPLETION:</td>
+                    <td class="value" id="expectedCompletion"></td>
+                    <td class="label">END TIME:</td>
+                    <td class="value" id="endTime"></td>
+                </tr>
+                <tr>
+                    <td class="label">CONTRACT DAY #:</td>
+                    <td class="value" id="contractDay"></td>
+                    <td class="label">SHIFT DURATION:</td>
+                    <td class="value" id="shiftDuration"></td>
+                </tr>
+                <tr>
+                    <td class="label">WEATHER DAYS:</td>
+                    <td class="value" id="weatherDays"></td>
+                    <td class="label">COMPLETED BY:</td>
+                    <td class="value" id="completedBy"></td>
+                </tr>
+                <!-- Weather Row -->
+                <tr class="weather-row">
+                    <td class="weather-label" rowspan="5">WEATHER:</td>
+                    <td id="weatherTemps" colspan="1"></td>
+                    <td class="label" rowspan="5">SIGNATURE:</td>
+                    <td class="signature-cell" rowspan="5" id="signatureCell">
+                        <div class="signature-name" id="signatureName"></div>
+                        <div class="signature-details" id="signatureDetails"></div>
+                    </td>
+                </tr>
+                <tr class="weather-row">
+                    <td class="weather-sub" id="weatherPrecip"></td>
+                </tr>
+                <tr class="weather-row">
+                    <td class="weather-sub" id="weatherCondition"></td>
+                </tr>
+                <tr class="weather-row">
+                    <td class="weather-sub" id="weatherJobSite"></td>
+                </tr>
+                <tr class="weather-row">
+                    <td class="weather-sub" id="weatherAdverse"></td>
+                </tr>
             </table>
 
-            <!-- DAILY WORK SUMMARY SECTION -->
-            <div class="section-header">DAILY WORK SUMMARY</div>
-            <div style="border: 1px solid #000; border-top: none; padding: 8px; margin-bottom: 12px;">
-                <div class="work-summary-intro">Construction Activities Performed and Observed on this Date:</div>
-                <div id="workSummaryContainer">
-                    <!-- Contractor blocks will be populated here -->
+            <!-- Daily Work Summary -->
+            <div class="section-header">Daily Work Summary</div>
+            <div class="work-summary">
+                <p style="font-weight:bold; margin-bottom:8px;">Construction Activities Performed and Observed on this Date:</p>
+                <div id="workSummaryContent">
+                    <!-- Contractor blocks will be inserted here -->
                 </div>
             </div>
 
-            <!-- DAILY OPERATIONS TABLE -->
-            <div class="section-header">DAILY OPERATIONS</div>
-            <table class="data-table" id="personnelTable">
+            <div class="page-footer">1 of <span class="total-pages">4</span></div>
+        </div>
+
+        <!-- ==================== PAGE 2 ==================== -->
+        <div class="page page-break" id="page2">
+            <!-- Report Header (repeated) -->
+            <div class="report-header">
+                <div id="logoContainer2">
+                    <div class="report-logo-placeholder" id="logoPlaceholder2">
+                        LOUIS ARMSTRONG<br>NEW ORLEANS<br>INTERNATIONAL AIRPORT
+                    </div>
+                    <img id="logoImage2" class="report-logo" style="display:none;" alt="Project Logo">
+                </div>
+                <div class="report-title">RPR DAILY REPORT</div>
+            </div>
+
+            <!-- Daily Operations Table -->
+            <div class="section-header">Daily Operations</div>
+            <table class="ops-table">
                 <thead>
                     <tr>
-                        <th style="min-width: 80px;">Contractor</th>
-                        <th style="min-width: 60px;">Trade</th>
-                        <th style="width: 50px;">Super(s)</th>
-                        <th style="width: 50px;">Foreman</th>
-                        <th style="width: 55px;">Operator(s)</th>
-                        <th style="width: 55px;">Laborer(s)</th>
-                        <th style="width: 55px;">Surveyor(s)</th>
-                        <th style="width: 50px;">Other(s)</th>
-                        <th style="width: 50px;">Total</th>
+                        <th style="width:100px;">CONTRACTOR</th>
+                        <th style="width:120px;">TRADE</th>
+                        <th>SUPER(S)</th>
+                        <th>FOREMAN</th>
+                        <th>OPERATOR(S)</th>
+                        <th>LABORER(S) /<br>ELECTRICIAN(S)</th>
+                        <th>SURVEYOR(S)</th>
+                        <th>OTHER(S)</th>
                     </tr>
                 </thead>
-                <tbody id="personnelTableBody">
-                    <!-- Rows will be populated here -->
+                <tbody id="operationsTableBody">
+                    <!-- Rows will be inserted here -->
                 </tbody>
-                <tfoot>
-                    <tr class="totals-row">
-                        <td colspan="2" style="text-align: right; padding-right: 8px;">TOTALS:</td>
-                        <td class="text-center" id="totalSuper">0</td>
-                        <td class="text-center" id="totalForeman">0</td>
-                        <td class="text-center" id="totalOperators">0</td>
-                        <td class="text-center" id="totalLaborers">0</td>
-                        <td class="text-center" id="totalSurveyors">0</td>
-                        <td class="text-center" id="totalOthers">0</td>
-                        <td class="text-center" id="totalAll">0</td>
-                    </tr>
-                </tfoot>
             </table>
 
-            <!-- MOBILIZED EQUIPMENT & DAILY UTILIZATION -->
-            <div class="section-header">MOBILIZED EQUIPMENT &amp; DAILY UTILIZATION</div>
-            <table class="data-table" id="equipmentTable">
+            <!-- Equipment Table -->
+            <div class="section-header">Mobilized Equipment & Daily Utilization</div>
+            <table class="equip-table">
                 <thead>
                     <tr>
-                        <th style="width: 20%;">Contractor</th>
-                        <th style="width: 45%;">Equipment Type / Model</th>
-                        <th style="width: 10%;">Qty</th>
-                        <th style="width: 25%;">Notes (Status)</th>
+                        <th style="width:120px;">CONTRACTOR</th>
+                        <th>EQUIPMENT TYPE / MODEL #</th>
+                        <th style="width:60px;">QUANTITY</th>
+                        <th style="width:140px;">NOTES</th>
                     </tr>
                 </thead>
                 <tbody id="equipmentTableBody">
-                    <!-- Rows will be populated here -->
+                    <!-- Rows will be inserted here -->
                 </tbody>
             </table>
 
-            <!-- GENERAL ISSUES SECTION -->
-            <div class="text-section">
-                <div class="section-header red">GENERAL ISSUES; UNFORESEEN CONDITIONS; NOTICES GIVEN</div>
-                <div class="text-section-content" id="issuesContent">N/A</div>
+            <!-- Issues Section -->
+            <div class="section-header">General Issues; Unforeseen Conditions; Notices Given</div>
+            <div class="text-section" id="issuesContent">
+                <ul><li class="na-text">N/A.</li></ul>
             </div>
 
-            <!-- COMMUNICATIONS SECTION -->
-            <div class="text-section">
-                <div class="section-header blue">COMMUNICATIONS WITH THE CONTRACTOR</div>
-                <div class="text-section-content" id="communicationsContent">N/A</div>
+            <!-- Communications Section -->
+            <div class="section-header">Communications with the Contractor</div>
+            <div class="text-section" id="communicationsContent">
+                <ul><li class="na-text">N/A.</li></ul>
             </div>
 
-            <!-- QA/QC SECTION -->
-            <div class="text-section">
-                <div class="section-header purple">QA/QC TESTING AND/OR INSPECTIONS</div>
-                <div class="text-section-content" id="qaqcContent">N/A</div>
-            </div>
+            <div class="page-footer">2 of <span class="total-pages">4</span></div>
+        </div>
 
-            <!-- SAFETY REPORT SECTION -->
-            <div class="text-section">
-                <div class="section-header">SAFETY REPORT</div>
-                <div class="text-section-content">
-                    <div style="margin-bottom: 8px;">
-                        <strong>Safety Incident Today:</strong>
-                        <span class="safety-checkbox">
-                            <span class="checkbox-box" id="incidentYes"></span> Yes
-                        </span>
-                        <span class="safety-checkbox">
-                            <span class="checkbox-box" id="incidentNo">X</span> No
-                        </span>
+        <!-- ==================== PAGE 3 ==================== -->
+        <div class="page page-break" id="page3">
+            <!-- Report Header (repeated) -->
+            <div class="report-header">
+                <div id="logoContainer3">
+                    <div class="report-logo-placeholder" id="logoPlaceholder3">
+                        LOUIS ARMSTRONG<br>NEW ORLEANS<br>INTERNATIONAL AIRPORT
                     </div>
-                    <div id="safetyContent">N/A</div>
+                    <img id="logoImage3" class="report-logo" style="display:none;" alt="Project Logo">
+                </div>
+                <div class="report-title">RPR DAILY REPORT</div>
+            </div>
+
+            <!-- QA/QC Section -->
+            <div class="section-header">QA/QC Testing and/or Inspections</div>
+            <div class="text-section" id="qaqcContent">
+                <ul><li class="na-text">N/A.</li></ul>
+            </div>
+
+            <!-- Safety Section -->
+            <div class="section-header">
+                <div class="safety-header">
+                    <span>Safety Report</span>
                 </div>
             </div>
-
-            <!-- VISITORS/DELIVERIES SECTION -->
             <div class="text-section">
-                <div class="section-header amber">VISITORS; DELIVERIES; ADDITIONAL CONTRACT AND/OR CHANGE ORDER ACTIVITIES; OTHER REMARKS</div>
-                <div class="text-section-content" id="visitorsContent">N/A</div>
-            </div>
-        </div>
-
-        <!-- PAGE 2+ - PHOTOS -->
-        <div class="page page-break" id="photosPage">
-            <div class="section-header navy">DAILY PHOTOS <span id="photoCount" style="float: right; font-weight: normal;">(0 photos)</span></div>
-            <div id="photosContainer" style="border: 1px solid #000; border-top: none; padding: 12px;">
-                <!-- Photos will be populated here -->
-            </div>
-        </div>
-
-        <!-- SIGNATURE PAGE -->
-        <div class="page page-break" id="signaturePage">
-            <div class="signature-block">
-                <div class="section-header navy">CERTIFICATION &amp; SIGNATURE</div>
-                <div class="signature-block-content">
-                    <p style="font-size: 10px; margin-bottom: 16px;">
-                        I certify that the information contained in this daily report is accurate and complete to the best of my knowledge.
-                    </p>
-                    <div class="signature-grid">
-                        <div class="signature-field">
-                            <label>Inspector Name</label>
-                            <span id="displaySignatureName">--</span>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                    <span style="font-weight:bold;">Incident(s) on this Date:</span>
+                    <div class="safety-checkboxes">
+                        <div class="checkbox-item">
+                            <span class="checkbox-box" id="checkYes"></span>
+                            <span>Yes</span>
                         </div>
-                        <div class="signature-field">
-                            <label>Title</label>
-                            <span id="displaySignatureTitle">--</span>
-                        </div>
-                        <div class="signature-field">
-                            <label>Company</label>
-                            <span id="displaySignatureCompany">--</span>
-                        </div>
-                    </div>
-                    <div class="final-signature">
-                        <div class="final-signature-line">
-                            <div class="line"></div>
-                            <div class="label">Signature</div>
-                        </div>
-                        <div class="final-signature-date">
-                            <div class="line" id="displaySignatureDate"></div>
-                            <div class="label">Date</div>
+                        <div class="checkbox-item">
+                            <span class="checkbox-box" id="checkNo">X</span>
+                            <span>No</span>
                         </div>
                     </div>
                 </div>
+                <div id="safetyContent">
+                    <ul><li class="na-text">N/A.</li></ul>
+                </div>
             </div>
-        </div>
-    </div>
 
-    <!-- Cancel Confirmation Modal -->
-    <div id="cancelModal" class="no-print" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 9999; align-items: center; justify-content: center; padding: 20px;">
-        <div style="background: white; width: 100%; max-width: 400px;">
-            <div style="background: #b91c1c; color: white; padding: 16px; text-align: center;">
-                <i class="fas fa-exclamation-triangle" style="font-size: 24px; margin-bottom: 8px;"></i>
-                <p style="font-weight: bold; text-transform: uppercase; margin: 0;">Cancel Ongoing Report</p>
+            <!-- Visitors Section -->
+            <div class="section-header">Visitors; Deliveries; Additional Contract and/or Change Order Activities; Other Remarks</div>
+            <div class="text-section" id="visitorsContent">
+                <ul><li class="na-text">N/A.</li></ul>
             </div>
-            <div style="padding: 16px;">
-                <p style="font-size: 12px; color: #666; margin-bottom: 12px;">
-                    Are you sure you want to cancel this report? This will <strong>permanently delete</strong> all data for this report date.
-                </p>
-                <p id="cancelReportDate" style="font-weight: bold; color: #b91c1c; margin-bottom: 16px;"></p>
-                <button onclick="confirmCancel()" style="width: 100%; padding: 12px; background: #b91c1c; color: white; border: none; font-weight: bold; text-transform: uppercase; cursor: pointer; margin-bottom: 8px;">
-                    <i class="fas fa-trash-alt" style="margin-right: 8px;"></i>Delete Report
-                </button>
-                <button onclick="hideCancelModal()" style="width: 100%; padding: 12px; background: #f1f5f9; color: #666; border: none; font-weight: 500; cursor: pointer;">
-                    Keep Report
-                </button>
-            </div>
-        </div>
-    </div>
 
-    <!-- Toast Container -->
-    <div id="toast-container" class="no-print" style="position: fixed; bottom: 16px; right: 16px; z-index: 9999;"></div>
+            <div class="page-footer">3 of <span class="total-pages">4</span></div>
+        </div>
+
+        <!-- ==================== PAGE 4 (Photos) ==================== -->
+        <div class="page" id="page4">
+            <!-- Report Header (repeated) -->
+            <div class="report-header">
+                <div id="logoContainer4">
+                    <div class="report-logo-placeholder" id="logoPlaceholder4">
+                        LOUIS ARMSTRONG<br>NEW ORLEANS<br>INTERNATIONAL AIRPORT
+                    </div>
+                    <img id="logoImage4" class="report-logo" style="display:none;" alt="Project Logo">
+                </div>
+                <div class="report-title">RPR DAILY REPORT</div>
+            </div>
+
+            <!-- Photos Section -->
+            <div class="section-header">Daily Photos</div>
+            <div class="photos-header-info">
+                <table>
+                    <tr>
+                        <td class="photo-label">Project Name:</td>
+                        <td id="photoProjectName"></td>
+                    </tr>
+                    <tr>
+                        <td class="photo-label">Project #:</td>
+                        <td id="photoProjectNo"></td>
+                    </tr>
+                </table>
+            </div>
+            <div class="photos-grid" id="photosGrid">
+                <!-- Photo cells will be inserted here -->
+            </div>
+
+            <div class="page-footer"><span id="photoPageNum">4</span> of <span class="total-pages">4</span></div>
+        </div>
+
+    </div><!-- END page-container -->
 
     <script>
         // ============ STATE ============
         let report = null;
         let activeProject = null;
         let projectContractors = [];
-        let reportDate = '';
 
         const PROJECTS_KEY = 'fvp_projects';
         const ACTIVE_PROJECT_KEY = 'fvp_active_project';
 
         // ============ INITIALIZATION ============
         document.addEventListener('DOMContentLoaded', () => {
-            // Get date from URL param
-            const params = new URLSearchParams(window.location.search);
-            reportDate = params.get('date') || new Date().toISOString().split('T')[0];
-
-            // Load project
             loadActiveProject();
-
-            // Load report data
             report = loadReport();
 
-            if (!report || !report.overview) {
-                showToast('Report not found', 'error');
-                setTimeout(() => window.location.href = 'index.html', 2000);
+            if (!report) {
+                alert('No report found for this date.');
+                window.location.href = 'index.html';
                 return;
             }
 
-            // Update edit report link
-            document.getElementById('editReportLink').href = `report.html?date=${reportDate}`;
-
-            // Populate all display fields
-            populateAllFields();
-
-            // Update header date
-            updateHeaderDate();
+            populateReport();
+            updateTotalPages();
         });
 
         // ============ PROJECT LOADING ============
         function loadActiveProject() {
             const activeId = localStorage.getItem(ACTIVE_PROJECT_KEY);
-            if (!activeId) {
-                activeProject = null;
-                projectContractors = [];
-                return;
-            }
+            if (!activeId) return;
 
             const projectsJson = localStorage.getItem(PROJECTS_KEY);
-            if (!projectsJson) {
-                activeProject = null;
-                projectContractors = [];
-                return;
-            }
+            if (!projectsJson) return;
 
             try {
                 const projects = JSON.parse(projectsJson);
@@ -867,335 +885,199 @@
                         if (a.type !== 'prime' && b.type === 'prime') return 1;
                         return 0;
                     });
-                } else {
-                    projectContractors = [];
                 }
             } catch (e) {
                 console.error('Failed to load project:', e);
-                activeProject = null;
-                projectContractors = [];
             }
         }
 
         // ============ REPORT LOADING ============
-        function getReportKey() {
-            if (activeProject) {
-                return `fieldvoice_report_${activeProject.id}_${reportDate}`;
-            }
-            return `fieldvoice_report_${reportDate}`;
-        }
-
         function loadReport() {
-            // Try project-specific key first
-            let key = getReportKey();
-            let saved = localStorage.getItem(key);
+            const params = new URLSearchParams(window.location.search);
+            const dateParam = params.get('date');
+            const todayStr = dateParam || new Date().toISOString().split('T')[0];
 
-            if (saved) {
-                try {
-                    return JSON.parse(saved);
-                } catch (e) {}
+            // Try project-specific key first
+            if (activeProject) {
+                const key = `fieldvoice_report_${activeProject.id}_${todayStr}`;
+                let saved = localStorage.getItem(key);
+                if (saved) {
+                    try { return JSON.parse(saved); } catch (e) {}
+                }
             }
 
-            // Try legacy key
-            const legacyKey = `fieldvoice_report_${reportDate}`;
-            saved = localStorage.getItem(legacyKey);
+            // Try date-only key
+            const legacyKey = `fieldvoice_report_${todayStr}`;
+            let saved = localStorage.getItem(legacyKey);
             if (saved) {
-                try {
-                    return JSON.parse(saved);
-                } catch (e) {}
+                try { return JSON.parse(saved); } catch (e) {}
             }
 
             // Try very old legacy key
             saved = localStorage.getItem('fieldvoice_report');
             if (saved) {
-                try {
-                    return JSON.parse(saved);
-                } catch (e) {}
+                try { return JSON.parse(saved); } catch (e) {}
             }
 
             return null;
         }
 
-        // ============ DATA PRIORITY HELPERS ============
-        function getValue(path, defaultValue = '') {
-            // Check user edits first
-            if (report.userEdits && report.userEdits[path] !== undefined) {
-                return report.userEdits[path];
-            }
+        // ============ POPULATE REPORT ============
+        function populateReport() {
+            const o = report.overview || {};
+            const ai = report.aiGenerated || {};
+            const userEdits = report.userEdits || {};
 
-            // Check AI-generated content
-            if (report.aiGenerated) {
-                const aiValue = getNestedValue(report.aiGenerated, path);
-                if (aiValue !== undefined && aiValue !== null && aiValue !== '') {
-                    if (Array.isArray(aiValue)) {
-                        return aiValue.join('\n');
-                    }
-                    return aiValue;
+            // Helper to get value with priority
+            function getValue(path, defaultVal = '') {
+                if (userEdits[path] !== undefined) return userEdits[path];
+                const aiVal = getNestedValue(ai, path);
+                if (aiVal !== undefined && aiVal !== null && aiVal !== '') {
+                    if (Array.isArray(aiVal)) return aiVal.join('\n');
+                    return aiVal;
                 }
-            }
-
-            // Check existing report data
-            const reportValue = getNestedValue(report, path);
-            if (reportValue !== undefined && reportValue !== null && reportValue !== '') {
-                if (Array.isArray(reportValue)) {
-                    return reportValue.join('\n');
+                const reportVal = getNestedValue(report, path);
+                if (reportVal !== undefined && reportVal !== null && reportVal !== '') {
+                    if (Array.isArray(reportVal)) return reportVal.join('\n');
+                    return reportVal;
                 }
-                return reportValue;
+                return defaultVal;
             }
 
-            return defaultValue;
-        }
-
-        function getNestedValue(obj, path) {
-            return path.split('.').reduce((o, k) => (o || {})[k], obj);
-        }
-
-        function getTextFieldValue(reportPath, aiPath, defaultValue = '') {
-            // Check user edits
-            if (report.userEdits && report.userEdits[reportPath] !== undefined) {
-                return report.userEdits[reportPath];
+            function getNestedValue(obj, path) {
+                return path.split('.').reduce((o, k) => (o || {})[k], obj);
             }
 
-            // Check AI-generated
-            if (report.aiGenerated) {
-                const aiValue = getNestedValue(report.aiGenerated, aiPath);
-                if (aiValue !== undefined && aiValue !== null && aiValue !== '') {
-                    if (Array.isArray(aiValue)) {
-                        return aiValue.join('\n');
-                    }
-                    return aiValue;
-                }
-            }
+            // Update header date
+            document.getElementById('headerDate').textContent = formatDisplayDate(o.date);
 
-            // Check report
-            const reportValue = getNestedValue(report, reportPath);
-            if (reportValue !== undefined && reportValue !== null && reportValue !== '') {
-                if (Array.isArray(reportValue)) {
-                    return reportValue.join('\n');
-                }
-                return reportValue;
-            }
+            // Project Overview
+            document.getElementById('projectName').textContent = getValue('overview.projectName', activeProject?.name || '');
+            document.getElementById('reportDate').textContent = formatDisplayDate(o.date);
+            document.getElementById('noabProjectNo').textContent = getValue('overview.noabProjectNo', activeProject?.noabProjectNo || '');
+            document.getElementById('location').textContent = getValue('overview.location', activeProject?.location || '');
+            document.getElementById('cnoSolicitationNo').textContent = getValue('overview.cnoSolicitationNo', activeProject?.cnoSolicitationNo || 'N/A');
+            document.getElementById('engineer').textContent = getValue('overview.engineer', activeProject?.engineer || '');
 
-            return defaultValue;
-        }
+            // Notice to Proceed
+            const ntpDate = activeProject?.noticeToProceed;
+            document.getElementById('noticeToProceed').textContent = ntpDate ? formatDisplayDate(ntpDate) : '';
 
-        // ============ POPULATE FIELDS ============
-        function populateAllFields() {
-            // Project Logo
-            const logoContainer = document.getElementById('logoContainer');
-            const logoPlaceholder = document.getElementById('logoPlaceholder');
-            if (activeProject?.logo) {
-                logoContainer.innerHTML = `<img src="${activeProject.logo}" alt="Project Logo">`;
-            }
+            document.getElementById('contractor').textContent = getValue('overview.contractor', activeProject?.primeContractor || '');
 
-            // Report Date
-            const dateObj = new Date(reportDate + 'T12:00:00');
-            const formattedDate = dateObj.toLocaleDateString('en-US', {
-                month: '2-digit',
-                day: '2-digit',
-                year: 'numeric'
-            });
-            const longFormattedDate = dateObj.toLocaleDateString('en-US', {
-                weekday: 'long',
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric'
-            });
+            // Contract Duration
+            const duration = activeProject?.contractDuration;
+            document.getElementById('contractDuration').textContent = duration ? `${duration} days` : '';
 
-            // Project Overview - Left Column
-            document.getElementById('displayProjectName').textContent = getValue('overview.projectName', activeProject?.name || '--');
-            document.getElementById('displayNoabProjectNo').textContent = getValue('overview.noabProjectNo', activeProject?.noabProjectNo || '--');
-            document.getElementById('displayCnoSolicitationNo').textContent = getValue('overview.cnoSolicitationNo', 'N/A');
+            // Times
+            document.getElementById('startTime').textContent = formatTime(getValue('overview.startTime', activeProject?.defaultStartTime || ''));
+            document.getElementById('endTime').textContent = formatTime(getValue('overview.endTime', activeProject?.defaultEndTime || ''));
 
-            if (activeProject?.noticeToProceed) {
-                document.getElementById('displayNoticeToProceed').textContent = formatDateDisplay(activeProject.noticeToProceed);
-            }
-            if (activeProject?.contractDuration) {
-                document.getElementById('displayContractDuration').textContent = activeProject.contractDuration + ' days';
-            }
-            if (activeProject?.expectedCompletion) {
-                document.getElementById('displayExpectedCompletion').textContent = formatDateDisplay(activeProject.expectedCompletion);
-            }
+            // Expected Completion
+            const expectedDate = activeProject?.expectedCompletion;
+            document.getElementById('expectedCompletion').textContent = expectedDate ? formatDisplayDate(expectedDate) : '';
 
+            // Shift Duration
+            const startTime = getValue('overview.startTime', activeProject?.defaultStartTime || '');
+            const endTime = getValue('overview.endTime', activeProject?.defaultEndTime || '');
+            document.getElementById('shiftDuration').textContent = calculateShiftDuration(startTime, endTime);
+
+            // Contract Day
             const contractDay = getValue('overview.contractDay', '');
-            if (contractDay && activeProject?.contractDuration) {
-                document.getElementById('displayContractDay').textContent = `Day ${contractDay} of ${activeProject.contractDuration}`;
-            } else if (contractDay) {
-                document.getElementById('displayContractDay').textContent = contractDay;
-            }
-
-            document.getElementById('displayWeatherDays').textContent = getValue('overview.weatherDays', activeProject?.weatherDays || '0') + ' days';
-
-            // Project Overview - Right Column
-            document.getElementById('displayDate').textContent = formattedDate;
-            document.getElementById('displayLocation').textContent = getValue('overview.location', activeProject?.location || '--');
-            document.getElementById('displayEngineer').textContent = getValue('overview.engineer', activeProject?.engineer || '--');
-            document.getElementById('displayContractor').textContent = getValue('overview.contractor', activeProject?.primeContractor || '--');
-
-            const startTime = getValue('overview.startTime', '');
-            const endTime = getValue('overview.endTime', '');
-            document.getElementById('displayStartTime').textContent = formatTimeDisplay(startTime);
-            document.getElementById('displayEndTime').textContent = formatTimeDisplay(endTime);
-            document.getElementById('displayShiftDuration').textContent = calculateShiftDuration(startTime, endTime);
-
-            document.getElementById('displayCompletedBy').textContent = getValue('overview.completedBy', '--');
-
-            // Weather - combined format
-            const highTemp = getValue('overview.weather.highTemp', '--');
-            const lowTemp = getValue('overview.weather.lowTemp', '--');
-            document.getElementById('displayWeatherTemps').textContent = `High Temp: ${highTemp}  Low Temp: ${lowTemp}`;
-            document.getElementById('displayWeatherPrecip').textContent = getValue('overview.weather.precipitation', '0.00"');
-            document.getElementById('displayWeatherCondition').textContent = getValue('overview.weather.generalCondition', '--');
-            document.getElementById('displayWeatherJobSite').textContent = getValue('overview.weather.jobSiteCondition', '--');
-            document.getElementById('displayWeatherAdverse').textContent = getValue('overview.weather.adverseConditions', 'N/A') || 'N/A';
-
-            // Inline signature in overview
-            const signatureName = getValue('signature.name', getValue('overview.completedBy', '--'));
-            document.getElementById('displaySignatureNameInline').textContent = signatureName;
-
-            // Text Sections
-            const issues = getTextFieldValue('issues', 'generalIssues', report.guidedNotes?.issues || '');
-            document.getElementById('issuesContent').innerHTML = formatTextContent(issues);
-
-            const communications = getTextFieldValue('communications', 'contractorCommunications', '');
-            document.getElementById('communicationsContent').innerHTML = formatTextContent(communications);
-
-            const qaqc = getTextFieldValue('qaqc', 'qaqcNotes', '');
-            document.getElementById('qaqcContent').innerHTML = formatTextContent(qaqc);
-
-            const safetyNotes = getTextFieldValue('safety.notes', 'safety.notes', report.guidedNotes?.safety || '');
-            document.getElementById('safetyContent').innerHTML = formatTextContent(safetyNotes);
-
-            // Safety Incident Checkboxes
-            const hasIncident = getValue('safety.hasIncident', false);
-            if (hasIncident) {
-                document.getElementById('incidentYes').textContent = 'X';
-                document.getElementById('incidentNo').textContent = '';
+            if (contractDay && duration) {
+                document.getElementById('contractDay').textContent = `${contractDay} of ${duration} days`;
             } else {
-                document.getElementById('incidentYes').textContent = '';
-                document.getElementById('incidentNo').textContent = 'X';
+                document.getElementById('contractDay').textContent = contractDay;
             }
 
-            const visitors = getTextFieldValue('visitors', 'visitorsRemarks', '');
-            document.getElementById('visitorsContent').innerHTML = formatTextContent(visitors);
+            // Weather Days
+            document.getElementById('weatherDays').textContent = getValue('overview.weatherDays', activeProject?.weatherDays || '0') + ' days';
 
-            // Final Signature Block
-            document.getElementById('displaySignatureName').textContent = getValue('signature.name', '--');
-            document.getElementById('displaySignatureTitle').textContent = getValue('signature.title', '--');
-            document.getElementById('displaySignatureCompany').textContent = getValue('signature.company', '--');
-            document.getElementById('displaySignatureDate').textContent = formattedDate;
+            // Completed By
+            document.getElementById('completedBy').textContent = getValue('overview.completedBy', '');
+
+            // Weather
+            const weather = o.weather || {};
+            document.getElementById('weatherTemps').textContent = `High Temp: ${weather.highTemp || '--'}° Low Temp: ${weather.lowTemp || '--'}°`;
+            document.getElementById('weatherPrecip').textContent = `Precipitation: ${weather.precipitation || '0.00"'}`;
+            document.getElementById('weatherCondition').textContent = `General Condition: ${weather.generalCondition || 'N/A'}`;
+            document.getElementById('weatherJobSite').textContent = `Job Site Condition: ${weather.jobSiteCondition || 'N/A'}`;
+            document.getElementById('weatherAdverse').textContent = `Adverse Conditions: ${weather.adverseConditions || 'N/A'}`;
+
+            // Signature
+            const sigName = getValue('signature.name', getValue('overview.completedBy', ''));
+            const sigTitle = getValue('signature.title', '');
+            const sigCompany = getValue('signature.company', '');
+            document.getElementById('signatureName').textContent = sigName;
+
+            let sigDetails = '';
+            if (sigTitle || sigCompany) {
+                sigDetails = `Digitally signed by ${sigName}\nDN: cn=${sigName}, c=US,\no=${sigCompany}, ou=${sigTitle},\nemail=${sigName.toLowerCase().replace(/\s/g, '')}@${sigCompany.toLowerCase().replace(/\s/g, '')}.com\nDate: ${new Date().toISOString().split('T')[0]}`;
+            }
+            document.getElementById('signatureDetails').innerHTML = sigDetails.replace(/\n/g, '<br>');
 
             // Render dynamic sections
             renderWorkSummary();
-            renderPersonnelTable();
+            renderOperationsTable();
             renderEquipmentTable();
+            renderTextSections();
+            renderSafetySection();
             renderPhotos();
         }
 
-        // ============ FORMAT HELPERS ============
-        function formatDateDisplay(isoDate) {
-            if (!isoDate) return '--';
-            const date = new Date(isoDate + 'T12:00:00');
-            return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-        }
-
-        function formatTimeDisplay(time24) {
-            if (!time24) return '--';
-            const [hours, minutes] = time24.split(':');
-            const h = parseInt(hours);
-            const ampm = h >= 12 ? 'PM' : 'AM';
-            const h12 = h % 12 || 12;
-            return `${h12}:${minutes} ${ampm}`;
-        }
-
-        function calculateShiftDuration(startTime, endTime) {
-            if (!startTime || !endTime) return '--';
-            const start = new Date(`2000-01-01T${startTime}`);
-            const end = new Date(`2000-01-01T${endTime}`);
-            let diffMs = end - start;
-            if (diffMs < 0) diffMs += 24 * 60 * 60 * 1000;
-            const hours = Math.floor(diffMs / (1000 * 60 * 60));
-            const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-            if (minutes > 0) return `${hours}h ${minutes}m`;
-            return `${hours} hours`;
-        }
-
-        function formatTextContent(text) {
-            if (!text || text.trim() === '') return 'N/A';
-            // Check if it looks like bullet points
-            const lines = text.split('\n').filter(l => l.trim());
-            if (lines.length > 1 && lines.every(l => l.trim().startsWith('-') || l.trim().startsWith('*') || l.trim().startsWith('•'))) {
-                const listItems = lines.map(l => `<li>${escapeHtml(l.replace(/^[-*•]\s*/, ''))}</li>`).join('');
-                return `<ul style="margin: 0; padding-left: 20px;">${listItems}</ul>`;
-            }
-            return escapeHtml(text).replace(/\n/g, '<br>');
-        }
-
-        function escapeHtml(str) {
-            if (!str) return '';
-            const div = document.createElement('div');
-            div.textContent = str;
-            return div.innerHTML;
-        }
-
-        // ============ RENDER WORK SUMMARY ============
+        // ============ WORK SUMMARY ============
         function renderWorkSummary() {
-            const container = document.getElementById('workSummaryContainer');
+            const container = document.getElementById('workSummaryContent');
 
             if (projectContractors.length === 0) {
-                const workSummary = getValue('guidedNotes.workSummary', '');
-                if (workSummary) {
-                    container.innerHTML = `<div class="contractor-narrative">${escapeHtml(workSummary)}</div>`;
-                } else {
-                    container.innerHTML = `<p style="color: #666; font-style: italic;">No work activities documented.</p>`;
-                }
+                // No contractors - show general work summary
+                const workText = getTextValue('guidedNotes.workSummary', 'issues', 'generalIssues', '');
+                container.innerHTML = `<p>${escapeHtml(workText) || '<span class="na-text">No work activities recorded.</span>'}</p>`;
                 return;
             }
 
             let html = '';
             projectContractors.forEach(contractor => {
                 const activity = getContractorActivity(contractor.id);
-                const noWork = activity?.noWork ?? true;
-                const narrative = activity?.narrative || '';
-                const equipment = activity?.equipmentUsed || '';
-                const crew = activity?.crew || '';
+                const typeLabel = contractor.type === 'prime' ? 'PRIME CONTRACTOR' : 'SUBCONTRACTOR';
+                const trades = contractor.trades ? ` (${contractor.trades.toUpperCase()})` : '';
 
-                const typeLabel = contractor.type === 'prime' ? 'Prime' : 'Sub';
-                const tradesDisplay = contractor.trades ? ` (${contractor.trades})` : '';
+                html += `<div class="contractor-block">`;
+                html += `<div class="contractor-name">${escapeHtml(contractor.name)} – ${typeLabel}${trades}</div>`;
 
-                html += `
-                    <div class="contractor-block">
-                        <div class="contractor-header">${escapeHtml(contractor.name)} - ${typeLabel}${tradesDisplay}</div>
-                        ${noWork && !narrative ?
-                            `<div class="contractor-narrative" style="font-style: italic;">No work performed on ${formatDateDisplay(reportDate)}.</div>` :
-                            `<div class="contractor-narrative">${escapeHtml(narrative) || 'N/A'}</div>
-                            ${equipment ? `<div class="contractor-details"><strong>EQUIPMENT:</strong> ${escapeHtml(equipment)}</div>` : ''}
-                            ${crew ? `<div class="contractor-details"><strong>CREW:</strong> ${escapeHtml(crew)}</div>` : ''}`
-                        }
-                    </div>
-                `;
+                if (activity?.noWork) {
+                    html += `<div class="contractor-narrative">No work performed on ${formatDisplayDate(report.overview?.date)}.</div>`;
+                } else {
+                    const narrative = activity?.narrative || '';
+                    if (narrative) {
+                        html += `<div class="contractor-narrative">${escapeHtml(narrative)}</div>`;
+                    }
+                    const equipment = activity?.equipmentUsed || '';
+                    const crew = activity?.crew || '';
+                    if (equipment || crew) {
+                        html += `<div class="contractor-details">`;
+                        if (equipment) html += `EQUIPMENT: ${escapeHtml(equipment.toUpperCase())}. `;
+                        if (crew) html += `CREW: ${escapeHtml(crew.toUpperCase())}.`;
+                        html += `</div>`;
+                    }
+                    if (!narrative && !equipment && !crew) {
+                        html += `<div class="contractor-narrative">No work performed on ${formatDisplayDate(report.overview?.date)}.</div>`;
+                    }
+                }
+                html += `</div>`;
             });
 
             container.innerHTML = html;
         }
 
         function getContractorActivity(contractorId) {
+            const userEdits = report.userEdits || {};
             const userEditKey = `activity_${contractorId}`;
-            if (report.userEdits && report.userEdits[userEditKey]) {
-                return report.userEdits[userEditKey];
-            }
+            if (userEdits[userEditKey]) return userEdits[userEditKey];
 
             if (report.aiGenerated?.activities) {
                 const aiActivity = report.aiGenerated.activities.find(a => a.contractorId === contractorId);
-                if (aiActivity) {
-                    return {
-                        contractorId: contractorId,
-                        noWork: aiActivity.noWork ?? false,
-                        narrative: aiActivity.narrative || '',
-                        equipmentUsed: aiActivity.equipmentUsed || '',
-                        crew: aiActivity.crew || ''
-                    };
-                }
+                if (aiActivity) return aiActivity;
             }
 
             if (report.activities) {
@@ -1204,73 +1086,40 @@
             return null;
         }
 
-        // ============ RENDER PERSONNEL TABLE ============
-        function renderPersonnelTable() {
-            const tbody = document.getElementById('personnelTableBody');
+        // ============ OPERATIONS TABLE ============
+        function renderOperationsTable() {
+            const tbody = document.getElementById('operationsTableBody');
 
             if (projectContractors.length === 0) {
-                tbody.innerHTML = `
-                    <tr>
-                        <td colspan="9" style="text-align: center; color: #666; padding: 12px;">
-                            No contractors defined.
-                        </td>
-                    </tr>
-                `;
+                tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:#666;">No contractors defined</td></tr>`;
                 return;
             }
 
-            let totals = { super: 0, foreman: 0, operators: 0, laborers: 0, surveyors: 0, others: 0, all: 0 };
-
-            const rows = projectContractors.map(contractor => {
+            let html = '';
+            projectContractors.forEach(contractor => {
                 const ops = getContractorOperations(contractor.id);
-                const supers = ops?.superintendents || 0;
-                const foremen = ops?.foremen || 0;
-                const operators = ops?.operators || 0;
-                const laborers = ops?.laborers || 0;
-                const surveyors = ops?.surveyors || 0;
-                const others = ops?.others || 0;
-                const rowTotal = supers + foremen + operators + laborers + surveyors + others;
+                const abbrev = contractor.abbreviation || contractor.name.substring(0, 10).toUpperCase();
+                const trades = formatTradesAbbrev(contractor.trades);
 
-                totals.super += supers;
-                totals.foreman += foremen;
-                totals.operators += operators;
-                totals.laborers += laborers;
-                totals.surveyors += surveyors;
-                totals.others += others;
-                totals.all += rowTotal;
+                html += `<tr>
+                    <td>${escapeHtml(abbrev)}</td>
+                    <td>${escapeHtml(trades)}</td>
+                    <td>${ops?.superintendents || 'N/A'}</td>
+                    <td>${ops?.foremen || 'N/A'}</td>
+                    <td>${ops?.operators || 'N/A'}</td>
+                    <td>${ops?.laborers || 'N/A'}</td>
+                    <td>${ops?.surveyors || 'N/A'}</td>
+                    <td>${ops?.others || 'N/A'}</td>
+                </tr>`;
+            });
 
-                return `
-                    <tr>
-                        <td style="font-weight: 500;">${escapeHtml(contractor.abbreviation || contractor.name)}</td>
-                        <td>${escapeHtml(contractor.trades || '-')}</td>
-                        <td class="text-center">${supers || '-'}</td>
-                        <td class="text-center">${foremen || '-'}</td>
-                        <td class="text-center">${operators || '-'}</td>
-                        <td class="text-center">${laborers || '-'}</td>
-                        <td class="text-center">${surveyors || '-'}</td>
-                        <td class="text-center">${others || '-'}</td>
-                        <td class="text-center" style="font-weight: bold;">${rowTotal || '-'}</td>
-                    </tr>
-                `;
-            }).join('');
-
-            tbody.innerHTML = rows;
-
-            // Update totals
-            document.getElementById('totalSuper').textContent = totals.super || '-';
-            document.getElementById('totalForeman').textContent = totals.foreman || '-';
-            document.getElementById('totalOperators').textContent = totals.operators || '-';
-            document.getElementById('totalLaborers').textContent = totals.laborers || '-';
-            document.getElementById('totalSurveyors').textContent = totals.surveyors || '-';
-            document.getElementById('totalOthers').textContent = totals.others || '-';
-            document.getElementById('totalAll').textContent = totals.all || '-';
+            tbody.innerHTML = html;
         }
 
         function getContractorOperations(contractorId) {
+            const userEdits = report.userEdits || {};
             const userEditKey = `operations_${contractorId}`;
-            if (report.userEdits && report.userEdits[userEditKey]) {
-                return report.userEdits[userEditKey];
-            }
+            if (userEdits[userEditKey]) return userEdits[userEditKey];
 
             if (report.aiGenerated?.operations) {
                 const aiOps = report.aiGenerated.operations.find(o => o.contractorId === contractorId);
@@ -1283,45 +1132,64 @@
             return null;
         }
 
-        // ============ RENDER EQUIPMENT TABLE ============
+        function formatTradesAbbrev(trades) {
+            if (!trades) return '-';
+            // Common trade abbreviations
+            const abbrevMap = {
+                'construction management': 'CM',
+                'project management': 'PM',
+                'pile driving': 'PLE',
+                'concrete': 'CONC',
+                'asphalt': 'ASP',
+                'utilities': 'UTL',
+                'earthwork': 'ERTHWRK',
+                'electrical': 'ELEC',
+                'communications': 'COMM',
+                'fence': 'FENCE',
+                'pavement markings': 'PVMNT MRK',
+                'hauling': 'HAUL',
+                'pavement subgrade': 'PVMT SUB',
+                'demo': 'DEMO',
+                'demolition': 'DEMO',
+                'general': 'GEN'
+            };
+
+            const parts = trades.split(/[;,]/).map(t => t.trim().toLowerCase());
+            const abbrevs = parts.map(t => abbrevMap[t] || t.substring(0, 6).toUpperCase());
+            return abbrevs.join('; ');
+        }
+
+        // ============ EQUIPMENT TABLE ============
         function renderEquipmentTable() {
             const tbody = document.getElementById('equipmentTableBody');
             const equipmentData = getEquipmentData();
 
             if (equipmentData.length === 0) {
-                tbody.innerHTML = `
-                    <tr>
-                        <td colspan="4" style="text-align: center; color: #666; padding: 12px;">
-                            No equipment documented.
-                        </td>
-                    </tr>
-                `;
+                tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:#666;">No equipment mobilized</td></tr>`;
                 return;
             }
 
-            const rows = equipmentData.map(item => {
-                const contractor = projectContractors.find(c => c.id === item.contractorId);
-                const contractorName = contractor ? (contractor.abbreviation || contractor.name) : '--';
-                const status = item.status === 'IDLE' ? 'IDLE' : item.status || 'IDLE';
+            let html = '';
+            equipmentData.forEach(item => {
+                const contractorName = getContractorName(item.contractorId);
+                const status = item.status || 'IDLE';
+                const notes = status === 'IDLE' ? 'IDLE' : `${status.replace(' hrs', '')} HOURS UTILIZED`;
 
-                return `
-                    <tr>
-                        <td>${escapeHtml(contractorName)}</td>
-                        <td>${escapeHtml(item.type || '--')}</td>
-                        <td class="text-center">${item.qty || 1}</td>
-                        <td style="${status === 'IDLE' ? 'color: #666; font-style: italic;' : 'color: #4a7c59; font-weight: 500;'}">${status}</td>
-                    </tr>
-                `;
-            }).join('');
+                html += `<tr>
+                    <td>${escapeHtml(contractorName)}</td>
+                    <td>${escapeHtml(item.type || 'N/A')}</td>
+                    <td>${item.qty || 1}</td>
+                    <td>${notes}</td>
+                </tr>`;
+            });
 
-            tbody.innerHTML = rows;
+            tbody.innerHTML = html;
         }
 
         function getEquipmentData() {
             if (report.equipment && report.equipment.length > 0) {
                 return report.equipment;
             }
-
             if (report.aiGenerated?.equipment && report.aiGenerated.equipment.length > 0) {
                 return report.aiGenerated.equipment.map(item => ({
                     contractorId: item.contractorId || '',
@@ -1330,197 +1198,283 @@
                     status: item.status || (item.hoursUsed ? `${item.hoursUsed} hrs` : 'IDLE')
                 }));
             }
-
             return [];
         }
 
-        // ============ RENDER PHOTOS ============
+        function getContractorName(contractorId) {
+            const contractor = projectContractors.find(c => c.id === contractorId);
+            if (contractor) {
+                return contractor.abbreviation || contractor.name.substring(0, 15).toUpperCase();
+            }
+            return 'UNKNOWN';
+        }
+
+        // ============ TEXT SECTIONS ============
+        function renderTextSections() {
+            // Issues
+            const issues = getTextValue('issues', 'generalIssues', 'guidedNotes.issues', '');
+            document.getElementById('issuesContent').innerHTML = formatTextSection(issues);
+
+            // Communications
+            const comms = getTextValue('communications', 'contractorCommunications', '', '');
+            document.getElementById('communicationsContent').innerHTML = formatTextSection(comms);
+
+            // QA/QC
+            const qaqc = getTextValue('qaqc', 'qaqcNotes', '', '');
+            document.getElementById('qaqcContent').innerHTML = formatTextSection(qaqc);
+
+            // Visitors
+            const visitors = getTextValue('visitors', 'visitorsRemarks', '', '');
+            document.getElementById('visitorsContent').innerHTML = formatTextSection(visitors);
+        }
+
+        function getTextValue(reportPath, aiPath, fallbackPath, defaultVal) {
+            const userEdits = report.userEdits || {};
+
+            // User edits first
+            if (userEdits[reportPath] !== undefined) {
+                return userEdits[reportPath];
+            }
+
+            // AI generated
+            if (report.aiGenerated) {
+                const aiVal = getNestedValueSimple(report.aiGenerated, aiPath);
+                if (aiVal !== undefined && aiVal !== null && aiVal !== '') {
+                    if (Array.isArray(aiVal)) return aiVal.join('\n');
+                    return aiVal;
+                }
+            }
+
+            // Report value
+            const reportVal = getNestedValueSimple(report, reportPath);
+            if (reportVal !== undefined && reportVal !== null && reportVal !== '') {
+                if (Array.isArray(reportVal)) return reportVal.join('\n');
+                return reportVal;
+            }
+
+            // Fallback path
+            if (fallbackPath) {
+                const fallbackVal = getNestedValueSimple(report, fallbackPath);
+                if (fallbackVal !== undefined && fallbackVal !== null && fallbackVal !== '') {
+                    if (Array.isArray(fallbackVal)) return fallbackVal.join('\n');
+                    return fallbackVal;
+                }
+            }
+
+            return defaultVal;
+        }
+
+        function getNestedValueSimple(obj, path) {
+            return path.split('.').reduce((o, k) => (o || {})[k], obj);
+        }
+
+        function formatTextSection(text) {
+            if (!text || text.trim() === '') {
+                return '<ul><li class="na-text">N/A.</li></ul>';
+            }
+
+            const lines = text.split('\n').filter(l => l.trim());
+            if (lines.length === 0) {
+                return '<ul><li class="na-text">N/A.</li></ul>';
+            }
+
+            if (lines.length === 1) {
+                return `<ul><li>${escapeHtml(lines[0])}</li></ul>`;
+            }
+
+            return '<ul>' + lines.map(line => `<li>${escapeHtml(line)}</li>`).join('') + '</ul>';
+        }
+
+        // ============ SAFETY SECTION ============
+        function renderSafetySection() {
+            const hasIncident = report.safety?.hasIncident || report.aiGenerated?.safety?.hasIncidents || false;
+            const noIncident = !hasIncident;
+
+            document.getElementById('checkYes').textContent = hasIncident ? 'X' : '';
+            document.getElementById('checkYes').classList.toggle('checked', hasIncident);
+            document.getElementById('checkNo').textContent = noIncident ? 'X' : '';
+            document.getElementById('checkNo').classList.toggle('checked', noIncident);
+
+            const safetyNotes = getTextValue('safety.notes', 'safety.notes', 'guidedNotes.safety', '');
+            document.getElementById('safetyContent').innerHTML = formatTextSection(safetyNotes);
+        }
+
+        // ============ PHOTOS ============
         function renderPhotos() {
-            const container = document.getElementById('photosContainer');
             const photos = report.photos || [];
-            const totalPhotos = photos.length;
+            const grid = document.getElementById('photosGrid');
+            const projectName = report.overview?.projectName || activeProject?.name || '';
+            const projectNo = report.overview?.noabProjectNo || activeProject?.noabProjectNo || '';
 
-            document.getElementById('photoCount').textContent = `(${totalPhotos} photo${totalPhotos !== 1 ? 's' : ''})`;
+            document.getElementById('photoProjectName').textContent = projectName;
+            document.getElementById('photoProjectNo').textContent = projectNo;
 
-            if (totalPhotos === 0) {
-                container.innerHTML = `
-                    <div style="text-align: center; color: #666; padding: 40px;">
-                        <i class="fas fa-images" style="font-size: 32px; margin-bottom: 8px;"></i>
-                        <p style="margin: 0;">No photos captured</p>
+            if (photos.length === 0) {
+                grid.innerHTML = `
+                    <div class="photo-cell">
+                        <div class="photo-image empty">No photos captured</div>
+                        <div class="photo-meta"><span>Date:</span> --</div>
+                    </div>
+                    <div class="photo-cell">
+                        <div class="photo-image empty"></div>
+                        <div class="photo-meta"><span>Date:</span> --</div>
                     </div>
                 `;
-                // Hide photos page if no photos
-                document.getElementById('photosPage').style.display = 'none';
                 return;
             }
 
-            let html = '<div class="photo-grid">';
-            photos.forEach((photo, index) => {
-                const photoNum = index + 1;
-                const dateStr = photo.date || '--';
-                const timeStr = photo.time || '--';
-                const gpsStr = photo.gps
-                    ? `${photo.gps.lat.toFixed(5)}, ${photo.gps.lng.toFixed(5)}`
-                    : null;
+            // Generate photo cells (4 per page, 2x2 grid)
+            let html = '';
+            const displayPhotos = photos.slice(0, 4); // First 4 photos for page 4
 
-                html += `
-                    <div class="photo-item">
-                        <div class="photo-item-header">Photo ${photoNum} of ${totalPhotos}</div>
-                        <div class="photo-item-image">
-                            <img src="${photo.url}" alt="Progress photo ${photoNum}" onerror="this.parentNode.innerHTML='<div style=\\'padding: 20px; text-align: center; color: #999;\\'><i class=\\'fas fa-exclamation-triangle\\' style=\\'font-size: 24px;\\'></i><br>Failed to load</div>'">
-                        </div>
-                        <div class="photo-item-caption">
-                            <div class="photo-meta">
-                                <i class="fas fa-calendar-alt"></i> ${dateStr} &nbsp;
-                                <i class="fas fa-clock"></i> ${timeStr}
-                                ${gpsStr ? `&nbsp; <i class="fas fa-map-marker-alt"></i> ${gpsStr}` : ''}
+            for (let i = 0; i < 4; i++) {
+                const photo = displayPhotos[i];
+                if (photo) {
+                    html += `
+                        <div class="photo-cell">
+                            <div class="photo-image">
+                                <img src="${photo.url}" alt="Photo ${i + 1}">
                             </div>
-                            ${photo.caption ? escapeHtml(photo.caption) : '<span style="color: #999; font-style: italic;">No caption</span>'}
+                            <div class="photo-meta"><span>Date:</span> ${photo.date || formatDisplayDate(report.overview?.date)}</div>
+                            <div class="photo-caption">${escapeHtml(photo.caption) || ''}</div>
                         </div>
-                    </div>
-                `;
-            });
-            html += '</div>';
-
-            container.innerHTML = html;
-        }
-
-        // ============ UI HELPERS ============
-        function updateHeaderDate() {
-            const dateObj = new Date(reportDate + 'T12:00:00');
-            const dateStr = dateObj.toLocaleDateString('en-US', {
-                weekday: 'short',
-                month: 'short',
-                day: 'numeric',
-                year: 'numeric'
-            });
-            document.getElementById('headerDate').textContent = dateStr;
-        }
-
-        // ============ CANCEL MODAL ============
-        function showCancelModal() {
-            const dateObj = new Date(reportDate + 'T12:00:00');
-            const formattedDate = dateObj.toLocaleDateString('en-US', {
-                weekday: 'long',
-                month: 'long',
-                day: 'numeric',
-                year: 'numeric'
-            });
-            document.getElementById('cancelReportDate').textContent = formattedDate;
-            document.getElementById('cancelModal').style.display = 'flex';
-        }
-
-        function hideCancelModal() {
-            document.getElementById('cancelModal').style.display = 'none';
-        }
-
-        function confirmCancel() {
-            const key = getReportKey();
-            localStorage.removeItem(key);
-
-            const legacyKey = `fieldvoice_report_${reportDate}`;
-            localStorage.removeItem(legacyKey);
-
-            const legacyReport = localStorage.getItem('fieldvoice_report');
-            if (legacyReport) {
-                try {
-                    const parsed = JSON.parse(legacyReport);
-                    const legacyDate = parsed.overview?.date;
-                    if (legacyDate) {
-                        const d = new Date(legacyDate);
-                        if (d.toISOString().split('T')[0] === reportDate) {
-                            localStorage.removeItem('fieldvoice_report');
-                        }
-                    }
-                } catch (e) {}
+                    `;
+                } else {
+                    html += `
+                        <div class="photo-cell">
+                            <div class="photo-image empty"></div>
+                            <div class="photo-meta"><span>Date:</span> ${formatDisplayDate(report.overview?.date)}</div>
+                        </div>
+                    `;
+                }
             }
 
-            showToast('Report deleted', 'success');
-            hideCancelModal();
-            setTimeout(() => window.location.href = 'index.html', 1500);
+            grid.innerHTML = html;
+
+            // If more than 4 photos, add additional photo pages
+            if (photos.length > 4) {
+                addAdditionalPhotoPages(photos.slice(4));
+            }
         }
 
-        // ============ EXPORT PDF ============
-        function exportPDF() {
+        function addAdditionalPhotoPages(remainingPhotos) {
+            const container = document.querySelector('.page-container');
+            let pageNum = 5;
+
+            for (let i = 0; i < remainingPhotos.length; i += 4) {
+                const pagePhotos = remainingPhotos.slice(i, i + 4);
+                const page = document.createElement('div');
+                page.className = 'page' + (i + 4 < remainingPhotos.length ? ' page-break' : '');
+
+                let photosHtml = '';
+                for (let j = 0; j < 4; j++) {
+                    const photo = pagePhotos[j];
+                    if (photo) {
+                        photosHtml += `
+                            <div class="photo-cell">
+                                <div class="photo-image">
+                                    <img src="${photo.url}" alt="Photo">
+                                </div>
+                                <div class="photo-meta"><span>Date:</span> ${photo.date || formatDisplayDate(report.overview?.date)}</div>
+                                <div class="photo-caption">${escapeHtml(photo.caption) || ''}</div>
+                            </div>
+                        `;
+                    } else {
+                        photosHtml += `
+                            <div class="photo-cell">
+                                <div class="photo-image empty"></div>
+                                <div class="photo-meta"><span>Date:</span> --</div>
+                            </div>
+                        `;
+                    }
+                }
+
+                page.innerHTML = `
+                    <div class="report-header">
+                        <div class="report-logo-placeholder">
+                            LOUIS ARMSTRONG<br>NEW ORLEANS<br>INTERNATIONAL AIRPORT
+                        </div>
+                        <div class="report-title">RPR DAILY REPORT</div>
+                    </div>
+                    <div class="section-header">Daily Photos (Continued)</div>
+                    <div class="photos-grid">${photosHtml}</div>
+                    <div class="page-footer">${pageNum} of <span class="total-pages">4</span></div>
+                `;
+
+                container.appendChild(page);
+                pageNum++;
+            }
+
+            updateTotalPages();
+        }
+
+        function updateTotalPages() {
+            const pages = document.querySelectorAll('.page');
+            const totalPages = pages.length;
+            document.querySelectorAll('.total-pages').forEach(el => {
+                el.textContent = totalPages;
+            });
+        }
+
+        // ============ UTILITY FUNCTIONS ============
+        function formatDisplayDate(dateStr) {
+            if (!dateStr) return '--';
+            try {
+                const d = new Date(dateStr);
+                if (isNaN(d.getTime())) return dateStr;
+                return d.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
+            } catch (e) {
+                return dateStr;
+            }
+        }
+
+        function formatTime(timeStr) {
+            if (!timeStr) return '';
+            try {
+                const [hours, minutes] = timeStr.split(':').map(Number);
+                const period = hours >= 12 ? 'PM' : 'AM';
+                const displayHours = hours % 12 || 12;
+                return `${displayHours}:${String(minutes).padStart(2, '0')} ${period}`;
+            } catch (e) {
+                return timeStr;
+            }
+        }
+
+        function calculateShiftDuration(startTime, endTime) {
+            if (!startTime || !endTime) return '';
+            try {
+                const start = new Date(`2000-01-01T${startTime}`);
+                const end = new Date(`2000-01-01T${endTime}`);
+                let diffMs = end - start;
+                if (diffMs < 0) diffMs += 24 * 60 * 60 * 1000;
+                const hours = diffMs / (1000 * 60 * 60);
+                return `${hours.toFixed(2)} hours`;
+            } catch (e) {
+                return '';
+            }
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        // ============ NAVIGATION ============
+        function goToEdit() {
+            const params = new URLSearchParams(window.location.search);
+            const dateParam = params.get('date');
+            if (dateParam) {
+                window.location.href = `report.html?date=${dateParam}`;
+            } else {
+                window.location.href = 'report.html';
+            }
+        }
+
+        function printReport() {
             window.print();
         }
-
-        // ============ TOAST ============
-        function showToast(message, type = 'success') {
-            const container = document.getElementById('toast-container');
-            const toast = document.createElement('div');
-            const colors = {
-                success: '#4a7c59',
-                error: '#b91c1c',
-                warning: '#d97706',
-                info: '#1e40af'
-            };
-            const icons = {
-                success: 'fa-check-circle',
-                error: 'fa-exclamation-circle',
-                warning: 'fa-exclamation-triangle',
-                info: 'fa-info-circle'
-            };
-            toast.style.cssText = `background: ${colors[type]}; color: white; padding: 12px 16px; border-radius: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); display: flex; align-items: center; gap: 8px; margin-bottom: 8px; transform: translateX(120%); transition: transform 0.3s ease;`;
-            toast.innerHTML = `<i class="fas ${icons[type]}"></i><span style="font-weight: bold; font-size: 12px;">${message}</span>`;
-            container.appendChild(toast);
-
-            setTimeout(() => toast.style.transform = 'translateX(0)', 10);
-            setTimeout(() => {
-                toast.style.transform = 'translateX(120%)';
-                setTimeout(() => toast.remove(), 300);
-            }, 3000);
-        }
-    </script>
-
-    <!-- PWA Navigation Fix -->
-    <script>
-        (function() {
-            if (window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches) {
-                document.addEventListener('click', function(e) {
-                    const link = e.target.closest('a');
-                    if (link && link.href && link.href.startsWith(window.location.origin)) {
-                        e.preventDefault();
-                        window.location.href = link.href;
-                    }
-                }, true);
-            }
-        })();
-    </script>
-
-    <!-- PWA Service Worker Registration & Offline Banner -->
-    <div id="offline-banner" class="no-print" style="display: none; position: fixed; top: 0; left: 0; right: 0; background: #f59e0b; color: #78350f; text-align: center; padding: 8px 16px; font-weight: bold; font-size: 12px; z-index: 9999; transform: translateY(-100%); transition: transform 0.3s ease;">
-        <i class="fas fa-wifi-slash" style="margin-right: 8px;"></i>You are offline - Some features may be unavailable
-    </div>
-    <script>
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./sw.js')
-                    .then(registration => {
-                        console.log('[PWA] Service Worker registered:', registration.scope);
-                    })
-                    .catch(error => {
-                        console.error('[PWA] Service Worker registration failed:', error);
-                    });
-            });
-        }
-
-        const offlineBanner = document.getElementById('offline-banner');
-        function showOfflineBanner() {
-            if (offlineBanner) {
-                offlineBanner.style.display = 'block';
-                setTimeout(() => offlineBanner.style.transform = 'translateY(0)', 10);
-            }
-        }
-        function hideOfflineBanner() {
-            if (offlineBanner) {
-                offlineBanner.style.transform = 'translateY(-100%)';
-                setTimeout(() => offlineBanner.style.display = 'none', 300);
-            }
-        }
-        window.addEventListener('online', hideOfflineBanner);
-        window.addEventListener('offline', showOfflineBanner);
-        if (!navigator.onLine) showOfflineBanner();
     </script>
 </body>
 </html>
