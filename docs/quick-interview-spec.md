@@ -278,7 +278,7 @@ The following fields exist in the report data structure and are populated by AI 
 
 ## Webhook Request Payload
 
-The `buildProcessPayload()` function (line 1047) constructs the payload sent to n8n:
+The `buildProcessPayload()` function (line 1046) constructs the payload sent to n8n:
 
 ```json
 {
@@ -366,7 +366,7 @@ The `buildProcessPayload()` function (line 1047) constructs the payload sent to 
 | `weather` | object | `report.overview.weather` | Auto-fetched + manual input |
 | `photos` | array | `report.photos[]` | Photo URLs excluded (only metadata) |
 | `reportDate` | string | `report.overview.date` | Formatted date |
-| `inspectorName` | string | `report.overview.completedBy` | Inspector name |
+| `inspectorName` | string | `report.overview?.completedBy` | Currently not populated by quick-interview.html (empty string) |
 
 ### fieldNotes by Capture Mode
 
@@ -385,6 +385,10 @@ The `buildProcessPayload()` function (line 1047) constructs the payload sent to 
   "safety": "No incidents reported" | "INCIDENT REPORTED: [notes joined with ;]"
 }
 ```
+
+**Note:** In guided mode, `issues` and `safety` are computed at submission time by `finishReport()`:
+- `issues` = `report.generalIssues.join('\n')`
+- `safety` = `"No incidents reported"` if `noIncidents` is true, otherwise `"INCIDENT REPORTED: "` + notes joined with `"; "`
 
 ---
 
@@ -406,36 +410,29 @@ The `buildProcessPayload()` function (line 1047) constructs the payload sent to 
     "createdAt": "2024-01-15T08:00:00.000Z",
     "interviewCompleted": false,
     "version": 2,
-    "naMarked": {
-      "issues": false,
-      "photos": false
-    },
-    "captureMode": "guided",
-    "status": "refined",
-    "offlineQueue": []
+    "naMarked": {},
+    "captureMode": null
   },
 
   "reporter": {
-    "name": "John Smith"
+    "name": ""
   },
 
   "project": {
-    "name": "Highway 61 Reconstruction",
+    "name": "",
     "dayNumber": null
   },
 
   "overview": {
-    "projectName": "Highway 61 Reconstruction",
+    "projectName": "",
     "date": "1/15/2024",
     "startTime": "7:00 AM",
-    "endTime": "4:30 PM",
-    "shiftDuration": "9.30 hours",
     "weather": {
-      "highTemp": "85",
-      "lowTemp": "72",
+      "highTemp": "--",
+      "lowTemp": "--",
       "precipitation": "0.00\"",
-      "generalCondition": "Sunny",
-      "jobSiteCondition": "Dry",
+      "generalCondition": "Syncing...",
+      "jobSiteCondition": "",
       "adverseConditions": "N/A"
     }
   },
@@ -445,46 +442,33 @@ The `buildProcessPayload()` function (line 1047) constructs the payload sent to 
   },
 
   "guidedNotes": {
-    "workSummary": "Work performed today...",
-    "issues": "Issues joined text...",
-    "safety": "Safety status text..."
+    "workSummary": ""
   },
 
   "contractors": [],
   "activities": [],
   "operations": [],
   "equipment": [],
-  "generalIssues": ["Issue 1", "Issue 2"],
+  "generalIssues": [],
   "qaqcNotes": [],
 
   "safety": {
     "hasIncidents": false,
-    "noIncidents": true,
-    "notes": ["No safety incidents reported."]
+    "noIncidents": false,
+    "notes": []
   },
 
   "contractorCommunications": "",
   "visitorsRemarks": "",
   "additionalNotes": "",
 
-  "photos": [
-    {
-      "id": "photo_1705329600000_0",
-      "url": "data:image/jpeg;base64,...",
-      "caption": "",
-      "timestamp": "2024-01-15T10:30:00.000Z",
-      "date": "1/15/2024",
-      "time": "10:30:00 AM",
-      "gps": { "lat": 29.9511, "lng": -90.0715, "accuracy": 10 },
-      "fileName": "IMG_1234.jpg",
-      "fileSize": 2048000,
-      "fileType": "image/jpeg"
-    }
-  ],
+  "photos": [],
 
   "aiGenerated": { ... }
 }
 ```
+
+**Note:** The `guidedNotes.issues` and `guidedNotes.safety` fields are populated by the `finishReport()` function just before sending to the webhook, not stored directly during capture. The `meta.captureMode` is `null` until the user selects a mode.
 
 ### Other localStorage Keys
 
