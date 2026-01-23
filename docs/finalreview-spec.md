@@ -304,6 +304,110 @@ if (activeProject) {
 | `report.meta.submitted` | `true` | Marks report as submitted |
 | `report.meta.submittedAt` | ISO timestamp | Submission timestamp |
 
+---
+
+## Empty Field Highlighting
+
+The final review page checks all Project Overview fields on page load and highlights any empty fields to help users identify incomplete data before submission.
+
+### Highlighted Fields
+
+| Element ID | Field Label |
+|------------|-------------|
+| `projectName` | Project Name |
+| `noabProjectNo` | NOAB Project No. |
+| `cnoSolicitationNo` | CNO Solicitation No. |
+| `location` | Location |
+| `engineer` | Engineer |
+| `contractor` | Contractor |
+| `noticeToProceed` | Notice to Proceed |
+| `contractDuration` | Contract Duration |
+| `expectedCompletion` | Expected Completion |
+| `contractDay` | Contract Day # |
+| `weatherDays` | Weather Days |
+| `reportDate` | Report Date |
+| `startTime` | Start Time |
+| `endTime` | End Time |
+| `completedBy` | Completed By |
+
+### Empty Value Detection
+
+A field is considered empty if its text content (after trimming) is:
+- Empty string (`''`)
+- Double dash (`'--'`)
+- Not applicable (`'N/A'`)
+
+### Visual Styling
+
+Empty fields receive the `.missing-field` CSS class:
+
+```css
+.missing-field {
+    border: 2px solid #dc2626 !important;
+    background-color: #fef2f2 !important;
+}
+```
+
+### Incomplete Fields Banner
+
+When empty fields are detected, a dismissible banner appears at the top of the page:
+
+| Element | Description |
+|---------|-------------|
+| `#incompleteBanner` | Container div, hidden by default |
+| `#incompleteBannerText` | Shows count: "X field(s) incomplete in Project Overview" |
+| Dismiss button | Hides the banner (does not block submission) |
+
+**Banner Behavior:**
+- Appears automatically on page load if any fields are empty
+- Shows count of incomplete fields with proper pluralization
+- Dismissible via "Dismiss" button
+- Hidden during print (`@media print { display: none !important; }`)
+- Does NOT block report submission
+
+### JavaScript Functions
+
+| Function | Purpose |
+|----------|---------|
+| `checkEmptyFields()` | Scans all Project Overview fields, applies highlighting, updates banner |
+| `dismissIncompleteBanner()` | Hides the incomplete fields banner |
+
+### Data Flow
+
+```
+Page loads
+    │
+    ▼
+populateReport() fills all fields from localStorage
+    │
+    ▼
+checkEmptyFields() called
+    │
+    ├─► Loop through PROJECT_OVERVIEW_FIELDS array
+    │    ├─► Get element by ID
+    │    ├─► Check if textContent is empty/--/N/A
+    │    ├─► Add or remove .missing-field class
+    │    └─► Increment emptyCount if empty
+    │
+    ├─► If emptyCount > 0
+    │    ├─► Update banner text with count
+    │    └─► Show banner (display: flex)
+    │
+    └─► If emptyCount === 0
+         └─► Hide banner (display: none)
+```
+
+### Re-checking After Edit
+
+When a user navigates back to `report.html`, fills in missing data, and returns to `finalreview.html`:
+1. The page reloads fresh from localStorage
+2. `populateReport()` loads the updated data
+3. `checkEmptyFields()` re-evaluates all fields
+4. Previously highlighted fields are cleared if now populated
+5. Banner count updates accordingly
+
+---
+
 ### Post-Submit UI State
 
 After submission, the Submit button is disabled:

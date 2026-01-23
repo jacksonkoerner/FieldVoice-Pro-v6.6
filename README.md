@@ -1078,6 +1078,17 @@ Extend the `weatherCodes` object in `index.html` (lines 418-433) with additional
 
 ## Recent Changes
 
+### Empty Field Highlighting in Final Review (January 2026)
+- **New feature in finalreview.html** - Visual indicators for incomplete Project Overview fields
+  - On page load, checks 15 Project Overview fields for empty values
+  - Empty fields highlighted with red border and light red background
+  - Dismissible banner at top shows count of incomplete fields
+  - Banner does not block submission - users can submit with missing fields
+  - Empty value detection: empty string, `--`, or `N/A`
+  - Highlighting updates when user navigates back from report.html with new data
+  - Banner hidden during print
+  - Fields checked: Project Name, NOAB Project No., CNO Solicitation No., Location, Engineer, Contractor, Notice to Proceed, Contract Duration, Expected Completion, Contract Day #, Weather Days, Report Date, Start Time, End Time, Completed By
+
 ### Code Cleanup (January 2026)
 - **Removed unused commented-out code from quick-interview.html**
   - Removed placeholder comments for deprecated sections (Personnel/Operations, Equipment, QA/QC Inspections, Communications, Visitors/Deliveries)
