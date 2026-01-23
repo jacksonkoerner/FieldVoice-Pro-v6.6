@@ -108,19 +108,33 @@
             margin: 20px auto;
             background: white;
             box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+            overflow-x: hidden;
         }
 
         .page {
-            width: 8.5in;
+            width: 100%;
+            max-width: 8.5in;
             min-height: 11in;
             padding: 0.4in 0.5in;
             background: white;
             position: relative;
+            box-sizing: border-box;
+            overflow-x: hidden;
         }
 
         .page-break {
             page-break-after: always;
             break-after: page;
+        }
+
+        /* Ensure all sections stay within page bounds */
+        .section-header,
+        .work-summary,
+        .text-section,
+        .photos-header-info,
+        .photos-grid {
+            max-width: 100%;
+            box-sizing: border-box;
         }
 
         /* ============ REPORT HEADER ============ */
@@ -162,6 +176,8 @@
             font-size: 10pt;
             text-transform: uppercase;
             margin-top: 12px;
+            border: 1px solid #000;
+            border-bottom: none;
         }
 
         .section-header:first-child {
@@ -169,8 +185,15 @@
         }
 
         /* ============ PROJECT OVERVIEW TABLE ============ */
+        .overview-wrapper {
+            width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
         .overview-table {
             width: 100%;
+            min-width: 500px;
             border-collapse: collapse;
             font-size: 9pt;
         }
@@ -179,17 +202,17 @@
             border: 1px solid #000;
             padding: 4px 8px;
             vertical-align: top;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
         }
 
         .overview-table .label {
             font-weight: bold;
             background: #f5f5f5;
-            width: 140px;
             white-space: nowrap;
         }
 
         .overview-table .value {
-            min-width: 150px;
         }
 
         /* Weather sub-table */
@@ -230,9 +253,11 @@
         /* ============ DAILY WORK SUMMARY ============ */
         .work-summary {
             border: 1px solid #000;
+            border-top: none;
             padding: 10px;
-            margin-top: 0;
             font-size: 9pt;
+            overflow-wrap: break-word;
+            word-wrap: break-word;
         }
 
         .contractor-block {
@@ -263,23 +288,27 @@
             width: 100%;
             border-collapse: collapse;
             font-size: 8pt;
-            margin-top: 0;
+            margin: 0;
+            border: 1px solid #000;
+            border-top: none;
         }
 
         .ops-table th {
             background: #f5f5f5;
             border: 1px solid #000;
-            padding: 4px 6px;
+            padding: 4px 3px;
             font-weight: bold;
             text-align: center;
             text-transform: uppercase;
-            font-size: 7pt;
+            font-size: 6pt;
+            white-space: nowrap;
         }
 
         .ops-table td {
             border: 1px solid #000;
-            padding: 4px 6px;
+            padding: 4px 3px;
             text-align: center;
+            font-size: 8pt;
         }
 
         .ops-table td:first-child,
@@ -292,23 +321,27 @@
             width: 100%;
             border-collapse: collapse;
             font-size: 8pt;
-            margin-top: 0;
+            margin: 0;
+            border: 1px solid #000;
+            border-top: none;
         }
 
         .equip-table th {
             background: #f5f5f5;
             border: 1px solid #000;
-            padding: 4px 6px;
+            padding: 4px 3px;
             font-weight: bold;
             text-align: center;
             text-transform: uppercase;
-            font-size: 7pt;
+            font-size: 6pt;
         }
 
         .equip-table td {
             border: 1px solid #000;
-            padding: 3px 6px;
+            padding: 3px;
             text-align: center;
+            font-size: 8pt;
+            word-wrap: break-word;
         }
 
         .equip-table td:first-child,
@@ -323,6 +356,8 @@
             padding: 8px 10px;
             min-height: 40px;
             font-size: 9pt;
+            overflow-wrap: break-word;
+            word-wrap: break-word;
         }
 
         .text-section ul {
@@ -531,28 +566,68 @@
 
         /* ============ RESPONSIVE (screen only) ============ */
         @media screen and (max-width: 900px) {
+            body {
+                background: white;
+            }
+
             .page-container {
                 margin: 0;
                 box-shadow: none;
+                max-width: 100%;
+                overflow-x: auto;
             }
 
             .page {
                 width: 100%;
-                padding: 16px;
+                min-width: 360px;
+                padding: 12px;
                 min-height: auto;
             }
 
-            .overview-table .label {
-                width: 100px;
-                font-size: 8pt;
-            }
-
-            .overview-table .value {
-                font-size: 8pt;
+            .report-header {
+                flex-direction: column;
+                gap: 8px;
+                text-align: center;
             }
 
             .report-title {
                 font-size: 14pt;
+                text-align: center;
+            }
+
+            .section-header {
+                font-size: 9pt;
+                padding: 5px 8px;
+            }
+
+            .work-summary {
+                padding: 8px;
+                font-size: 8pt;
+            }
+
+            .text-section {
+                padding: 6px 8px;
+                font-size: 8pt;
+            }
+
+            .overview-wrapper {
+                overflow-x: auto;
+            }
+
+            .ops-table,
+            .equip-table {
+                font-size: 7pt;
+            }
+
+            .ops-table th,
+            .equip-table th {
+                padding: 3px 2px;
+                font-size: 5pt;
+            }
+
+            .ops-table td,
+            .equip-table td {
+                padding: 3px 2px;
             }
 
             .photos-grid {
@@ -561,6 +636,19 @@
 
             .photo-cell {
                 border-right: 1px solid #ccc !important;
+                min-height: 200px;
+            }
+
+            .photo-image {
+                height: 150px;
+            }
+
+            .page-footer {
+                position: relative;
+                bottom: auto;
+                left: auto;
+                right: auto;
+                margin-top: 20px;
             }
         }
     </style>
@@ -606,6 +694,7 @@
 
             <!-- Project Overview -->
             <div class="section-header">Project Overview</div>
+            <div class="overview-wrapper">
             <table class="overview-table">
                 <tr>
                     <td class="label">PROJECT NAME:</td>
@@ -678,6 +767,7 @@
                     <td class="weather-sub" id="weatherAdverse"></td>
                 </tr>
             </table>
+            </div><!-- end overview-wrapper -->
 
             <!-- Daily Work Summary -->
             <div class="section-header">Daily Work Summary</div>
@@ -709,12 +799,12 @@
             <table class="ops-table">
                 <thead>
                     <tr>
-                        <th style="width:100px;">CONTRACTOR</th>
-                        <th style="width:120px;">TRADE</th>
+                        <th>CONTRACTOR</th>
+                        <th>TRADE</th>
                         <th>SUPER(S)</th>
                         <th>FOREMAN</th>
                         <th>OPERATOR(S)</th>
-                        <th>LABORER(S) /<br>ELECTRICIAN(S)</th>
+                        <th>LABORER(S)</th>
                         <th>SURVEYOR(S)</th>
                         <th>OTHER(S)</th>
                     </tr>
@@ -729,10 +819,10 @@
             <table class="equip-table">
                 <thead>
                     <tr>
-                        <th style="width:120px;">CONTRACTOR</th>
+                        <th>CONTRACTOR</th>
                         <th>EQUIPMENT TYPE / MODEL #</th>
-                        <th style="width:60px;">QUANTITY</th>
-                        <th style="width:140px;">NOTES</th>
+                        <th>QTY</th>
+                        <th>NOTES</th>
                     </tr>
                 </thead>
                 <tbody id="equipmentTableBody">
@@ -1431,7 +1521,16 @@
         function formatTime(timeStr) {
             if (!timeStr) return '';
             try {
-                const [hours, minutes] = timeStr.split(':').map(Number);
+                // Handle already formatted time (e.g., "6:00 AM")
+                if (timeStr.includes('AM') || timeStr.includes('PM')) {
+                    return timeStr;
+                }
+                // Handle 24-hour format (e.g., "06:00")
+                const parts = timeStr.split(':');
+                if (parts.length < 2) return timeStr;
+                const hours = parseInt(parts[0], 10);
+                const minutes = parseInt(parts[1], 10);
+                if (isNaN(hours) || isNaN(minutes)) return timeStr;
                 const period = hours >= 12 ? 'PM' : 'AM';
                 const displayHours = hours % 12 || 12;
                 return `${displayHours}:${String(minutes).padStart(2, '0')} ${period}`;
@@ -1443,11 +1542,31 @@
         function calculateShiftDuration(startTime, endTime) {
             if (!startTime || !endTime) return '';
             try {
-                const start = new Date(`2000-01-01T${startTime}`);
-                const end = new Date(`2000-01-01T${endTime}`);
-                let diffMs = end - start;
-                if (diffMs < 0) diffMs += 24 * 60 * 60 * 1000;
-                const hours = diffMs / (1000 * 60 * 60);
+                // Handle already formatted times
+                let startHours, startMinutes, endHours, endMinutes;
+                
+                if (startTime.includes(':')) {
+                    const startParts = startTime.split(':');
+                    startHours = parseInt(startParts[0], 10);
+                    startMinutes = parseInt(startParts[1], 10) || 0;
+                } else {
+                    return '';
+                }
+                
+                if (endTime.includes(':')) {
+                    const endParts = endTime.split(':');
+                    endHours = parseInt(endParts[0], 10);
+                    endMinutes = parseInt(endParts[1], 10) || 0;
+                } else {
+                    return '';
+                }
+                
+                if (isNaN(startHours) || isNaN(endHours)) return '';
+                
+                let diffMinutes = (endHours * 60 + endMinutes) - (startHours * 60 + startMinutes);
+                if (diffMinutes < 0) diffMinutes += 24 * 60; // Handle overnight
+                
+                const hours = diffMinutes / 60;
                 return `${hours.toFixed(2)} hours`;
             } catch (e) {
                 return '';
