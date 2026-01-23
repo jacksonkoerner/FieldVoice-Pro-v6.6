@@ -96,11 +96,11 @@
         }
         .btn-edit:hover { background: #2d4a6f; }
 
-        .btn-print {
+        .btn-submit {
             background: #16a34a;
             color: white;
         }
-        .btn-print:hover { background: #15803d; }
+        .btn-submit:hover { background: #15803d; }
 
         /* ============ PAGE CONTAINER ============ */
         .page-container {
@@ -690,9 +690,9 @@
                 <i class="fas fa-edit"></i>
                 <span>Edit</span>
             </button>
-            <button onclick="printReport()" class="header-btn btn-print">
-                <i class="fas fa-print"></i>
-                <span>Print / PDF</span>
+            <button onclick="submitReport()" class="header-btn btn-submit">
+                <i class="fas fa-paper-plane"></i>
+                <span>Submit</span>
             </button>
         </div>
     </header>
@@ -981,7 +981,21 @@
 
             populateReport();
             updateTotalPages();
+            checkSubmittedState();
         });
+
+        // ============ CHECK SUBMITTED STATE ============
+        function checkSubmittedState() {
+            if (report && report.meta && report.meta.submitted) {
+                const submitBtn = document.querySelector('.btn-submit');
+                if (submitBtn) {
+                    submitBtn.innerHTML = '<i class="fas fa-check"></i><span>Submitted</span>';
+                    submitBtn.disabled = true;
+                    submitBtn.style.opacity = '0.7';
+                    submitBtn.style.cursor = 'default';
+                }
+            }
+        }
 
         // ============ PROJECT LOADING ============
         function loadActiveProject() {
@@ -1138,6 +1152,34 @@
             renderTextSections();
             renderSafetySection();
             renderPhotos();
+            renderLogo();
+        }
+
+        // ============ LOGO RENDERING ============
+        function renderLogo() {
+            // Check if activeProject has a logo
+            if (activeProject && activeProject.logo) {
+                const logoData = activeProject.logo;
+
+                // Update all logo containers across all pages
+                const logoContainers = [
+                    { placeholder: 'logoPlaceholder', image: 'logoImage' },
+                    { placeholder: 'logoPlaceholder2', image: 'logoImage2' },
+                    { placeholder: 'logoPlaceholder3', image: 'logoImage3' },
+                    { placeholder: 'logoPlaceholder4', image: 'logoImage4' }
+                ];
+
+                logoContainers.forEach(container => {
+                    const placeholder = document.getElementById(container.placeholder);
+                    const image = document.getElementById(container.image);
+
+                    if (placeholder && image) {
+                        placeholder.style.display = 'none';
+                        image.src = logoData;
+                        image.style.display = 'block';
+                    }
+                });
+            }
         }
 
         // ============ WORK SUMMARY ============
@@ -1504,11 +1546,14 @@
                     }
                 }
 
+                // Determine logo HTML based on whether project has a logo
+                const logoHtml = activeProject && activeProject.logo
+                    ? `<img src="${activeProject.logo}" class="report-logo" alt="Project Logo">`
+                    : `<div class="report-logo-placeholder">LOUIS ARMSTRONG<br>NEW ORLEANS<br>INTERNATIONAL AIRPORT</div>`;
+
                 page.innerHTML = `
                     <div class="report-header">
-                        <div class="report-logo-placeholder">
-                            LOUIS ARMSTRONG<br>NEW ORLEANS<br>INTERNATIONAL AIRPORT
-                        </div>
+                        <div>${logoHtml}</div>
                         <div class="report-title">RPR DAILY REPORT</div>
                     </div>
                     <div class="section-header">Daily Photos (Continued)</div>
@@ -1616,8 +1661,130 @@
             }
         }
 
-        function printReport() {
-            window.print();
+        function submitReport() {
+            if (!report) {
+                alert('No report data found.');
+                return;
+            }
+
+            // Get the current report key
+            const params = new URLSearchParams(window.location.search);
+            const dateParam = params.get('date');
+            const todayStr = dateParam || new Date().toISOString().split('T')[0];
+
+            // Mark report as submitted
+            report.meta = report.meta || {};
+            report.meta.submitted = true;
+            report.meta.submittedAt = new Date().toISOString();
+
+            // Determine the storage key
+            let storageKey;
+            if (activeProject) {
+                storageKey = `fieldvoice_report_${activeProject.id}_${todayStr}`;
+            } else {
+                storageKey = `fieldvoice_report_${todayStr}`;
+            }
+
+            // Save the updated report
+            try {
+                localStorage.setItem(storageKey, JSON.stringify(report));
+                showSubmitSuccess();
+            } catch (e) {
+                console.error('Failed to save report:', e);
+                alert('Failed to submit report. Storage may be full.');
+            }
+        }
+
+        function showSubmitSuccess() {
+            // Create and show a success modal
+            const modal = document.createElement('div');
+            modal.id = 'submitSuccessModal';
+            modal.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(0,0,0,0.5);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 1000;
+                padding: 20px;
+            `;
+
+            modal.innerHTML = `
+                <div style="
+                    background: white;
+                    max-width: 400px;
+                    width: 100%;
+                    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+                ">
+                    <div style="
+                        background: #16a34a;
+                        padding: 20px;
+                        text-align: center;
+                    ">
+                        <i class="fas fa-check-circle" style="color: white; font-size: 48px;"></i>
+                    </div>
+                    <div style="padding: 24px; text-align: center;">
+                        <h3 style="
+                            font-size: 18px;
+                            font-weight: bold;
+                            color: #1e293b;
+                            margin-bottom: 8px;
+                            text-transform: uppercase;
+                        ">Report Submitted</h3>
+                        <p style="
+                            color: #64748b;
+                            font-size: 14px;
+                            margin-bottom: 20px;
+                        ">Your report has been saved to the archives.</p>
+                        <div style="display: flex; gap: 12px;">
+                            <button onclick="closeSubmitModal()" style="
+                                flex: 1;
+                                padding: 12px;
+                                background: #f1f5f9;
+                                border: 1px solid #e2e8f0;
+                                color: #475569;
+                                font-weight: bold;
+                                text-transform: uppercase;
+                                font-size: 12px;
+                                cursor: pointer;
+                            ">Close</button>
+                            <button onclick="window.location.href='archives.html'" style="
+                                flex: 1;
+                                padding: 12px;
+                                background: #0a1628;
+                                border: none;
+                                color: white;
+                                font-weight: bold;
+                                text-transform: uppercase;
+                                font-size: 12px;
+                                cursor: pointer;
+                            ">View Archives</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            document.body.appendChild(modal);
+
+            // Update the submit button to show submitted state
+            const submitBtn = document.querySelector('.btn-submit');
+            if (submitBtn) {
+                submitBtn.innerHTML = '<i class="fas fa-check"></i><span>Submitted</span>';
+                submitBtn.disabled = true;
+                submitBtn.style.opacity = '0.7';
+                submitBtn.style.cursor = 'default';
+            }
+        }
+
+        function closeSubmitModal() {
+            const modal = document.getElementById('submitSuccessModal');
+            if (modal) {
+                modal.remove();
+            }
         }
     </script>
 </body>
