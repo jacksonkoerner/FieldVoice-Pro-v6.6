@@ -692,7 +692,7 @@ The application uses n8n webhooks for AI text refinement, report submission, and
 | **EXTRACT_WEBHOOK_URL** | `project-config.html` | Document extraction for project setup |
 
 **Production Webhook URLs (n8n Cloud):**
-- Refine: `https://advidere.app.n8n.cloud/webhook/fieldvoice-refine`
+- Refine: `https://advidere.app.n8n.cloud/webhook/fieldvoice-refine-v6`
 - Submit: `https://advidere.app.n8n.cloud/webhook/fieldvoice-submit`
 - Extract: `https://advidere.app.n8n.cloud/webhook/fieldvoice-project-extractor`
 
