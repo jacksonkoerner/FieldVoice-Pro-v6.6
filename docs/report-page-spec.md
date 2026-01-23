@@ -25,7 +25,7 @@ n8n webhook (POST to fieldvoice-refine)
 report.html (display + edit)
 ```
 
-The webhook endpoint: `https://advidere.app.n8n.cloud/webhook/fieldvoice-refine`
+The webhook endpoint: `https://advidere.app.n8n.cloud/webhook/fieldvoice-refine-v6`
 
 ---
 

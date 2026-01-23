@@ -12,7 +12,7 @@
 
 ### Webhook
 
-**Endpoint:** `https://advidere.app.n8n.cloud/webhook/fieldvoice-refine`
+**Endpoint:** `https://advidere.app.n8n.cloud/webhook/fieldvoice-refine-v6`
 
 ### Data Flow
 
