@@ -650,6 +650,7 @@ Example: 'ABC Concrete had 5 workers pouring the foundation today. Weather was g
 
         // ============ LOCALSTORAGE DRAFT MANAGEMENT ============
         const QUICK_INTERVIEW_STORAGE_KEY = 'fvp_quick_interview_draft';
+        const OFFLINE_QUEUE_KEY = 'fvp_offline_queue';
 
         /**
          * Save all form data to localStorage
@@ -859,9 +860,32 @@ Example: 'ABC Concrete had 5 workers pouring the foundation today. Weather was g
 
         /**
          * Clear localStorage draft (called after successful FINISH)
+         * Also removes from offline queue if present
          */
         function clearLocalStorageDraft() {
             localStorage.removeItem(QUICK_INTERVIEW_STORAGE_KEY);
+
+            // Also clear from offline queue if present
+            const activeProjectId = localStorage.getItem('fvp_active_project');
+            const todayStr = new Date().toISOString().split('T')[0];
+
+            try {
+                const stored = localStorage.getItem(OFFLINE_QUEUE_KEY);
+                if (stored) {
+                    const queue = JSON.parse(stored);
+                    const initialLength = queue.drafts?.length || 0;
+                    queue.drafts = (queue.drafts || []).filter(
+                        d => !(d.projectId === activeProjectId && d.reportDate === todayStr)
+                    );
+                    if (queue.drafts.length !== initialLength) {
+                        localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(queue));
+                        console.log('[OFFLINE] Removed synced report from offline queue');
+                    }
+                }
+            } catch (e) {
+                console.error('[OFFLINE] Failed to clear from offline queue:', e);
+            }
+
             console.log('[LOCAL] Draft cleared from localStorage');
         }
 
@@ -1670,17 +1694,76 @@ Example: 'ABC Concrete had 5 workers pouring the foundation today. Weather was g
 
         /**
          * Handle offline/error scenario for AI processing
+         * Saves to offline queue for later sync from drafts.html
          */
-        function handleOfflineProcessing(payload) {
-            report.meta.status = 'pending_refine';
-            report.meta.offlineQueue = report.meta.offlineQueue || [];
-            report.meta.offlineQueue.push({
-                type: 'refine',
+        function handleOfflineProcessing(payload, redirectToDrafts = false) {
+            const activeProjectId = localStorage.getItem('fvp_active_project');
+            const todayStr = new Date().toISOString().split('T')[0];
+
+            // Build draft data for offline queue
+            const draftData = {
+                projectId: activeProjectId,
+                projectName: report.overview?.projectName || activeProject?.name || 'Unknown Project',
+                reportDate: todayStr,
+                lastSaved: new Date().toISOString(),
+                captureMode: report.meta?.captureMode || 'guided',
+                status: 'pending_sync',
+                errorMessage: null,
                 payload: payload,
-                queuedAt: new Date().toISOString()
-            });
+                data: {
+                    meta: report.meta,
+                    overview: report.overview,
+                    weather: report.overview?.weather,
+                    guidedNotes: report.guidedNotes,
+                    fieldNotes: report.fieldNotes,
+                    activities: report.activities,
+                    operations: report.operations,
+                    equipment: report.equipment,
+                    photos: report.photos,
+                    safety: report.safety,
+                    generalIssues: report.generalIssues,
+                    qaqcNotes: report.qaqcNotes,
+                    contractorCommunications: report.contractorCommunications,
+                    visitorsRemarks: report.visitorsRemarks,
+                    additionalNotes: report.additionalNotes,
+                    reporter: report.reporter
+                }
+            };
+
+            // Save to offline queue
+            try {
+                const stored = localStorage.getItem(OFFLINE_QUEUE_KEY);
+                const queue = stored ? JSON.parse(stored) : { drafts: [] };
+
+                // Check if this project/date combo already exists
+                const existingIndex = queue.drafts.findIndex(
+                    d => d.projectId === activeProjectId && d.reportDate === todayStr
+                );
+
+                if (existingIndex >= 0) {
+                    // Update existing entry
+                    queue.drafts[existingIndex] = draftData;
+                } else {
+                    // Add new entry
+                    queue.drafts.push(draftData);
+                }
+
+                localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(queue));
+                console.log('[OFFLINE] Report saved to offline queue');
+            } catch (e) {
+                console.error('[OFFLINE] Failed to save to offline queue:', e);
+            }
+
+            // Also update local meta status
+            report.meta.status = 'pending_refine';
             saveReport();
-            showToast("You're offline - AI processing will complete when connected", 'warning');
+
+            showToast("You're offline. Report saved to drafts.", 'warning');
+
+            // Redirect to drafts page if requested
+            if (redirectToDrafts) {
+                window.location.href = 'drafts.html';
+            }
         }
 
         /**
@@ -1718,8 +1801,7 @@ Example: 'ABC Concrete had 5 workers pouring the foundation today. Weather was g
 
             // Check if online
             if (!navigator.onLine) {
-                handleOfflineProcessing(payload);
-                window.location.href = 'report.html';
+                handleOfflineProcessing(payload, true);
                 return;
             }
 
@@ -1757,10 +1839,8 @@ Example: 'ABC Concrete had 5 workers pouring the foundation today. Weather was g
                     finishBtn.innerHTML = originalBtnHtml;
                 }
 
-                // Handle as offline - keep localStorage in case they want to retry
-                handleOfflineProcessing(payload);
-                // Note: Don't clear localStorage here - they might want to retry when online
-                window.location.href = 'report.html';
+                // Handle as offline - save to drafts queue and redirect
+                handleOfflineProcessing(payload, true);
             }
         }
 
@@ -3991,8 +4071,7 @@ Example: 'ABC Concrete had 5 workers pouring the foundation today. Weather was g
 
             // Check if online
             if (!navigator.onLine) {
-                handleOfflineProcessing(payload);
-                window.location.href = 'report.html';
+                handleOfflineProcessing(payload, true);
                 return;
             }
 
@@ -4030,10 +4109,8 @@ Example: 'ABC Concrete had 5 workers pouring the foundation today. Weather was g
                     finishBtn.innerHTML = originalBtnHtml;
                 }
 
-                // Handle as offline - keep localStorage in case they want to retry
-                handleOfflineProcessing(payload);
-                // Note: Don't clear localStorage here - they might want to retry when online
-                window.location.href = 'report.html';
+                // Handle as offline - save to drafts queue and redirect
+                handleOfflineProcessing(payload, true);
             }
         }
 

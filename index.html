@@ -174,7 +174,7 @@
         </section>
 
         <!-- REPORT ARCHIVES -->
-        <section class="px-4 mb-4 flex-1">
+        <section class="px-4 mb-4">
             <a href="archives.html" class="block bg-white border-l-4 border-dot-slate p-4 hover:bg-slate-50 transition-colors">
                 <div class="flex items-center gap-3">
                     <div class="w-10 h-10 bg-dot-slate flex items-center justify-center shrink-0">
@@ -185,6 +185,23 @@
                         <p class="text-sm text-slate-600">View past reports and history</p>
                     </div>
                     <i class="fas fa-chevron-right text-slate-400"></i>
+                </div>
+            </a>
+        </section>
+
+        <!-- DRAFTS & PENDING REPORTS -->
+        <section id="draftsSection" class="px-4 mb-4 flex-1 hidden">
+            <a href="drafts.html" class="block bg-white border-l-4 border-dot-orange p-4 hover:bg-orange-50 transition-colors">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-dot-orange flex items-center justify-center shrink-0 relative">
+                        <i class="fas fa-clock text-white"></i>
+                    </div>
+                    <div class="flex-1">
+                        <p class="text-xs font-bold text-dot-orange uppercase tracking-wider">Drafts & Pending</p>
+                        <p id="draftsDescription" class="text-sm text-slate-600">Reports waiting to sync</p>
+                    </div>
+                    <span id="draftsBadge" class="bg-dot-orange text-white text-xs font-bold px-2 py-1 min-w-[24px] text-center">0</span>
+                    <i class="fas fa-chevron-right text-dot-orange"></i>
                 </div>
             </a>
         </section>
@@ -880,6 +897,35 @@
             updateReportStatus();
         }
 
+        // ============ DRAFTS/OFFLINE QUEUE ============
+        const OFFLINE_QUEUE_KEY = 'fvp_offline_queue';
+
+        function getOfflineQueueCount() {
+            try {
+                const stored = localStorage.getItem(OFFLINE_QUEUE_KEY);
+                if (!stored) return 0;
+                const parsed = JSON.parse(stored);
+                return parsed.drafts ? parsed.drafts.length : 0;
+            } catch (e) {
+                return 0;
+            }
+        }
+
+        function updateDraftsSection() {
+            const count = getOfflineQueueCount();
+            const section = document.getElementById('draftsSection');
+            const badge = document.getElementById('draftsBadge');
+            const description = document.getElementById('draftsDescription');
+
+            if (count > 0) {
+                section.classList.remove('hidden');
+                badge.textContent = count;
+                description.textContent = count === 1 ? '1 report waiting to sync' : `${count} reports waiting to sync`;
+            } else {
+                section.classList.add('hidden');
+            }
+        }
+
         // ============ INIT ============
         document.addEventListener('DOMContentLoaded', async () => {
             if (shouldShowOnboarding()) {
@@ -908,6 +954,7 @@
                 // Update UI
                 updateActiveProjectCard();
                 updateReportStatus();
+                updateDraftsSection();
 
                 // Show submitted banner if there's a submitted report today and not dismissed this session
                 const bannerDismissedThisSession = sessionStorage.getItem('fvp_submitted_banner_dismissed') === 'true';
@@ -923,9 +970,13 @@
                 // Still update UI with whatever we have
                 updateActiveProjectCard();
                 updateReportStatus();
+                updateDraftsSection();
                 syncWeather();
             }
         });
+
+        // Update drafts section when coming back online
+        window.addEventListener('online', updateDraftsSection);
     </script>
 
     <!-- Project Picker Modal -->
