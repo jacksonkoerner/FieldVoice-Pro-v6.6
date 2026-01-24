@@ -18,6 +18,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="FieldVoice">
 
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script>
@@ -147,117 +148,133 @@
     <div id="toast-container" class="fixed bottom-4 right-4 z-50"></div>
 
     <script>
+        // ============ SUPABASE CONFIGURATION ============
+        const SUPABASE_URL = 'https://ruzadotbgkjhgwkvotlz.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ1emFkb3RiZ2tqaGd3a3ZvdGx6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkyMDY1MzQsImV4cCI6MjA4NDc4MjUzNH0.RiW5IFA_i8Fj4QIc1Swe1ERx3rEwPyOnQ5tOicAFXI0';
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
         // ============ STATE ============
-        let pendingDeleteKey = null;
+        let pendingDeleteId = null;
+        let pendingDeleteDate = null;
+        let projectsCache = [];
+
+        const ACTIVE_PROJECT_KEY = 'fvp_active_project'; // Keep in localStorage (device-specific)
 
         // ============ PROJECT LOADING ============
-        const PROJECTS_KEY = 'fvp_projects';
+        async function loadProjects() {
+            try {
+                const { data, error } = await supabaseClient
+                    .from('projects')
+                    .select('id, project_name, status')
+                    .order('project_name', { ascending: true });
 
-        function getProjects() {
-            const saved = localStorage.getItem(PROJECTS_KEY);
-            if (saved) {
-                try { return JSON.parse(saved); } catch (e) { return []; }
+                if (error) {
+                    console.error('[SUPABASE] Error loading projects:', error);
+                    return [];
+                }
+
+                projectsCache = data.map(row => ({
+                    id: row.id,
+                    name: row.project_name || '',
+                    status: row.status || 'active'
+                }));
+
+                console.log('[SUPABASE] Loaded projects:', projectsCache.length);
+                return projectsCache;
+            } catch (e) {
+                console.error('[SUPABASE] Failed to load projects:', e);
+                return [];
             }
-            return [];
         }
 
         function getProjectById(projectId) {
-            const projects = getProjects();
-            return projects.find(p => p.id === projectId) || null;
+            return projectsCache.find(p => p.id === projectId) || null;
         }
 
-        // ============ STORAGE HELPERS ============
-        function getAllReports() {
-            const reports = [];
-            // Legacy patterns (date only)
-            const legacyKeyPattern = /^fieldvoice_report_(\d{4}-\d{2}-\d{2})$/;
-            const legacySubmittedPattern = /^fieldvoice_report_(\d{4}-\d{2}-\d{2})_submitted_\d+$/;
-            // Project-specific patterns (projectId_date)
-            const projectKeyPattern = /^fieldvoice_report_([a-zA-Z0-9_-]+)_(\d{4}-\d{2}-\d{2})$/;
-            const projectSubmittedPattern = /^fieldvoice_report_([a-zA-Z0-9_-]+)_(\d{4}-\d{2}-\d{2})_submitted_\d+$/;
+        // ============ REPORT LOADING ============
+        async function getAllReports() {
+            try {
+                // Query reports table with photo count
+                const { data: reportRows, error: reportError } = await supabaseClient
+                    .from('reports')
+                    .select(`
+                        id,
+                        project_id,
+                        project_name,
+                        report_date,
+                        inspector_name,
+                        status,
+                        created_at,
+                        submitted_at,
+                        updated_at
+                    `)
+                    .order('report_date', { ascending: false });
 
-            for (let i = 0; i < localStorage.length; i++) {
-                const key = localStorage.key(i);
-
-                // Check for project-specific keys first
-                const projectMatch = key.match(projectKeyPattern);
-                const projectSubmittedMatch = key.match(projectSubmittedPattern);
-
-                if (projectMatch || projectSubmittedMatch) {
-                    try {
-                        const data = JSON.parse(localStorage.getItem(key));
-                        const projectId = projectMatch ? projectMatch[1] : projectSubmittedMatch[1];
-                        const dateStr = projectMatch ? projectMatch[2] : projectSubmittedMatch[2];
-                        const project = getProjectById(projectId);
-
-                        reports.push({
-                            key: key,
-                            date: dateStr,
-                            projectId: projectId,
-                            projectName: project?.name || data.project?.name || data.overview?.projectName || 'Unknown Project',
-                            submitted: data.meta?.submitted === true,
-                            photoCount: data.photos?.length || 0,
-                            createdAt: data.meta?.createdAt || dateStr,
-                            submittedAt: data.meta?.submittedAt || null
-                        });
-                    } catch (e) {
-                        console.error('Error parsing report:', key, e);
-                    }
-                    continue;
+                if (reportError) {
+                    console.error('[SUPABASE] Error loading reports:', reportError);
+                    return [];
                 }
 
-                // Check for legacy keys (no project ID)
-                const legacyMatch = key.match(legacyKeyPattern);
-                const legacySubmittedMatch = key.match(legacySubmittedPattern);
-
-                if (legacyMatch || legacySubmittedMatch) {
-                    try {
-                        const data = JSON.parse(localStorage.getItem(key));
-                        const dateStr = legacyMatch ? legacyMatch[1] : legacySubmittedMatch[1];
-
-                        reports.push({
-                            key: key,
-                            date: dateStr,
-                            projectId: null,
-                            projectName: data.project?.name || data.overview?.projectName || null,
-                            submitted: data.meta?.submitted === true,
-                            photoCount: data.photos?.length || 0,
-                            createdAt: data.meta?.createdAt || dateStr,
-                            submittedAt: data.meta?.submittedAt || null
-                        });
-                    } catch (e) {
-                        console.error('Error parsing report:', key, e);
-                    }
+                if (!reportRows || reportRows.length === 0) {
+                    return [];
                 }
+
+                // Get photo counts for all reports
+                const reportIds = reportRows.map(r => r.id);
+                const { data: photoCounts, error: photoError } = await supabaseClient
+                    .from('report_photos')
+                    .select('report_id')
+                    .in('report_id', reportIds);
+
+                // Count photos per report
+                const photoCountMap = {};
+                if (!photoError && photoCounts) {
+                    photoCounts.forEach(p => {
+                        photoCountMap[p.report_id] = (photoCountMap[p.report_id] || 0) + 1;
+                    });
+                }
+
+                // Map to the format expected by the UI
+                const reports = reportRows.map(row => {
+                    const project = getProjectById(row.project_id);
+                    return {
+                        id: row.id,
+                        date: row.report_date,
+                        projectId: row.project_id,
+                        projectName: project?.name || row.project_name || 'Unknown Project',
+                        submitted: row.status === 'submitted',
+                        photoCount: photoCountMap[row.id] || 0,
+                        createdAt: row.created_at,
+                        submittedAt: row.submitted_at
+                    };
+                });
+
+                console.log('[SUPABASE] Loaded reports:', reports.length);
+                return reports;
+            } catch (e) {
+                console.error('[SUPABASE] Failed to load reports:', e);
+                return [];
             }
-
-            // Sort by date descending (newest first)
-            reports.sort((a, b) => {
-                // Use submittedAt if available, otherwise use date
-                const dateA = a.submittedAt || a.createdAt || a.date;
-                const dateB = b.submittedAt || b.createdAt || b.date;
-                return dateB.localeCompare(dateA);
-            });
-
-            return reports;
         }
 
-        function deleteReport(key) {
-            localStorage.removeItem(key);
+        async function deleteReport(reportId) {
+            try {
+                // Delete the report - related tables will cascade automatically
+                const { error } = await supabaseClient
+                    .from('reports')
+                    .delete()
+                    .eq('id', reportId);
 
-            // Also remove legacy key if it matches this report
-            const legacyReport = localStorage.getItem('fieldvoice_report');
-            if (legacyReport) {
-                try {
-                    const parsed = JSON.parse(legacyReport);
-                    const reportDate = key.match(/(\d{4}-\d{2}-\d{2})/)?.[1];
-                    if (reportDate && parsed.overview?.date) {
-                        const legacyDate = new Date(parsed.overview.date).toISOString().split('T')[0];
-                        if (legacyDate === reportDate) {
-                            localStorage.removeItem('fieldvoice_report');
-                        }
-                    }
-                } catch (e) {}
+                if (error) {
+                    console.error('[SUPABASE] Error deleting report:', error);
+                    throw error;
+                }
+
+                console.log('[SUPABASE] Report deleted:', reportId);
+                return true;
+            } catch (e) {
+                console.error('[SUPABASE] Failed to delete report:', e);
+                return false;
             }
         }
 
@@ -273,9 +290,18 @@
         }
 
         // ============ RENDER ============
-        function renderReportList() {
+        async function renderReportList() {
             const section = document.getElementById('reportListSection');
-            const reports = getAllReports();
+
+            // Show loading state
+            section.innerHTML = `
+                <div class="flex flex-col items-center justify-center py-16 px-4">
+                    <i class="fas fa-spinner fa-spin text-slate-400 text-3xl mb-4"></i>
+                    <p class="text-sm text-slate-500">Loading reports...</p>
+                </div>
+            `;
+
+            const reports = await getAllReports();
 
             if (reports.length === 0) {
                 section.innerHTML = `
@@ -320,10 +346,13 @@
                 ? `<p class="text-xs text-slate-500 truncate"><i class="fas fa-building mr-1"></i>${escapeHtml(report.projectName)}</p>`
                 : '';
 
+            // Build URL with reportId for Supabase lookup
+            const viewUrl = `finalreview.html?date=${report.date}&reportId=${report.id}`;
+
             return `
                 <div class="swipe-container flex bg-white shadow-sm border border-slate-200">
                     <!-- Main content (clickable) -->
-                    <a href="finalreview.html?date=${report.date}"
+                    <a href="${viewUrl}"
                        class="swipe-content flex-shrink-0 w-full p-4 flex items-center gap-4 hover:bg-slate-50 transition-colors">
                         <div class="flex-1 min-w-0">
                             <p class="font-bold text-slate-800 truncate">${formattedDate}</p>
@@ -344,7 +373,7 @@
                     </a>
                     <!-- Delete button (revealed on swipe) -->
                     <div class="delete-btn-container flex-shrink-0">
-                        <button onclick="showDeleteModal('${report.key}', '${formattedDate.replace(/'/g, "\\'")}')"
+                        <button onclick="showDeleteModal('${report.id}', '${formattedDate.replace(/'/g, "\\'")}')"
                                 class="h-full w-20 bg-red-600 text-white flex flex-col items-center justify-center hover:bg-red-700 transition-colors">
                             <i class="fas fa-trash-alt text-lg mb-1"></i>
                             <span class="text-[10px] font-bold uppercase">Delete</span>
@@ -355,23 +384,29 @@
         }
 
         // ============ DELETE MODAL ============
-        function showDeleteModal(key, dateStr) {
-            pendingDeleteKey = key;
+        function showDeleteModal(reportId, dateStr) {
+            pendingDeleteId = reportId;
+            pendingDeleteDate = dateStr;
             document.getElementById('deleteReportDate').textContent = dateStr;
             document.getElementById('deleteModal').classList.remove('hidden');
         }
 
         function closeDeleteModal() {
-            pendingDeleteKey = null;
+            pendingDeleteId = null;
+            pendingDeleteDate = null;
             document.getElementById('deleteModal').classList.add('hidden');
         }
 
-        function confirmDelete() {
-            if (pendingDeleteKey) {
-                deleteReport(pendingDeleteKey);
-                showToast('Report deleted', 'success');
+        async function confirmDelete() {
+            if (pendingDeleteId) {
+                const success = await deleteReport(pendingDeleteId);
+                if (success) {
+                    showToast('Report deleted', 'success');
+                } else {
+                    showToast('Failed to delete report', 'error');
+                }
                 closeDeleteModal();
-                renderReportList();
+                await renderReportList();
             }
         }
 
@@ -408,8 +443,28 @@
         }
 
         // ============ INIT ============
-        document.addEventListener('DOMContentLoaded', () => {
-            renderReportList();
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                // Load projects first (for project name lookups)
+                await loadProjects();
+                // Then render the report list
+                await renderReportList();
+            } catch (err) {
+                console.error('Failed to initialize:', err);
+                const section = document.getElementById('reportListSection');
+                section.innerHTML = `
+                    <div class="flex flex-col items-center justify-center py-16 px-4">
+                        <div class="w-20 h-20 bg-red-100 border-2 border-red-300 flex items-center justify-center mb-6">
+                            <i class="fas fa-exclamation-triangle text-red-500 text-3xl"></i>
+                        </div>
+                        <p class="text-lg font-bold text-slate-500 mb-2 text-center">Failed to load reports</p>
+                        <p class="text-sm text-slate-400 text-center mb-6">Please check your connection and try again.</p>
+                        <button onclick="location.reload()" class="px-6 py-3 bg-dot-navy text-white font-bold uppercase tracking-wide hover:bg-dot-blue transition-colors">
+                            <i class="fas fa-redo mr-2"></i>Retry
+                        </button>
+                    </div>
+                `;
+            }
         });
     </script>
 
