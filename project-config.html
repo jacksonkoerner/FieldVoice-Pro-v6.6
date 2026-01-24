@@ -20,6 +20,7 @@
 
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script>
         tailwind.config = {
             theme: {
@@ -563,34 +564,349 @@
     </div>
 
     <script>
+        // ============ SUPABASE CONFIGURATION ============
+        const SUPABASE_URL = 'https://ruzadotbgkjhgwkvotlz.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ1emFkb3RiZ2tqaGd3a3ZvdGx6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkyMDY1MzQsImV4cCI6MjA4NDc4MjUzNH0.RiW5IFA_i8Fj4QIc1Swe1ERx3rEwPyOnQ5tOicAFXI0';
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
         // ============ CONSTANTS ============
-        const PROJECTS_KEY = 'fvp_projects';
-        const ACTIVE_PROJECT_KEY = 'fvp_active_project';
+        const ACTIVE_PROJECT_KEY = 'fvp_active_project'; // Keep in localStorage (device-specific)
         const EXTRACT_WEBHOOK_URL = 'https://advidere.app.n8n.cloud/webhook/fieldvoice-project-extractor';
 
         // ============ STATE ============
         let currentProject = null;
         let deleteCallback = null;
         let selectedFiles = [];
+        let isLoading = false;
+
+        // ============ FIELD MAPPING UTILITIES ============
+        // Maps camelCase (JS) to snake_case (Supabase)
+        const projectFieldMap = {
+            id: 'id',
+            name: 'project_name',
+            noabProjectNo: 'noab_project_no',
+            cnoSolicitationNo: 'cno_solicitation_no',
+            location: 'location',
+            engineer: 'engineer',
+            primeContractor: 'prime_contractor',
+            noticeToProceed: 'notice_to_proceed',
+            contractDuration: 'contract_duration',
+            weatherDays: 'weather_days',
+            expectedCompletion: 'expected_completion',
+            defaultStartTime: 'default_start_time',
+            defaultEndTime: 'default_end_time',
+            logo: 'logo',
+            status: 'status',
+            createdAt: 'created_at',
+            updatedAt: 'updated_at'
+        };
+
+        const contractorFieldMap = {
+            id: 'id',
+            projectId: 'project_id',
+            name: 'name',
+            abbreviation: 'abbreviation',
+            type: 'type',
+            trades: 'trades',
+            status: 'status',
+            addedDate: 'added_date',
+            removedDate: 'removed_date',
+            createdAt: 'created_at',
+            updatedAt: 'updated_at'
+        };
+
+        const equipmentFieldMap = {
+            id: 'id',
+            projectId: 'project_id',
+            contractorId: 'contractor_id',
+            type: 'type',
+            model: 'model',
+            identifier: 'identifier',
+            status: 'status',
+            addedDate: 'added_date',
+            removedDate: 'removed_date',
+            createdAt: 'created_at',
+            updatedAt: 'updated_at'
+        };
+
+        // Convert JS object to Supabase format
+        function toSupabaseProject(project) {
+            return {
+                id: project.id,
+                project_name: project.name || '',
+                noab_project_no: project.noabProjectNo || '',
+                cno_solicitation_no: project.cnoSolicitationNo || 'N/A',
+                location: project.location || '',
+                engineer: project.engineer || '',
+                prime_contractor: project.primeContractor || '',
+                notice_to_proceed: project.noticeToProceed || null,
+                contract_duration: project.contractDuration || null,
+                weather_days: project.weatherDays || 0,
+                expected_completion: project.expectedCompletion || null,
+                default_start_time: project.defaultStartTime || '06:00',
+                default_end_time: project.defaultEndTime || '16:00',
+                logo: project.logo || null,
+                status: project.status || 'active',
+                updated_at: new Date().toISOString()
+            };
+        }
+
+        // Convert Supabase object to JS format
+        function fromSupabaseProject(row) {
+            return {
+                id: row.id,
+                name: row.project_name || '',
+                noabProjectNo: row.noab_project_no || '',
+                cnoSolicitationNo: row.cno_solicitation_no || 'N/A',
+                location: row.location || '',
+                engineer: row.engineer || '',
+                primeContractor: row.prime_contractor || '',
+                noticeToProceed: row.notice_to_proceed || '',
+                contractDuration: row.contract_duration || '',
+                weatherDays: row.weather_days || 0,
+                expectedCompletion: row.expected_completion || '',
+                defaultStartTime: row.default_start_time || '06:00',
+                defaultEndTime: row.default_end_time || '16:00',
+                logo: row.logo || null,
+                status: row.status || 'active',
+                contractors: [],
+                equipment: []
+            };
+        }
+
+        function toSupabaseContractor(contractor, projectId) {
+            return {
+                id: contractor.id,
+                project_id: projectId,
+                name: contractor.name || '',
+                abbreviation: contractor.abbreviation || '',
+                type: contractor.type || 'subcontractor',
+                trades: contractor.trades ? contractor.trades.split(';').map(t => t.trim()).filter(t => t) : [],
+                status: contractor.status || 'active',
+                added_date: contractor.addedDate || null,
+                removed_date: contractor.removedDate || null,
+                updated_at: new Date().toISOString()
+            };
+        }
+
+        function fromSupabaseContractor(row) {
+            return {
+                id: row.id,
+                name: row.name || '',
+                abbreviation: row.abbreviation || '',
+                type: row.type || 'subcontractor',
+                trades: Array.isArray(row.trades) ? row.trades.join('; ') : (row.trades || ''),
+                status: row.status || 'active',
+                addedDate: row.added_date || null,
+                removedDate: row.removed_date || null
+            };
+        }
+
+        function toSupabaseEquipment(equipment, projectId) {
+            return {
+                id: equipment.id,
+                project_id: projectId,
+                contractor_id: equipment.contractorId,
+                type: equipment.type || '',
+                model: equipment.model || '',
+                identifier: equipment.identifier || null,
+                status: equipment.status || 'active',
+                added_date: equipment.addedDate || null,
+                removed_date: equipment.removedDate || null,
+                updated_at: new Date().toISOString()
+            };
+        }
+
+        function fromSupabaseEquipment(row) {
+            return {
+                id: row.id,
+                contractorId: row.contractor_id,
+                type: row.type || '',
+                model: row.model || '',
+                identifier: row.identifier || null,
+                status: row.status || 'active',
+                addedDate: row.added_date || null,
+                removedDate: row.removed_date || null
+            };
+        }
 
         // ============ INITIALIZATION ============
         // Note: Initialization moved to end of script with setupDropZone()
 
         // ============ PROJECT MANAGEMENT ============
-        function getProjects() {
-            const saved = localStorage.getItem(PROJECTS_KEY);
-            if (saved) {
-                try {
-                    return JSON.parse(saved);
-                } catch (e) {
+        async function getProjects() {
+            try {
+                // Fetch all projects
+                const { data: projectRows, error: projectError } = await supabaseClient
+                    .from('projects')
+                    .select('*')
+                    .order('created_at', { ascending: false });
+
+                if (projectError) {
+                    console.error('Error fetching projects:', projectError);
+                    showToast('Failed to load projects', 'error');
                     return [];
                 }
+
+                if (!projectRows || projectRows.length === 0) {
+                    return [];
+                }
+
+                // Fetch all contractors
+                const { data: contractorRows, error: contractorError } = await supabaseClient
+                    .from('contractors')
+                    .select('*');
+
+                if (contractorError) {
+                    console.error('Error fetching contractors:', contractorError);
+                }
+
+                // Fetch all equipment
+                const { data: equipmentRows, error: equipmentError } = await supabaseClient
+                    .from('equipment')
+                    .select('*');
+
+                if (equipmentError) {
+                    console.error('Error fetching equipment:', equipmentError);
+                }
+
+                // Build the nested structure
+                const projects = projectRows.map(projectRow => {
+                    const project = fromSupabaseProject(projectRow);
+
+                    // Add contractors for this project
+                    if (contractorRows) {
+                        project.contractors = contractorRows
+                            .filter(c => c.project_id === project.id)
+                            .map(fromSupabaseContractor);
+                    }
+
+                    // Add equipment for this project
+                    if (equipmentRows) {
+                        project.equipment = equipmentRows
+                            .filter(e => e.project_id === project.id)
+                            .map(fromSupabaseEquipment);
+                    }
+
+                    return project;
+                });
+
+                return projects;
+            } catch (error) {
+                console.error('Error in getProjects:', error);
+                showToast('Failed to load projects', 'error');
+                return [];
             }
-            return [];
         }
 
-        function saveProjects(projects) {
-            localStorage.setItem(PROJECTS_KEY, JSON.stringify(projects));
+        async function saveProjectToSupabase(project) {
+            try {
+                // 1. Upsert the project
+                const projectData = toSupabaseProject(project);
+                const { error: projectError } = await supabaseClient
+                    .from('projects')
+                    .upsert(projectData, { onConflict: 'id' });
+
+                if (projectError) {
+                    console.error('Error saving project:', projectError);
+                    throw new Error('Failed to save project');
+                }
+
+                // 2. Handle contractors - get existing ones first
+                const { data: existingContractors } = await supabaseClient
+                    .from('contractors')
+                    .select('id')
+                    .eq('project_id', project.id);
+
+                const existingContractorIds = new Set((existingContractors || []).map(c => c.id));
+                const currentContractorIds = new Set((project.contractors || []).map(c => c.id));
+
+                // Delete removed contractors (equipment will cascade)
+                const contractorsToDelete = [...existingContractorIds].filter(id => !currentContractorIds.has(id));
+                if (contractorsToDelete.length > 0) {
+                    const { error: deleteContractorError } = await supabaseClient
+                        .from('contractors')
+                        .delete()
+                        .in('id', contractorsToDelete);
+
+                    if (deleteContractorError) {
+                        console.error('Error deleting contractors:', deleteContractorError);
+                    }
+                }
+
+                // Upsert current contractors
+                if (project.contractors && project.contractors.length > 0) {
+                    const contractorData = project.contractors.map(c => toSupabaseContractor(c, project.id));
+                    const { error: contractorError } = await supabaseClient
+                        .from('contractors')
+                        .upsert(contractorData, { onConflict: 'id' });
+
+                    if (contractorError) {
+                        console.error('Error saving contractors:', contractorError);
+                        throw new Error('Failed to save contractors');
+                    }
+                }
+
+                // 3. Handle equipment
+                const { data: existingEquipment } = await supabaseClient
+                    .from('equipment')
+                    .select('id')
+                    .eq('project_id', project.id);
+
+                const existingEquipmentIds = new Set((existingEquipment || []).map(e => e.id));
+                const currentEquipmentIds = new Set((project.equipment || []).map(e => e.id));
+
+                // Delete removed equipment
+                const equipmentToDelete = [...existingEquipmentIds].filter(id => !currentEquipmentIds.has(id));
+                if (equipmentToDelete.length > 0) {
+                    const { error: deleteEquipmentError } = await supabaseClient
+                        .from('equipment')
+                        .delete()
+                        .in('id', equipmentToDelete);
+
+                    if (deleteEquipmentError) {
+                        console.error('Error deleting equipment:', deleteEquipmentError);
+                    }
+                }
+
+                // Upsert current equipment
+                if (project.equipment && project.equipment.length > 0) {
+                    const equipmentData = project.equipment.map(e => toSupabaseEquipment(e, project.id));
+                    const { error: equipmentError } = await supabaseClient
+                        .from('equipment')
+                        .upsert(equipmentData, { onConflict: 'id' });
+
+                    if (equipmentError) {
+                        console.error('Error saving equipment:', equipmentError);
+                        throw new Error('Failed to save equipment');
+                    }
+                }
+
+                return true;
+            } catch (error) {
+                console.error('Error in saveProjectToSupabase:', error);
+                throw error;
+            }
+        }
+
+        async function deleteProjectFromSupabase(projectId) {
+            try {
+                // Delete the project - contractors and equipment cascade automatically
+                const { error } = await supabaseClient
+                    .from('projects')
+                    .delete()
+                    .eq('id', projectId);
+
+                if (error) {
+                    console.error('Error deleting project:', error);
+                    throw new Error('Failed to delete project');
+                }
+
+                return true;
+            } catch (error) {
+                console.error('Error in deleteProjectFromSupabase:', error);
+                throw error;
+            }
         }
 
         function getActiveProjectId() {
@@ -601,83 +917,14 @@
             localStorage.setItem(ACTIVE_PROJECT_KEY, projectId);
         }
 
-        // Counter to ensure unique IDs even when created in the same millisecond
-        let idCounter = 0;
-
-        function generateId(prefix) {
-            return `${prefix}_${Date.now()}_${idCounter++}`;
-        }
-
-        // Migration function to repair duplicate IDs in existing projects
-        function repairDuplicateIds() {
-            const projects = getProjects();
-            let projectsModified = false;
-
-            projects.forEach(project => {
-                let modified = false;
-
-                // Repair duplicate contractor IDs
-                if (project.contractors && project.contractors.length > 0) {
-                    const seenContractorIds = new Set();
-                    const contractorIdMap = {}; // Maps old ID to new ID for equipment update
-
-                    project.contractors.forEach(contractor => {
-                        if (seenContractorIds.has(contractor.id)) {
-                            // Duplicate found - generate new ID
-                            const oldId = contractor.id;
-                            const newId = generateId('contractor');
-                            contractorIdMap[oldId] = newId;
-                            contractor.id = newId;
-                            modified = true;
-                            console.log(`[Migration] Fixed duplicate contractor ID: ${oldId} -> ${newId}`);
-                        } else {
-                            seenContractorIds.add(contractor.id);
-                            contractorIdMap[contractor.id] = contractor.id; // Keep same ID
-                        }
-                    });
-
-                    // Update equipment references if contractor IDs changed
-                    if (project.equipment && project.equipment.length > 0 && Object.keys(contractorIdMap).length > 0) {
-                        project.equipment.forEach(equip => {
-                            if (contractorIdMap[equip.contractorId] && contractorIdMap[equip.contractorId] !== equip.contractorId) {
-                                equip.contractorId = contractorIdMap[equip.contractorId];
-                            }
-                        });
-                    }
-                }
-
-                // Repair duplicate equipment IDs
-                if (project.equipment && project.equipment.length > 0) {
-                    const seenEquipmentIds = new Set();
-
-                    project.equipment.forEach(equip => {
-                        if (seenEquipmentIds.has(equip.id)) {
-                            // Duplicate found - generate new ID
-                            const oldId = equip.id;
-                            equip.id = generateId('equip');
-                            modified = true;
-                            console.log(`[Migration] Fixed duplicate equipment ID: ${oldId} -> ${equip.id}`);
-                        } else {
-                            seenEquipmentIds.add(equip.id);
-                        }
-                    });
-                }
-
-                if (modified) {
-                    projectsModified = true;
-                }
-            });
-
-            // Save if any projects were modified
-            if (projectsModified) {
-                saveProjects(projects);
-                console.log('[Migration] Saved projects with repaired IDs');
-            }
+        // Generate UUID for new records
+        function generateId() {
+            return crypto.randomUUID();
         }
 
         function createNewProject() {
             currentProject = {
-                id: generateId('proj'),
+                id: generateId(),
                 name: '',
                 logo: null,
                 noabProjectNo: '',
@@ -700,17 +947,22 @@
             showProjectForm();
         }
 
-        function loadProject(projectId) {
-            const projects = getProjects();
-            const project = projects.find(p => p.id === projectId);
-            if (project) {
-                currentProject = JSON.parse(JSON.stringify(project)); // Deep copy
-                populateForm();
-                showProjectForm();
+        async function loadProject(projectId) {
+            try {
+                const projects = await getProjects();
+                const project = projects.find(p => p.id === projectId);
+                if (project) {
+                    currentProject = JSON.parse(JSON.stringify(project)); // Deep copy
+                    populateForm();
+                    showProjectForm();
+                }
+            } catch (error) {
+                console.error('Error loading project:', error);
+                showToast('Failed to load project', 'error');
             }
         }
 
-        function saveProject() {
+        async function saveProject() {
             if (!currentProject) return;
 
             // Validate required fields
@@ -731,58 +983,58 @@
             currentProject.primeContractor = document.getElementById('primeContractor').value.trim();
             currentProject.noticeToProceed = document.getElementById('noticeToProceed').value;
             currentProject.reportDate = document.getElementById('reportDate').value;
-            currentProject.contractDuration = parseInt(document.getElementById('contractDuration').value) || '';
+            currentProject.contractDuration = parseInt(document.getElementById('contractDuration').value) || null;
             currentProject.expectedCompletion = document.getElementById('expectedCompletion').value;
             currentProject.defaultStartTime = document.getElementById('defaultStartTime').value || '06:00';
             currentProject.defaultEndTime = document.getElementById('defaultEndTime').value || '16:00';
             currentProject.weatherDays = parseInt(document.getElementById('weatherDays').value) || 0;
             currentProject.contractDayNo = parseInt(document.getElementById('contractDayNo').value) || '';
 
-            // Save to projects array
-            let projects = getProjects();
-            const existingIndex = projects.findIndex(p => p.id === currentProject.id);
-            if (existingIndex >= 0) {
-                projects[existingIndex] = currentProject;
-            } else {
-                projects.push(currentProject);
+            try {
+                // Save to Supabase
+                await saveProjectToSupabase(currentProject);
+                showToast('Project saved successfully');
+                await renderSavedProjects();
+                updateActiveProjectBadge();
+            } catch (error) {
+                console.error('Error saving project:', error);
+                showToast('Failed to save project', 'error');
             }
-            saveProjects(projects);
-
-            showToast('Project saved successfully');
-            renderSavedProjects();
-            updateActiveProjectBadge();
         }
 
         function deleteProject(projectId) {
-            showDeleteModal('Are you sure you want to delete this project? This cannot be undone.', () => {
-                let projects = getProjects();
-                projects = projects.filter(p => p.id !== projectId);
-                saveProjects(projects);
+            showDeleteModal('Are you sure you want to delete this project? This cannot be undone.', async () => {
+                try {
+                    await deleteProjectFromSupabase(projectId);
 
-                // Clear active project if it was deleted
-                if (getActiveProjectId() === projectId) {
-                    localStorage.removeItem(ACTIVE_PROJECT_KEY);
+                    // Clear active project if it was deleted
+                    if (getActiveProjectId() === projectId) {
+                        localStorage.removeItem(ACTIVE_PROJECT_KEY);
+                    }
+
+                    // If we're currently editing this project, close the form
+                    if (currentProject && currentProject.id === projectId) {
+                        hideProjectForm();
+                    }
+
+                    await renderSavedProjects();
+                    showToast('Project deleted');
+                } catch (error) {
+                    console.error('Error deleting project:', error);
+                    showToast('Failed to delete project', 'error');
                 }
-
-                // If we're currently editing this project, close the form
-                if (currentProject && currentProject.id === projectId) {
-                    hideProjectForm();
-                }
-
-                renderSavedProjects();
-                showToast('Project deleted');
             });
         }
 
-        function setActiveProject() {
+        async function setActiveProject() {
             if (!currentProject) return;
 
             // Save first to ensure project exists
-            saveProject();
+            await saveProject();
 
             setActiveProjectId(currentProject.id);
             showToast('Set as active project');
-            renderSavedProjects();
+            await renderSavedProjects();
             updateActiveProjectBadge();
         }
 
@@ -792,9 +1044,18 @@
         }
 
         // ============ UI RENDERING ============
-        function renderSavedProjects() {
+        async function renderSavedProjects() {
             const container = document.getElementById('savedProjectsList');
-            const projects = getProjects();
+
+            // Show loading state
+            container.innerHTML = `
+                <div class="p-6 text-center">
+                    <i class="fas fa-spinner fa-spin text-slate-400 text-2xl mb-3"></i>
+                    <p class="text-sm text-slate-500">Loading projects...</p>
+                </div>
+            `;
+
+            const projects = await getProjects();
             const activeId = getActiveProjectId();
 
             if (projects.length === 0) {
@@ -1013,7 +1274,7 @@
             } else {
                 // Add new
                 currentProject.contractors.push({
-                    id: generateId('contractor'),
+                    id: generateId(),
                     name,
                     abbreviation: abbr,
                     type,
@@ -1244,7 +1505,7 @@
             } else {
                 // Add new
                 currentProject.equipment.push({
-                    id: generateId('equip'),
+                    id: generateId(),
                     contractorId,
                     type,
                     model
@@ -1667,7 +1928,7 @@
             if (data.contractors && Array.isArray(data.contractors)) {
                 const contractorIdMap = {}; // Map original names to new IDs
                 currentProject.contractors = data.contractors.map(contractor => {
-                    const id = generateId('contractor');
+                    const id = generateId();
                     contractorIdMap[contractor.name] = id;
                     return {
                         id: id,
@@ -1701,7 +1962,7 @@
                         }
 
                         return {
-                            id: generateId('equip'),
+                            id: generateId(),
                             contractorId: contractorId || '',
                             type: equip.type || '',
                             model: equip.model || ''
@@ -1767,10 +2028,8 @@
         }
 
         // Initialize drop zones when DOM is ready
-        document.addEventListener('DOMContentLoaded', () => {
-            // Run migration to fix any existing projects with duplicate IDs
-            repairDuplicateIds();
-            renderSavedProjects();
+        document.addEventListener('DOMContentLoaded', async () => {
+            await renderSavedProjects();
             setupDropZone();
             setupLogoDropZone();
         });
