@@ -18,6 +18,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="FieldVoice">
 
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script>
@@ -194,36 +195,89 @@
     </div>
 
     <script>
-        const USER_SETTINGS_KEY = 'fvp_user_settings';
+        // Supabase configuration
+        const SUPABASE_URL = 'https://ruzadotbgkjhgwkvotlz.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ1emFkb3RiZ2tqaGd3a3ZvdGx6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkyMDY1MzQsImV4cCI6MjA4NDc4MjUzNH0.RiW5IFA_i8Fj4QIc1Swe1ERx3rEwPyOnQ5tOicAFXI0';
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        function loadSettings() {
-            const saved = localStorage.getItem(USER_SETTINGS_KEY);
-            if (saved) {
-                try {
-                    const settings = JSON.parse(saved);
-                    document.getElementById('inspectorName').value = settings.inspectorName || '';
-                    document.getElementById('title').value = settings.title || '';
-                    document.getElementById('company').value = settings.company || '';
-                    document.getElementById('email').value = settings.email || '';
-                    document.getElementById('phone').value = settings.phone || '';
-                } catch (e) {
-                    console.error('Failed to load settings:', e);
+        // Store the current profile ID for updates
+        let currentProfileId = null;
+
+        async function loadSettings() {
+            try {
+                const { data, error } = await supabaseClient
+                    .from('user_profiles')
+                    .select('*')
+                    .limit(1)
+                    .single();
+
+                if (error && error.code !== 'PGRST116') {
+                    // PGRST116 = no rows returned, which is fine for new users
+                    console.error('Failed to load settings:', error);
+                    showToast('Failed to load profile', 'error');
                 }
+
+                if (data) {
+                    currentProfileId = data.id;
+                    document.getElementById('inspectorName').value = data.full_name || '';
+                    document.getElementById('title').value = data.title || '';
+                    document.getElementById('company').value = data.company || '';
+                    document.getElementById('email').value = data.email || '';
+                    document.getElementById('phone').value = data.phone || '';
+                }
+            } catch (e) {
+                console.error('Failed to load settings:', e);
+                showToast('Failed to load profile', 'error');
             }
             updateSignaturePreview();
         }
 
-        function saveSettings() {
-            const settings = {
-                inspectorName: document.getElementById('inspectorName').value.trim(),
+        async function saveSettings() {
+            const profileData = {
+                full_name: document.getElementById('inspectorName').value.trim(),
                 title: document.getElementById('title').value.trim(),
                 company: document.getElementById('company').value.trim(),
-                email: document.getElementById('email').value.trim(),
-                phone: document.getElementById('phone').value.trim()
+                email: document.getElementById('email').value.trim() || null,
+                phone: document.getElementById('phone').value.trim() || null,
+                updated_at: new Date().toISOString()
             };
-            localStorage.setItem(USER_SETTINGS_KEY, JSON.stringify(settings));
-            showToast('Profile saved successfully');
-            updateSignaturePreview();
+
+            try {
+                let result;
+                if (currentProfileId) {
+                    // Update existing profile
+                    result = await supabaseClient
+                        .from('user_profiles')
+                        .update(profileData)
+                        .eq('id', currentProfileId)
+                        .select()
+                        .single();
+                } else {
+                    // Insert new profile
+                    result = await supabaseClient
+                        .from('user_profiles')
+                        .insert(profileData)
+                        .select()
+                        .single();
+                }
+
+                if (result.error) {
+                    console.error('Failed to save settings:', result.error);
+                    showToast('Failed to save profile', 'error');
+                    return;
+                }
+
+                // Store the profile ID for future updates
+                if (result.data) {
+                    currentProfileId = result.data.id;
+                }
+
+                showToast('Profile saved successfully');
+                updateSignaturePreview();
+            } catch (e) {
+                console.error('Failed to save settings:', e);
+                showToast('Failed to save profile', 'error');
+            }
         }
 
         function updateSignaturePreview() {
@@ -245,21 +299,27 @@
             document.getElementById('signaturePreview').textContent = signature;
         }
 
-        function getFormattedSignature() {
-            const saved = localStorage.getItem(USER_SETTINGS_KEY);
-            if (!saved) return '';
-
+        // Note: This function is kept for compatibility but now fetches from Supabase
+        async function getFormattedSignature() {
             try {
-                const settings = JSON.parse(saved);
-                let signature = settings.inspectorName || '';
-                if (settings.title) {
-                    signature += `, ${settings.title}`;
+                const { data, error } = await supabaseClient
+                    .from('user_profiles')
+                    .select('full_name, title, company')
+                    .limit(1)
+                    .single();
+
+                if (error || !data) return '';
+
+                let signature = data.full_name || '';
+                if (data.title) {
+                    signature += `, ${data.title}`;
                 }
-                if (settings.company) {
-                    signature += ` (${settings.company})`;
+                if (data.company) {
+                    signature += ` (${data.company})`;
                 }
                 return signature;
             } catch (e) {
+                console.error('Failed to get signature:', e);
                 return '';
             }
         }
