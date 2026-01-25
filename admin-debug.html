@@ -78,7 +78,7 @@
         // Supabase setup - same credentials as other pages
         const SUPABASE_URL = 'https://ruzadotbgkjhgwkvotlz.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ1emFkb3RiZ2tqaGd3a3ZvdGx6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkyMDY1MzQsImV4cCI6MjA4NDc4MjUzNH0.RiW5IFA_i8Fj4QIc1Swe1ERx3rEwPyOnQ5tOicAFXI0';
-        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         // Load localStorage display
         function displayLocalStorage() {
@@ -133,7 +133,7 @@
             container.innerHTML = '<p class="text-gray-500">Loading...</p>';
 
             try {
-                const { data: reports, error } = await supabase
+                const { data: reports, error } = await supabaseClient
                     .from('reports')
                     .select(`
                         id,
@@ -195,7 +195,7 @@
             if (!confirm('Delete this report? This cannot be undone.')) return;
 
             try {
-                const { error } = await supabase
+                const { error } = await supabaseClient
                     .from('reports')
                     .delete()
                     .eq('id', reportId);
@@ -214,7 +214,7 @@
             if (!confirm('Reset this report to draft status?')) return;
 
             try {
-                const { error } = await supabase
+                const { error } = await supabaseClient
                     .from('reports')
                     .update({ status: 'draft' })
                     .eq('id', reportId);
@@ -234,7 +234,7 @@
             if (!confirm('Are you REALLY sure?')) return;
 
             try {
-                const { error } = await supabase
+                const { error } = await supabaseClient
                     .from('reports')
                     .delete()
                     .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all
@@ -253,7 +253,7 @@
             if (!confirm('Reset ALL reports to draft status?')) return;
 
             try {
-                const { error } = await supabase
+                const { error } = await supabaseClient
                     .from('reports')
                     .update({ status: 'draft' })
                     .neq('id', '00000000-0000-0000-0000-000000000000');
