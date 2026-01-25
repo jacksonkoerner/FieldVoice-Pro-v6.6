@@ -1821,6 +1821,20 @@ Example: 'ABC Concrete had 5 workers pouring the foundation today. Weather was g
                 // Save AI response to local report
                 if (result.aiGenerated) {
                     report.aiGenerated = result.aiGenerated;
+
+                    // Cache AI response to localStorage for immediate availability on report.html
+                    const todayStr = new Date().toISOString().split('T')[0];
+                    try {
+                        localStorage.setItem(`fvp_ai_response_${currentReportId}`, JSON.stringify({
+                            reportId: currentReportId,
+                            reportDate: todayStr,
+                            aiGenerated: result.aiGenerated,
+                            cachedAt: new Date().toISOString()
+                        }));
+                        console.log('[CACHE] AI response cached to localStorage');
+                    } catch (e) {
+                        console.warn('[CACHE] Failed to cache AI response:', e);
+                    }
                 }
                 report.meta.status = 'refined';
                 await saveReportToSupabase();
@@ -1828,8 +1842,9 @@ Example: 'ABC Concrete had 5 workers pouring the foundation today. Weather was g
                 // Clear localStorage draft - report is now saved and refined
                 clearLocalStorageDraft();
 
-                // Navigate to report
-                window.location.href = 'report.html';
+                // Navigate to report with date and reportId parameters
+                const todayStr = new Date().toISOString().split('T')[0];
+                window.location.href = `report.html?date=${todayStr}&reportId=${currentReportId}`;
             } catch (error) {
                 console.error('AI processing failed:', error);
 
@@ -4091,6 +4106,20 @@ Example: 'ABC Concrete had 5 workers pouring the foundation today. Weather was g
                 // Save AI response to local report
                 if (result.aiGenerated) {
                     report.aiGenerated = result.aiGenerated;
+
+                    // Cache AI response to localStorage for immediate availability on report.html
+                    const todayStr = new Date().toISOString().split('T')[0];
+                    try {
+                        localStorage.setItem(`fvp_ai_response_${currentReportId}`, JSON.stringify({
+                            reportId: currentReportId,
+                            reportDate: todayStr,
+                            aiGenerated: result.aiGenerated,
+                            cachedAt: new Date().toISOString()
+                        }));
+                        console.log('[CACHE] AI response cached to localStorage');
+                    } catch (e) {
+                        console.warn('[CACHE] Failed to cache AI response:', e);
+                    }
                 }
                 report.meta.status = 'refined';
                 await saveReportToSupabase();
@@ -4098,8 +4127,9 @@ Example: 'ABC Concrete had 5 workers pouring the foundation today. Weather was g
                 // Clear localStorage draft - report is now saved and refined
                 clearLocalStorageDraft();
 
-                // Navigate to report
-                window.location.href = 'report.html';
+                // Navigate to report with date and reportId parameters
+                const todayStr = new Date().toISOString().split('T')[0];
+                window.location.href = `report.html?date=${todayStr}&reportId=${currentReportId}`;
             } catch (error) {
                 console.error('AI processing failed:', error);
 
