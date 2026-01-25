@@ -200,19 +200,21 @@
                     .select(`
                         id,
                         project_id,
-                        project_name,
                         report_date,
                         inspector_name,
                         status,
                         created_at,
                         submitted_at,
-                        updated_at
+                        updated_at,
+                        projects (
+                            project_name
+                        )
                     `)
                     .order('report_date', { ascending: false });
 
                 if (reportError) {
                     console.error('[SUPABASE] Error loading reports:', reportError);
-                    return [];
+                    throw new Error(reportError.message || 'Failed to load reports');
                 }
 
                 if (!reportRows || reportRows.length === 0) {
@@ -241,7 +243,7 @@
                         id: row.id,
                         date: row.report_date,
                         projectId: row.project_id,
-                        projectName: project?.name || row.project_name || 'Unknown Project',
+                        projectName: project?.name || row.projects?.project_name || 'Unknown Project',
                         submitted: row.status === 'submitted',
                         photoCount: photoCountMap[row.id] || 0,
                         createdAt: row.created_at,
@@ -253,7 +255,7 @@
                 return reports;
             } catch (e) {
                 console.error('[SUPABASE] Failed to load reports:', e);
-                return [];
+                throw e;
             }
         }
 
@@ -301,7 +303,25 @@
                 </div>
             `;
 
-            const reports = await getAllReports();
+            let reports;
+            try {
+                reports = await getAllReports();
+            } catch (err) {
+                console.error('[ARCHIVES] Error loading reports:', err);
+                section.innerHTML = `
+                    <div class="flex flex-col items-center justify-center py-16 px-4">
+                        <div class="w-20 h-20 bg-red-100 border-2 border-red-300 flex items-center justify-center mb-6">
+                            <i class="fas fa-exclamation-triangle text-red-500 text-3xl"></i>
+                        </div>
+                        <p class="text-lg font-bold text-slate-500 mb-2 text-center">Error loading reports</p>
+                        <p class="text-sm text-red-500 text-center mb-6">${err.message || 'Unknown error'}</p>
+                        <button onclick="location.reload()" class="px-6 py-3 bg-dot-navy text-white font-bold uppercase tracking-wide hover:bg-dot-blue transition-colors">
+                            <i class="fas fa-redo mr-2"></i>Retry
+                        </button>
+                    </div>
+                `;
+                return;
+            }
 
             if (reports.length === 0) {
                 section.innerHTML = `
