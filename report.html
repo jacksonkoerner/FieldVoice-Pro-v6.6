@@ -1393,20 +1393,43 @@
             // Clear any stale report ID before loading
             currentReportId = null;
 
-            if (!activeProject) {
+            // Check URL params for reportId (for direct loading after redirect)
+            const params = new URLSearchParams(window.location.search);
+            const reportIdParam = params.get('reportId');
+
+            if (!activeProject && !reportIdParam) {
                 return createFreshReport();
             }
 
             const reportDateStr = getReportDateStr();
 
             try {
-                // Try to find existing report for this project and date
-                const { data: reportRow, error: reportError } = await supabaseClient
-                    .from('reports')
-                    .select('*')
-                    .eq('project_id', activeProject.id)
-                    .eq('report_date', reportDateStr)
-                    .single();
+                let reportRow = null;
+                let reportError = null;
+
+                // If we have a reportId param, try loading by ID first (most reliable)
+                if (reportIdParam) {
+                    const result = await supabaseClient
+                        .from('reports')
+                        .select('*')
+                        .eq('id', reportIdParam)
+                        .single();
+                    reportRow = result.data;
+                    reportError = result.error;
+                    console.log('[LOAD] Loaded report by ID param:', reportIdParam);
+                }
+
+                // Fall back to project_id + date lookup
+                if (!reportRow && activeProject) {
+                    const result = await supabaseClient
+                        .from('reports')
+                        .select('*')
+                        .eq('project_id', activeProject.id)
+                        .eq('report_date', reportDateStr)
+                        .single();
+                    reportRow = result.data;
+                    reportError = result.error;
+                }
 
                 if (reportError && reportError.code !== 'PGRST116') {
                     console.error('Error loading report:', reportError);
@@ -1514,14 +1537,39 @@
                     }));
                 }
 
-                // AI response
-                if (aiResponseResult.data) {
+                // AI response - Check localStorage cache first for immediate availability
+                let aiGenerated = null;
+                const cacheKey = `fvp_ai_response_${reportRow.id}`;
+                const cachedAI = localStorage.getItem(cacheKey);
+
+                if (cachedAI) {
                     try {
-                        loadedReport.aiGenerated = aiResponseResult.data.response_payload || null;
+                        const cacheData = JSON.parse(cachedAI);
+                        // Validate cache is recent (within 5 minutes) and matches this report
+                        const cacheAge = Date.now() - new Date(cacheData.cachedAt).getTime();
+                        if (cacheData.reportId === reportRow.id && cacheAge < 300000) {
+                            aiGenerated = cacheData.aiGenerated;
+                            console.log('[CACHE] Using cached AI response from localStorage');
+                        }
+                        // Clear cache after use (one-time use)
+                        localStorage.removeItem(cacheKey);
+                    } catch (e) {
+                        console.warn('[CACHE] Failed to parse cached AI response:', e);
+                        localStorage.removeItem(cacheKey);
+                    }
+                }
+
+                // Fall back to Supabase data if no valid cache
+                if (!aiGenerated && aiResponseResult.data) {
+                    try {
+                        aiGenerated = aiResponseResult.data.response_payload || null;
+                        console.log('[SUPABASE] Loaded AI response from database');
                     } catch (e) {
                         console.error('Failed to parse AI response:', e);
                     }
                 }
+
+                loadedReport.aiGenerated = aiGenerated;
 
                 // User edits
                 if (userEditsResult.data && userEditsResult.data.length > 0) {

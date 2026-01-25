@@ -1347,71 +1347,68 @@
                     }));
                 }
 
-                // Process photos
+                // Process photos - use storage_path to build full URL
                 if (photosResult.data && photosResult.data.length > 0) {
                     loadedReport.photos = photosResult.data.map(row => ({
                         id: row.id,
-                        url: row.photo_url || '',
+                        url: row.storage_path ? `${SUPABASE_URL}/storage/v1/object/public/report-photos/${row.storage_path}` : '',
+                        storagePath: row.storage_path || '',
+                        fileName: row.filename || '',
                         caption: row.caption || '',
-                        date: row.taken_at ? new Date(row.taken_at).toLocaleDateString() : ''
+                        date: row.taken_at ? new Date(row.taken_at).toLocaleDateString() : '',
+                        time: row.taken_at ? new Date(row.taken_at).toLocaleTimeString() : '',
+                        gps: row.gps_lat && row.gps_lng ? { lat: row.gps_lat, lng: row.gps_lng } : null
                     }));
                 }
 
-                // Process AI response
-                if (aiResponseResult.data) {
-                    const aiData = aiResponseResult.data;
+                // Process AI response - data is stored as JSONB in response_payload column
+                if (aiResponseResult.data && aiResponseResult.data.response_payload) {
+                    const aiPayload = aiResponseResult.data.response_payload;
+
+                    // Use response_payload directly - it already contains the aiGenerated object
                     loadedReport.aiGenerated = {
-                        activities: [],
-                        generalIssues: aiData.general_issues || '',
-                        qaqcNotes: aiData.qaqc_notes || '',
-                        safety: {
-                            hasIncident: aiData.safety_has_incident || false,
-                            notes: aiData.safety_notes || ''
-                        },
-                        contractorCommunications: aiData.contractor_communications || '',
-                        visitorsRemarks: aiData.visitors_remarks || '',
-                        operations: [],
-                        equipment: []
+                        activities: aiPayload.activities || [],
+                        operations: aiPayload.operations || [],
+                        equipment: aiPayload.equipment || [],
+                        generalIssues: aiPayload.generalIssues || [],
+                        qaqcNotes: aiPayload.qaqcNotes || [],
+                        safety: aiPayload.safety || { hasIncidents: false, noIncidents: true, notes: '' },
+                        contractorCommunications: aiPayload.contractorCommunications || '',
+                        visitorsRemarks: aiPayload.visitorsRemarks || ''
                     };
 
-                    // Parse JSON fields if they exist
-                    if (aiData.activities_json) {
-                        try {
-                            loadedReport.aiGenerated.activities = typeof aiData.activities_json === 'string'
-                                ? JSON.parse(aiData.activities_json)
-                                : aiData.activities_json;
-                        } catch (e) {
-                            console.warn('[SUPABASE] Failed to parse AI activities:', e);
-                        }
-                    }
-                    if (aiData.operations_json) {
-                        try {
-                            loadedReport.aiGenerated.operations = typeof aiData.operations_json === 'string'
-                                ? JSON.parse(aiData.operations_json)
-                                : aiData.operations_json;
-                        } catch (e) {
-                            console.warn('[SUPABASE] Failed to parse AI operations:', e);
-                        }
-                    }
-                    if (aiData.equipment_json) {
-                        try {
-                            loadedReport.aiGenerated.equipment = typeof aiData.equipment_json === 'string'
-                                ? JSON.parse(aiData.equipment_json)
-                                : aiData.equipment_json;
-                        } catch (e) {
-                            console.warn('[SUPABASE] Failed to parse AI equipment:', e);
-                        }
+                    console.log('[SUPABASE] Loaded AI response from response_payload:', loadedReport.aiGenerated);
+
+                    // Copy AI text sections to report for easy access
+                    // Handle both array and string formats for issues
+                    if (Array.isArray(aiPayload.generalIssues)) {
+                        loadedReport.issues = aiPayload.generalIssues.join('\n');
+                    } else {
+                        loadedReport.issues = aiPayload.generalIssues || '';
                     }
 
-                    // Copy AI text sections to report
-                    loadedReport.issues = aiData.general_issues || '';
-                    loadedReport.communications = aiData.contractor_communications || '';
-                    loadedReport.qaqc = aiData.qaqc_notes || '';
-                    loadedReport.visitors = aiData.visitors_remarks || '';
-                    loadedReport.safety = {
-                        hasIncident: aiData.safety_has_incident || false,
-                        notes: aiData.safety_notes || ''
-                    };
+                    loadedReport.communications = aiPayload.contractorCommunications || '';
+
+                    // Handle both array and string formats for qaqc
+                    if (Array.isArray(aiPayload.qaqcNotes)) {
+                        loadedReport.qaqc = aiPayload.qaqcNotes.join('\n');
+                    } else {
+                        loadedReport.qaqc = aiPayload.qaqcNotes || '';
+                    }
+
+                    loadedReport.visitors = aiPayload.visitorsRemarks || '';
+
+                    // Safety - handle different property names (hasIncidents vs hasIncident)
+                    if (aiPayload.safety) {
+                        const safetyNotes = Array.isArray(aiPayload.safety.notes)
+                            ? aiPayload.safety.notes.join('\n')
+                            : (aiPayload.safety.notes || '');
+                        loadedReport.safety = {
+                            hasIncident: aiPayload.safety.hasIncidents || aiPayload.safety.hasIncident || false,
+                            noIncidents: aiPayload.safety.noIncidents || false,
+                            notes: safetyNotes
+                        };
+                    }
                 }
 
                 // Process user edits
