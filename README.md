@@ -89,15 +89,21 @@
 ├── icons/                  # PWA app icons directory
 │   ├── icon.svg            # Source SVG icon (construction/microphone themed)
 │   ├── icon-72x72.png      # App icon for various device sizes
+│   ├── icon-72x72-maskable.png     # Maskable icon for Android
 │   ├── icon-96x96.png
+│   ├── icon-96x96-maskable.png
 │   ├── icon-128x128.png
+│   ├── icon-128x128-maskable.png
 │   ├── icon-144x144.png
+│   ├── icon-144x144-maskable.png
 │   ├── icon-152x152.png
+│   ├── icon-152x152-maskable.png
 │   ├── icon-192x192.png
-│   ├── icon-192x192-maskable.png   # Maskable icon for Android
+│   ├── icon-192x192-maskable.png
 │   ├── icon-384x384.png
+│   ├── icon-384x384-maskable.png
 │   ├── icon-512x512.png
-│   └── icon-512x512-maskable.png   # Maskable icon for Android
+│   └── icon-512x512-maskable.png
 ├── docs/                   # Technical documentation
 │   ├── project-config-spec.md
 │   ├── quick-interview-spec.md
@@ -105,6 +111,7 @@
 │   ├── finalreview-spec.md
 │   ├── current-data-flow.md        # Detailed data flow mapping
 │   ├── data-flow-audit.md          # Complete table usage audit by page
+│   ├── supabase-schema.md          # Comprehensive Supabase schema documentation
 │   └── report-finalreview-archives-investigation.md  # Page interconnection analysis
 ├── migrations/             # Database migration scripts
 │   └── 001_add_guided_section_columns.sql  # Adds guided mode columns
@@ -115,11 +122,11 @@
 
 | Page | Lines | Purpose |
 |------|-------|---------|
-| `index.html` | ~1,091 | Dashboard with project selection, active project display, weather, and navigation |
-| `quick-interview.html` | ~4,354 | DOT-compliant report with dual capture modes (Quick Notes minimal or Guided Sections), 12 expandable sections, auto-expanding textareas, contractor-based work entry |
+| `index.html` | ~1,100 | Dashboard with project selection, active project display, weather, and navigation |
+| `quick-interview.html` | ~4,356 | DOT-compliant report with dual capture modes (Quick Notes minimal or Guided Sections), 12 expandable sections, auto-expanding textareas, contractor-based work entry |
 | `report.html` | ~3,302 | AI-populated editable DOT form with Form View and Original Notes tabs, Final Review navigation |
 | `finalreview.html` | ~2,320 | Read-only DOT RPR Daily Report viewer matching official DOT format with 4+ page layout, print-optimized CSS, contractor-based work summary, operations/equipment tables, and photo grid |
-| `archives.html` | ~566 | Report history with swipe-to-delete, date-sorted report list, view finalized reports |
+| `archives.html` | ~564 | Report history with swipe-to-delete, date-sorted report list, view finalized reports |
 | `drafts.html` | ~699 | Drafts & offline queue management - displays pending reports waiting to sync when online |
 | `permissions.html` | ~1,596 | Permission testing (mic, camera, GPS), iOS-specific instructions for native dictation |
 | `permission-debug.html` | ~1,074 | Debugging utility for troubleshooting permission issues |
@@ -903,11 +910,11 @@ npx serve .
 
 | File | Lines | Size (approx) |
 |------|-------|---------------|
-| index.html | 1,091 | 52 KB |
-| quick-interview.html | 4,354 | 205 KB |
+| index.html | 1,100 | 52 KB |
+| quick-interview.html | 4,356 | 205 KB |
 | report.html | 3,302 | 150 KB |
 | finalreview.html | 2,320 | 89 KB |
-| archives.html | 566 | 25 KB |
+| archives.html | 564 | 25 KB |
 | drafts.html | 699 | 30 KB |
 | permissions.html | 1,596 | 81 KB |
 | permission-debug.html | 1,074 | 53 KB |
@@ -915,11 +922,11 @@ npx serve .
 | settings.html | 538 | 26 KB |
 | landing.html | 1,560 | 80 KB |
 | admin-debug.html | 277 | 11 KB |
-| sw.js | 209 | 7 KB |
+| sw.js | 208 | 7 KB |
 | manifest.json | 113 | 3 KB |
 | icons/ | - | ~3 KB |
 | assets/ | - | ~328 KB |
-| **Total** | **~19,805** | **~1.3 MB** |
+| **Total** | **~19,813** | **~1.3 MB** |
 
 ---
 
@@ -1063,4 +1070,4 @@ FieldVoice Pro is a sophisticated, production-ready field documentation system t
 - **Streamlined navigation** with project picker, Home buttons, and improved workflow tracking
 - **Comprehensive documentation** - Detailed data flow audits and technical specs in docs/ directory
 
-The codebase is mature (~20,914 lines including PWA infrastructure), well-structured, and includes comprehensive error handling for real-world field conditions including graceful offline degradation.
+The codebase is mature (~19,813 lines including PWA infrastructure), well-structured, and includes comprehensive error handling for real-world field conditions including graceful offline degradation.
