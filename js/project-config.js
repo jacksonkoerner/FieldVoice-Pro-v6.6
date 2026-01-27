@@ -13,10 +13,18 @@ let isLoading = false;
 // ============ PROJECT MANAGEMENT ============
 async function getProjects() {
     try {
-        // Fetch all projects
+        // Get current user's ID
+        const userId = getStorageItem(STORAGE_KEYS.USER_ID);
+
+        if (!userId) {
+            console.warn('[getProjects] No user_id found - user needs to set up profile first');
+            return [];
+        }
+
         const { data: projectRows, error: projectError } = await supabaseClient
             .from('projects')
             .select('*')
+            .eq('user_id', userId)
             .order('created_at', { ascending: false });
 
         if (projectError) {
