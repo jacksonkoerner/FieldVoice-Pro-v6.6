@@ -55,6 +55,7 @@ function fromSupabaseProject(row) {
 function toSupabaseProject(project) {
     if (!project) return null;
     return {
+        id: project.id,
         project_name: project.projectName || project.name || '',
         noab_project_no: project.noabProjectNo || '',
         cno_solicitation_no: project.cnoSolicitationNo || '',
@@ -111,6 +112,7 @@ function fromSupabaseContractor(row) {
 function toSupabaseContractor(contractor, projectId) {
     if (!contractor) return null;
     return {
+        id: contractor.id,
         project_id: projectId || contractor.projectId,
         name: contractor.name || '',
         company: contractor.company || '',
