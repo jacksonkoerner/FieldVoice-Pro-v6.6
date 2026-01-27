@@ -103,22 +103,45 @@ async function saveSettings() {
 
     // Step 6: Try to upsert to Supabase
     try {
+        // DEBUG: Log the profile object being built
+        console.log('[saveSettings] Profile object:', JSON.stringify(profile, null, 2));
+
         const supabaseData = toSupabaseUserProfile(profile);
 
-        const { error } = await supabaseClient
-            .from('user_profiles')
-            .upsert(supabaseData, { onConflict: 'id' });
+        // DEBUG: Log the converted Supabase payload
+        console.log('[saveSettings] Supabase payload:', JSON.stringify(supabaseData, null, 2));
+        console.log('[saveSettings] Payload has id?', !!supabaseData?.id, 'id value:', supabaseData?.id);
 
-        if (error) {
-            console.error('Failed to save settings to Supabase:', error);
+        const result = await supabaseClient
+            .from('user_profiles')
+            .upsert(supabaseData, { onConflict: 'id' })
+            .select()
+            .single();
+
+        // DEBUG: Log the full Supabase response
+        console.log('[saveSettings] Supabase result:', JSON.stringify(result, null, 2));
+        console.log('[saveSettings] Supabase data:', result.data);
+        console.log('[saveSettings] Supabase error:', result.error);
+        console.log('[saveSettings] Supabase status:', result.status);
+
+        if (result.error) {
+            console.error('[saveSettings] Failed to save settings to Supabase:', result.error);
+            console.error('[saveSettings] Error code:', result.error.code);
+            console.error('[saveSettings] Error message:', result.error.message);
+            console.error('[saveSettings] Error details:', result.error.details);
+            console.error('[saveSettings] Error hint:', result.error.hint);
             showToast('Saved locally. Save again when online to backup.', 'warning');
             return;
         }
 
         // Step 7: Success - show confirmation
+        console.log('[saveSettings] SUCCESS - Profile saved to Supabase');
         showToast('Profile saved');
     } catch (e) {
-        console.error('Failed to save settings to Supabase:', e);
+        console.error('[saveSettings] EXCEPTION caught:', e);
+        console.error('[saveSettings] Exception name:', e.name);
+        console.error('[saveSettings] Exception message:', e.message);
+        console.error('[saveSettings] Exception stack:', e.stack);
         // Step 8: Offline or error - inform user
         showToast('Saved locally. Save again when online to backup.', 'warning');
     }
