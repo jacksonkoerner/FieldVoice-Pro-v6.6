@@ -34,11 +34,11 @@ async function loadSettings() {
         const { data, error } = await supabaseClient
             .from('user_profiles')
             .select('*')
-            .limit(1)
-            .single();
+            .eq('device_id', deviceId)
+            .maybeSingle();  // Returns null if not found, doesn't throw error
 
         // DEBUG: Log Supabase query result
-        console.log('[loadSettings] Supabase query result:', data);
+        console.log('[loadSettings] Supabase result for this device:', data);
         console.log('[loadSettings] Error:', error);
 
         if (error && error.code !== 'PGRST116') {
@@ -91,15 +91,16 @@ async function saveSettings() {
     console.log('[saveSettings] Current user_id in localStorage:', getStorageItem(STORAGE_KEYS.USER_ID));
     console.log('[saveSettings] currentProfileId variable:', currentProfileId);
 
-    // Step 2: Get or generate user_id
+    // Step 2: Get user_id (only if we have one for THIS device)
+    // Do NOT fall back to currentProfileId — it might be from another device
+    // Do NOT generate a new UUID — let Supabase generate it
     let userId = getStorageItem(STORAGE_KEYS.USER_ID);
-    if (!userId) {
-        userId = currentProfileId || crypto.randomUUID();
-    }
+    console.log('[saveSettings] userId from localStorage:', userId);
 
     // Step 3: Build profile object with all fields
     const profile = {
-        id: userId,
+        // Only include id if we have one for THIS device
+        ...(userId && { id: userId }),
         deviceId: deviceId,
         fullName: document.getElementById('inspectorName').value.trim(),
         title: document.getElementById('title').value.trim(),
@@ -112,9 +113,11 @@ async function saveSettings() {
     // Step 4: Save to localStorage first (local-first)
     setStorageItem(STORAGE_KEYS.USER_PROFILE, profile);
 
-    // Step 5: Store user_id in localStorage for use by other pages
-    setStorageItem(STORAGE_KEYS.USER_ID, userId);
-    currentProfileId = userId;
+    // Step 5: Only store user_id if we have one (will be set after Supabase upsert for new devices)
+    if (userId) {
+        setStorageItem(STORAGE_KEYS.USER_ID, userId);
+        currentProfileId = userId;
+    }
 
     updateSignaturePreview();
 
@@ -131,7 +134,7 @@ async function saveSettings() {
 
         const result = await supabaseClient
             .from('user_profiles')
-            .upsert(supabaseData, { onConflict: 'id' })
+            .upsert(supabaseData, { onConflict: 'device_id' })
             .select()
             .single();
 
@@ -151,7 +154,15 @@ async function saveSettings() {
             return;
         }
 
-        // Step 7: Success - show confirmation
+        // Step 7: Store the Supabase-returned id (especially important for new devices)
+        if (result.data && result.data.id) {
+            const returnedId = result.data.id;
+            setStorageItem(STORAGE_KEYS.USER_ID, returnedId);
+            currentProfileId = returnedId;
+            console.log('[saveSettings] Stored user_id from Supabase:', returnedId);
+        }
+
+        // Step 8: Success - show confirmation
         console.log('[saveSettings] SUCCESS - Profile saved to Supabase');
         showToast('Profile saved');
     } catch (e) {
@@ -186,11 +197,12 @@ function updateSignaturePreview() {
 // Note: This function is kept for compatibility but now fetches from Supabase
 async function getFormattedSignature() {
     try {
+        const deviceId = getDeviceId();
         const { data, error } = await supabaseClient
             .from('user_profiles')
             .select('full_name, title, company')
-            .limit(1)
-            .single();
+            .eq('device_id', deviceId)
+            .maybeSingle();
 
         if (error || !data) return '';
 
