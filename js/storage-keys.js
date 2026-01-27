@@ -315,3 +315,19 @@ export function clearSyncQueue() {
   removeStorageItem(STORAGE_KEYS.SYNC_QUEUE);
   console.log('Sync queue cleared');
 }
+
+// Expose to window for non-module scripts
+if (typeof window !== 'undefined') {
+  window.STORAGE_KEYS = STORAGE_KEYS;
+  window.getDeviceId = getDeviceId;
+  window.getStorageItem = getStorageItem;
+  window.setStorageItem = setStorageItem;
+  window.removeStorageItem = removeStorageItem;
+  window.getCurrentReport = getCurrentReport;
+  window.saveCurrentReport = saveCurrentReport;
+  window.deleteCurrentReport = deleteCurrentReport;
+  window.getActiveProject = getActiveProject;
+  window.addToSyncQueue = addToSyncQueue;
+  window.getSyncQueue = getSyncQueue;
+  window.clearSyncQueue = clearSyncQueue;
+}

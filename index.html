@@ -20,6 +20,8 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="./js/config.js"></script>
+    <script src="./js/storage-keys.js"></script>
+    <script src="./js/report-rules.js"></script>
     <script src="./js/supabase-utils.js"></script>
     <script src="./js/pwa-utils.js"></script>
     <script src="./js/ui-utils.js"></script>
@@ -170,6 +172,11 @@
         <!-- ACTIVE PROJECT CARD -->
         <section id="activeProjectSection" class="px-4 mb-4">
             <!-- Content rendered by updateActiveProjectCard() -->
+        </section>
+
+        <!-- REPORT CARDS BY URGENCY -->
+        <section id="reportCardsSection" class="px-4 mb-4">
+            <!-- Rendered by renderReportCards() -->
         </section>
 
         <!-- DYNAMIC STATUS/ACTION CARD -->

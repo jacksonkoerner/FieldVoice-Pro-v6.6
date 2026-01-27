@@ -1,7 +1,17 @@
+// ============================================================================
+// FieldVoice Pro v6 - Dashboard (index.js)
+//
+// Uses:
+// - storage-keys.js: STORAGE_KEYS, getStorageItem, setStorageItem, getSyncQueue
+// - report-rules.js: getTodayDateString, canStartNewReport, getReportsByUrgency
+// - ui-utils.js: escapeHtml, formatDate
+// - config.js: supabaseClient, ACTIVE_PROJECT_KEY
+// - supabase-utils.js: fromSupabaseProject
+// ============================================================================
+
 // ============ STATE ============
 let projectsCache = [];
 let activeProjectCache = null;
-let todayReportCache = null;
 
 // ============ PROJECT MANAGEMENT ============
 async function loadProjects() {
@@ -17,6 +27,12 @@ async function loadProjects() {
         }
 
         projectsCache = data.map(fromSupabaseProject);
+
+        // Also cache projects in localStorage for offline access and report-rules.js
+        const projectsMap = {};
+        projectsCache.forEach(p => { projectsMap[p.id] = p; });
+        setStorageItem(STORAGE_KEYS.PROJECTS, projectsMap);
+
         console.log('[SUPABASE] Loaded projects:', projectsCache.length);
         return projectsCache;
     } catch (e) {
@@ -30,7 +46,7 @@ function getProjects() {
 }
 
 async function loadActiveProject() {
-    const activeId = localStorage.getItem(ACTIVE_PROJECT_KEY);
+    const activeId = getStorageItem(STORAGE_KEYS.ACTIVE_PROJECT_ID);
     if (!activeId) {
         activeProjectCache = null;
         return null;
@@ -59,7 +75,7 @@ async function loadActiveProject() {
     }
 }
 
-function getActiveProject() {
+function getActiveProjectFromCache() {
     return activeProjectCache;
 }
 
@@ -69,7 +85,7 @@ function openProjectConfig() {
 
 function updateActiveProjectCard() {
     const section = document.getElementById('activeProjectSection');
-    const project = getActiveProject();
+    const project = getActiveProjectFromCache();
 
     if (project) {
         section.innerHTML = `
@@ -134,7 +150,7 @@ async function showProjectPickerModal() {
     // Load fresh projects from Supabase
     await loadProjects();
     const projects = getProjects();
-    const activeId = localStorage.getItem(ACTIVE_PROJECT_KEY);
+    const activeId = getStorageItem(STORAGE_KEYS.ACTIVE_PROJECT_ID);
 
     if (projects.length === 0) {
         // No projects configured
@@ -152,47 +168,38 @@ async function showProjectPickerModal() {
             </div>
         `;
     } else {
-        // Fetch today's report status for all projects to check which are refined
-        const todayStr = getTodayDateStr();
-        const projectIds = projects.map(p => p.id);
-
-        let refinedProjectIds = new Set();
-        try {
-            const { data: reports } = await supabaseClient
-                .from('reports')
-                .select('project_id, status')
-                .in('project_id', projectIds)
-                .eq('report_date', todayStr);
-
-            if (reports) {
-                // Note: 'finalized' is reserved for future admin approval workflow
-                reports.forEach(r => {
-                    if (['refined', 'submitted', 'finalized'].includes(r.status)) {
-                        refinedProjectIds.add(r.project_id);
-                    }
-                });
-            }
-        } catch (e) {
-            console.error('Failed to check project report statuses:', e);
+        // Check eligibility using report-rules.js
+        const eligibilityMap = {};
+        for (const project of projects) {
+            eligibilityMap[project.id] = canStartNewReport(project.id);
         }
 
         // Render project list
         listContainer.innerHTML = projects.map(project => {
             const isActive = project.id === activeId;
-            const isRefined = refinedProjectIds.has(project.id);
+            const eligibility = eligibilityMap[project.id];
+            const canStart = eligibility.allowed;
+            const reason = eligibility.reason;
 
-            if (isRefined) {
-                // Project has a refined report - show disabled state
+            if (!canStart && reason !== 'CONTINUE_EXISTING') {
+                // Project is blocked - show disabled state
+                const reasonText = reason === 'UNFINISHED_PREVIOUS' ? 'Has Late Report'
+                                 : reason === 'ALREADY_SUBMITTED_TODAY' ? 'Submitted Today'
+                                 : 'Unavailable';
+                const reasonIcon = reason === 'UNFINISHED_PREVIOUS' ? 'fa-exclamation-triangle'
+                                 : reason === 'ALREADY_SUBMITTED_TODAY' ? 'fa-check-circle'
+                                 : 'fa-lock';
+
                 return `
                     <div class="w-full p-4 text-left border-b border-slate-200 last:border-b-0 bg-slate-50 opacity-60 cursor-not-allowed">
                         <div class="flex items-center gap-3">
                             <div class="w-10 h-10 bg-slate-400 flex items-center justify-center shrink-0">
-                                <i class="fas fa-lock text-white"></i>
+                                <i class="fas ${reasonIcon} text-white"></i>
                             </div>
                             <div class="flex-1 min-w-0">
                                 <div class="flex items-center gap-2">
                                     <p class="font-bold text-slate-600 truncate">${escapeHtml(project.name)}</p>
-                                    <span class="shrink-0 text-[10px] bg-slate-400 text-white px-2 py-0.5 font-bold uppercase">In Review</span>
+                                    <span class="shrink-0 text-[10px] bg-slate-400 text-white px-2 py-0.5 font-bold uppercase">${reasonText}</span>
                                 </div>
                                 <p class="text-xs text-slate-500 truncate mt-0.5">
                                     ${project.noabProjectNo ? `#${escapeHtml(project.noabProjectNo)}` : ''}
@@ -216,6 +223,7 @@ async function showProjectPickerModal() {
                             <div class="flex items-center gap-2">
                                 <p class="font-bold text-slate-800 truncate">${escapeHtml(project.name)}</p>
                                 ${isActive ? '<span class="shrink-0 text-[10px] bg-safety-green text-white px-2 py-0.5 font-bold uppercase">Active</span>' : ''}
+                                ${reason === 'CONTINUE_EXISTING' ? '<span class="shrink-0 text-[10px] bg-dot-orange text-white px-2 py-0.5 font-bold uppercase">In Progress</span>' : ''}
                             </div>
                             <p class="text-xs text-slate-500 truncate mt-0.5">
                                 ${project.noabProjectNo ? `#${escapeHtml(project.noabProjectNo)}` : ''}
@@ -237,8 +245,8 @@ function closeProjectPickerModal() {
 }
 
 async function selectProjectAndProceed(projectId) {
-    // Set as active project in localStorage
-    localStorage.setItem(ACTIVE_PROJECT_KEY, projectId);
+    // Set as active project in localStorage using storage-keys helper
+    setStorageItem(STORAGE_KEYS.ACTIVE_PROJECT_ID, projectId);
 
     // Update cache
     await loadActiveProject();
@@ -256,113 +264,93 @@ function goToProjectSetup() {
     window.location.href = 'project-config.html';
 }
 
-// ============ REPORT LOADING ============
-function getTodayDateStr() {
-    return new Date().toISOString().split('T')[0];
-}
+// ============ REPORT CARDS ============
+function renderReportCards() {
+    const container = document.getElementById('reportCardsSection');
+    if (!container) return;
 
-function getYesterdayDateStr() {
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    return yesterday.toISOString().split('T')[0];
-}
+    const { late, todayDrafts, todayReady, todaySubmitted } = getReportsByUrgency();
 
-async function loadTodayReport() {
-    const activeProject = getActiveProject();
-    if (!activeProject) {
-        todayReportCache = null;
-        return null;
+    // If no reports at all, hide the section
+    if (late.length === 0 && todayDrafts.length === 0 && todayReady.length === 0 && todaySubmitted.length === 0) {
+        container.innerHTML = '';
+        return;
     }
 
-    const todayStr = getTodayDateStr();
+    let html = '';
 
-    try {
-        const { data, error } = await supabaseClient
-            .from('reports')
-            .select('id, project_id, report_date, status, created_at, updated_at')
-            .eq('project_id', activeProject.id)
-            .eq('report_date', todayStr)
-            .single();
-
-        if (error) {
-            // No report found is expected
-            if (error.code !== 'PGRST116') {
-                console.error('[SUPABASE] Error loading today report:', error);
-            }
-            todayReportCache = null;
-            return null;
-        }
-
-        // If report is submitted, return null (so dashboard shows "no report" state)
-        if (data.status === 'submitted') {
-            todayReportCache = { ...data, submitted: true };
-            return null;
-        }
-
-        // Load additional metadata for progress calculation
-        const [rawCaptureResult, activitiesResult] = await Promise.all([
-            supabaseClient.from('report_raw_capture').select('transcript, guided_notes').eq('report_id', data.id).single(),
-            supabaseClient.from('report_contractor_work').select('id').eq('report_id', data.id)
-        ]);
-
-        todayReportCache = {
-            id: data.id,
-            projectId: data.project_id,
-            date: data.report_date,
-            status: data.status,
-            submitted: false,
-            meta: {
-                interviewCompleted: data.status === 'draft' || data.status === 'pending_refine' || data.status === 'refined',
-                status: data.status
-            },
-            hasActivities: activitiesResult.data && activitiesResult.data.length > 0,
-            hasRawCapture: rawCaptureResult.data !== null
-        };
-
-        console.log('[SUPABASE] Loaded today report:', todayReportCache.id);
-        return todayReportCache;
-    } catch (e) {
-        console.error('[SUPABASE] Failed to load today report:', e);
-        todayReportCache = null;
-        return null;
+    // LATE reports (red warning, need immediate attention)
+    if (late.length > 0) {
+        html += `<div class="mb-3">
+            <p class="text-xs font-bold text-red-600 uppercase tracking-wider mb-2">
+                <i class="fas fa-exclamation-triangle mr-1"></i>Late Reports
+            </p>`;
+        late.forEach(report => {
+            html += renderReportCard(report, 'late');
+        });
+        html += '</div>';
     }
+
+    // Today's drafts
+    if (todayDrafts.length > 0) {
+        html += `<div class="mb-3">
+            <p class="text-xs font-bold text-dot-orange uppercase tracking-wider mb-2">In Progress</p>`;
+        todayDrafts.forEach(report => {
+            html += renderReportCard(report, 'draft');
+        });
+        html += '</div>';
+    }
+
+    // Today's ready for review
+    if (todayReady.length > 0) {
+        html += `<div class="mb-3">
+            <p class="text-xs font-bold text-safety-green uppercase tracking-wider mb-2">Ready for Review</p>`;
+        todayReady.forEach(report => {
+            html += renderReportCard(report, 'ready');
+        });
+        html += '</div>';
+    }
+
+    // Today's submitted (view only)
+    if (todaySubmitted.length > 0) {
+        html += `<div class="mb-3">
+            <p class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Submitted Today</p>`;
+        todaySubmitted.forEach(report => {
+            html += renderReportCard(report, 'submitted');
+        });
+        html += '</div>';
+    }
+
+    container.innerHTML = html;
 }
 
-function getReport() {
-    // Return cached report (non-submitted only)
-    if (todayReportCache && !todayReportCache.submitted) {
-        return todayReportCache;
-    }
-    return null;
+function renderReportCard(report, type) {
+    const projectName = report.project_name || 'Unknown Project';
+    const date = formatDate(report.date, 'short');
+
+    const styles = {
+        late: { border: 'border-red-500', bg: 'bg-red-50', icon: 'fa-exclamation-circle', iconColor: 'text-red-500' },
+        draft: { border: 'border-dot-orange', bg: 'bg-orange-50', icon: 'fa-pen', iconColor: 'text-dot-orange' },
+        ready: { border: 'border-safety-green', bg: 'bg-green-50', icon: 'fa-check-circle', iconColor: 'text-safety-green' },
+        submitted: { border: 'border-slate-300', bg: 'bg-slate-50', icon: 'fa-archive', iconColor: 'text-slate-400' }
+    };
+
+    const style = styles[type] || styles.draft;
+    const href = type === 'submitted' ? `archives.html?id=${report.id}` : 'quick-interview.html';
+
+    return `
+        <a href="${href}" class="block ${style.bg} border-l-4 ${style.border} p-3 mb-2 hover:bg-opacity-80 transition-colors">
+            <div class="flex items-center gap-3">
+                <i class="fas ${style.icon} ${style.iconColor}"></i>
+                <div class="flex-1 min-w-0">
+                    <p class="font-medium text-slate-800 truncate">${escapeHtml(projectName)}</p>
+                    <p class="text-xs text-slate-500">${date}</p>
+                </div>
+                <i class="fas fa-chevron-right text-slate-400"></i>
+            </div>
+        </a>
+    `;
 }
-
-async function hasSubmittedReportToday() {
-    const activeProject = getActiveProject();
-    if (!activeProject) return false;
-
-    const todayStr = getTodayDateStr();
-
-    try {
-        const { data, error } = await supabaseClient
-            .from('reports')
-            .select('id, status')
-            .eq('project_id', activeProject.id)
-            .eq('report_date', todayStr)
-            .eq('status', 'submitted')
-            .single();
-
-        if (error) {
-            return false;
-        }
-
-        return data !== null;
-    } catch (e) {
-        return false;
-    }
-}
-
-// Note: saveReport is no longer needed on index.html - saving happens on report.html
-// Weather data updates are also handled on report.html
 
 // ============ WEATHER ============
 async function syncWeather() {
@@ -391,6 +379,7 @@ async function syncWeather() {
             );
         });
 
+        // Keep raw localStorage for permission flags (they're not in STORAGE_KEYS)
         localStorage.setItem('fvp_loc_granted', 'true');
 
         const { latitude, longitude } = position.coords;
@@ -455,108 +444,36 @@ async function syncWeather() {
 
 // ============ UI UPDATES ============
 function updateReportStatus() {
-    const report = getReport();
     const statusSection = document.getElementById('reportStatusSection');
+    const { late, todayDrafts, todayReady } = getReportsByUrgency();
 
-    // Note: getReport() returns null for submitted reports, so they fall into the "no report" case
-    if (!report) {
-        // STATE: No Report Started
-        statusSection.innerHTML = `
-            <div class="bg-white border-2 border-slate-200 p-6">
-                <div class="text-center">
-                    <div class="w-16 h-16 bg-slate-100 border-2 border-slate-300 flex items-center justify-center mx-auto mb-4">
-                        <i class="fas fa-clipboard text-slate-400 text-2xl"></i>
-                    </div>
-                    <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">No Report Started</p>
-                    <p class="text-sm text-slate-500 mb-4">Begin documentation to create today's report</p>
-                    <button onclick="beginDailyReport()" class="block w-full bg-dot-navy hover:bg-dot-blue text-white p-4 transition-colors">
-                        <div class="flex items-center justify-center gap-3">
-                            <i class="fas fa-plus text-dot-yellow"></i>
-                            <span class="font-bold uppercase tracking-wide">Begin Daily Report</span>
-                        </div>
-                    </button>
-                </div>
-            </div>
-        `;
+    // If there are any active reports, don't show "Begin" button
+    const hasActiveReports = late.length > 0 || todayDrafts.length > 0 || todayReady.length > 0;
 
-    } else if (report.meta?.interviewCompleted && !report.submitted) {
-        // STATE: Interview Complete, Ready for Review & Submit
-        const isPending = report.meta?.status === 'pending_refine';
-        const isRefined = ['refined', 'submitted', 'finalized'].includes(report.meta?.status);
-        const statusColor = isPending ? 'border-dot-yellow' : (isRefined ? 'border-safety-green' : 'border-dot-blue');
-        const iconBg = isPending ? 'bg-dot-yellow' : (isRefined ? 'bg-safety-green' : 'bg-dot-blue');
-        const labelColor = isPending ? 'text-dot-yellow' : (isRefined ? 'text-safety-green' : 'text-dot-blue');
-        const statusLabel = isPending ? 'Processing Pending' : (isRefined ? 'AI Refined' : 'Ready for Review');
-        const statusDesc = isPending ? 'AI processing will complete when online' : 'Review and submit your report';
-
-        // Only show "continue editing" link for draft and pending_refine status, NOT for refined reports
-        const showEditLink = !isRefined;
-
-        statusSection.innerHTML = `
-            <div class="bg-white border-2 ${statusColor} p-6">
-                <div class="text-center">
-                    <div class="w-16 h-16 ${iconBg} flex items-center justify-center mx-auto mb-4">
-                        <i class="fas ${isPending ? 'fa-clock' : 'fa-clipboard-check'} text-white text-2xl"></i>
-                    </div>
-                    <p class="text-xs font-bold ${labelColor} uppercase tracking-wider mb-1">${statusLabel}</p>
-                    <p class="text-sm text-slate-700 font-medium mb-1">Report Complete</p>
-                    <p class="text-xs text-slate-500 mb-4">${statusDesc}</p>
-                    <a href="report.html" class="block w-full bg-safety-green hover:bg-green-700 text-white p-4 transition-colors ${showEditLink ? 'mb-3' : ''}">
-                        <div class="flex items-center justify-center gap-3">
-                            <i class="fas fa-check-circle text-white"></i>
-                            <span class="font-bold uppercase tracking-wide">Review & Submit</span>
-                        </div>
-                    </a>
-                    ${showEditLink ? `
-                    <a href="quick-interview.html" class="text-sm text-slate-500 hover:text-dot-blue transition-colors">
-                        <i class="fas fa-edit mr-1"></i>or continue editing
-                    </a>
-                    ` : ''}
-                </div>
-            </div>
-        `;
-
-    } else if (!report.meta?.interviewCompleted) {
-        // STATE: In Progress (still editing)
-        const progress = calculateProgress(report);
-
-        statusSection.innerHTML = `
-            <div class="bg-white border-2 border-dot-orange p-6">
-                <div class="text-center">
-                    <div class="w-16 h-16 bg-dot-orange flex items-center justify-center mx-auto mb-4">
-                        <i class="fas fa-pen text-white text-2xl"></i>
-                    </div>
-                    <p class="text-xs font-bold text-dot-orange uppercase tracking-wider mb-1">In Progress</p>
-                    <p class="text-sm text-slate-700 font-medium mb-2">Report In Progress</p>
-                    <!-- Progress bar -->
-                    <div class="flex items-center gap-3 mb-4 max-w-xs mx-auto">
-                        <div class="flex-1 h-2 bg-slate-200 overflow-hidden">
-                            <div class="h-full bg-dot-orange transition-all" style="width: ${progress}%"></div>
-                        </div>
-                        <span class="text-sm font-bold text-slate-500">${progress}%</span>
-                    </div>
-                    <a href="quick-interview.html" class="block w-full bg-dot-orange hover:bg-orange-700 text-white p-4 transition-colors">
-                        <div class="flex items-center justify-center gap-3">
-                            <i class="fas fa-play text-white"></i>
-                            <span class="font-bold uppercase tracking-wide">Continue Report</span>
-                        </div>
-                    </a>
-                </div>
-            </div>
-        `;
+    if (hasActiveReports) {
+        // Report cards section handles display
+        statusSection.innerHTML = '';
+        return;
     }
-}
 
-function calculateProgress(report) {
-    // Simplified progress calculation based on available data
-    let filled = 0;
-    let total = 4;
-
-    if (report.hasRawCapture) filled++;
-    if (report.hasActivities) filled++;
-    if (report.meta?.interviewCompleted) filled += 2;
-
-    return Math.round((filled / total) * 100);
+    // No active reports - show Begin button
+    statusSection.innerHTML = `
+        <div class="bg-white border-2 border-slate-200 p-6">
+            <div class="text-center">
+                <div class="w-16 h-16 bg-slate-100 border-2 border-slate-300 flex items-center justify-center mx-auto mb-4">
+                    <i class="fas fa-clipboard text-slate-400 text-2xl"></i>
+                </div>
+                <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">No Report Started</p>
+                <p class="text-sm text-slate-500 mb-4">Begin documentation to create today's report</p>
+                <button onclick="beginDailyReport()" class="block w-full bg-dot-navy hover:bg-dot-blue text-white p-4 transition-colors">
+                    <div class="flex items-center justify-center gap-3">
+                        <i class="fas fa-plus text-dot-yellow"></i>
+                        <span class="font-bold uppercase tracking-wide">Begin Daily Report</span>
+                    </div>
+                </button>
+            </div>
+        </div>
+    `;
 }
 
 // ============ ACTIONS ============
@@ -629,23 +546,16 @@ async function dismissSubmittedBanner() {
     banner.classList.add('hidden');
     sessionStorage.setItem('fvp_submitted_banner_dismissed', 'true');
 
-    // Reload report status to show fresh state
-    await loadTodayReport();
+    // Refresh UI
+    renderReportCards();
     updateReportStatus();
 }
 
 // ============ DRAFTS/OFFLINE QUEUE ============
-const OFFLINE_QUEUE_KEY = 'fvp_offline_queue';
-
 function getOfflineQueueCount() {
-    try {
-        const stored = localStorage.getItem(OFFLINE_QUEUE_KEY);
-        if (!stored) return 0;
-        const parsed = JSON.parse(stored);
-        return parsed.drafts ? parsed.drafts.length : 0;
-    } catch (e) {
-        return 0;
-    }
+    // Use getSyncQueue from storage-keys.js
+    const queue = getSyncQueue();
+    return queue.length;
 }
 
 function updateDraftsSection() {
@@ -657,7 +567,7 @@ function updateDraftsSection() {
     if (count > 0) {
         section.classList.remove('hidden');
         badge.textContent = count;
-        description.textContent = count === 1 ? '1 report waiting to sync' : `${count} reports waiting to sync`;
+        description.textContent = count === 1 ? '1 item waiting to sync' : `${count} items waiting to sync`;
     } else {
         section.classList.add('hidden');
     }
@@ -702,20 +612,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     try {
-        // Load data from Supabase
+        // Load projects from Supabase (projects still live there)
         await loadProjects();
         await loadActiveProject();
-        await loadTodayReport();
 
-        // Update UI
+        // Update UI - reports come from localStorage now
         updateActiveProjectCard();
+        renderReportCards();
         updateReportStatus();
         updateDraftsSection();
 
-        // Show submitted banner if there's a submitted report today and not dismissed this session
+        // Show submitted banner if there are submitted reports today and not dismissed this session
         const bannerDismissedThisSession = sessionStorage.getItem('fvp_submitted_banner_dismissed') === 'true';
-        const hasSubmitted = await hasSubmittedReportToday();
-        if (hasSubmitted && !bannerDismissedThisSession) {
+        const { todaySubmitted } = getReportsByUrgency();
+        if (todaySubmitted.length > 0 && !bannerDismissedThisSession) {
             document.getElementById('submittedBanner').classList.remove('hidden');
         }
 
@@ -725,6 +635,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.error('Failed to initialize:', err);
         // Still update UI with whatever we have
         updateActiveProjectCard();
+        renderReportCards();
         updateReportStatus();
         updateDraftsSection();
         syncWeather();

@@ -8,11 +8,8 @@
  * @module report-rules
  */
 
-import {
-  STORAGE_KEYS,
-  getStorageItem,
-  getCurrentReport
-} from './storage-keys.js';
+// Dependencies from storage-keys.js (loaded before this file)
+// Uses globals: STORAGE_KEYS, getStorageItem, getCurrentReport
 
 // ============================================================================
 // CONSTANTS
@@ -575,4 +572,40 @@ export function validateReportForSubmit(reportId) {
     valid: errors.length === 0,
     errors
   };
+}
+
+// Expose to window for non-module scripts
+if (typeof window !== 'undefined') {
+  // Constants
+  window.REPORT_STATUS = REPORT_STATUS;
+  window.CAPTURE_MODE = CAPTURE_MODE;
+  window.GUIDED_SECTIONS = GUIDED_SECTIONS;
+  window.TOGGLE_SECTIONS = TOGGLE_SECTIONS;
+
+  // Date/time helpers
+  window.getTodayDateString = getTodayDateString;
+  window.isReportFromToday = isReportFromToday;
+  window.isReportLate = isReportLate;
+
+  // Project eligibility
+  window.canStartNewReport = canStartNewReport;
+  window.getProjectsEligibleForNewReport = getProjectsEligibleForNewReport;
+  window.getReportsByUrgency = getReportsByUrgency;
+
+  // Status flow
+  window.canTransitionStatus = canTransitionStatus;
+  window.getNextValidStatus = getNextValidStatus;
+  window.isReportEditable = isReportEditable;
+  window.canReturnToNotes = canReturnToNotes;
+
+  // Toggle rules
+  window.canChangeToggle = canChangeToggle;
+  window.getSectionToggleState = getSectionToggleState;
+
+  // Mode switching
+  window.canSwitchCaptureMode = canSwitchCaptureMode;
+
+  // Validation
+  window.validateReportForAI = validateReportForAI;
+  window.validateReportForSubmit = validateReportForSubmit;
 }
