@@ -22,7 +22,13 @@ export const STORAGE_KEYS = {
   SYNC_QUEUE: 'fvp_sync_queue',
   LAST_SYNC: 'fvp_last_sync',
   DEVICE_ID: 'fvp_device_id',
-  OFFLINE_QUEUE: 'fvp_offline_queue'
+  OFFLINE_QUEUE: 'fvp_offline_queue',
+  MIC_GRANTED: 'fvp_mic_granted',
+  MIC_TIMESTAMP: 'fvp_mic_timestamp',
+  CAM_GRANTED: 'fvp_cam_granted',
+  LOC_GRANTED: 'fvp_loc_granted',
+  SPEECH_GRANTED: 'fvp_speech_granted',
+  ONBOARDED: 'fvp_onboarded'
 };
 
 /**
