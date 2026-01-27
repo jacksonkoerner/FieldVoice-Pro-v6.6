@@ -38,15 +38,6 @@ async function getProjects() {
             console.error('Error fetching contractors:', contractorError);
         }
 
-        // Fetch all equipment
-        const { data: equipmentRows, error: equipmentError } = await supabaseClient
-            .from('equipment')
-            .select('*');
-
-        if (equipmentError) {
-            console.error('Error fetching equipment:', equipmentError);
-        }
-
         // Build the nested structure
         const projects = projectRows.map(projectRow => {
             const project = fromSupabaseProject(projectRow);
@@ -56,13 +47,6 @@ async function getProjects() {
                 project.contractors = contractorRows
                     .filter(c => c.project_id === project.id)
                     .map(fromSupabaseContractor);
-            }
-
-            // Add equipment for this project
-            if (equipmentRows) {
-                project.equipment = equipmentRows
-                    .filter(e => e.project_id === project.id)
-                    .map(fromSupabaseEquipment);
             }
 
             return project;
@@ -98,7 +82,7 @@ async function saveProjectToSupabase(project) {
         const existingContractorIds = new Set((existingContractors || []).map(c => c.id));
         const currentContractorIds = new Set((project.contractors || []).map(c => c.id));
 
-        // Delete removed contractors (equipment will cascade)
+        // Delete removed contractors
         const contractorsToDelete = [...existingContractorIds].filter(id => !currentContractorIds.has(id));
         if (contractorsToDelete.length > 0) {
             const { error: deleteContractorError } = await supabaseClient
@@ -124,41 +108,6 @@ async function saveProjectToSupabase(project) {
             }
         }
 
-        // 3. Handle equipment
-        const { data: existingEquipment } = await supabaseClient
-            .from('equipment')
-            .select('id')
-            .eq('project_id', project.id);
-
-        const existingEquipmentIds = new Set((existingEquipment || []).map(e => e.id));
-        const currentEquipmentIds = new Set((project.equipment || []).map(e => e.id));
-
-        // Delete removed equipment
-        const equipmentToDelete = [...existingEquipmentIds].filter(id => !currentEquipmentIds.has(id));
-        if (equipmentToDelete.length > 0) {
-            const { error: deleteEquipmentError } = await supabaseClient
-                .from('equipment')
-                .delete()
-                .in('id', equipmentToDelete);
-
-            if (deleteEquipmentError) {
-                console.error('Error deleting equipment:', deleteEquipmentError);
-            }
-        }
-
-        // Upsert current equipment
-        if (project.equipment && project.equipment.length > 0) {
-            const equipmentData = project.equipment.map(e => toSupabaseEquipment(e, project.id));
-            const { error: equipmentError } = await supabaseClient
-                .from('equipment')
-                .upsert(equipmentData, { onConflict: 'id' });
-
-            if (equipmentError) {
-                console.error('Error saving equipment:', equipmentError);
-                throw new Error('Failed to save equipment');
-            }
-        }
-
         return true;
     } catch (error) {
         console.error('Error in saveProjectToSupabase:', error);
@@ -168,7 +117,7 @@ async function saveProjectToSupabase(project) {
 
 async function deleteProjectFromSupabase(projectId) {
     try {
-        // Delete the project - contractors and equipment cascade automatically
+        // Delete the project - contractors cascade automatically
         const { error } = await supabaseClient
             .from('projects')
             .delete()
@@ -212,8 +161,7 @@ function createNewProject() {
         defaultEndTime: '16:00',
         weatherDays: 0,
         contractDayNo: '',
-        contractors: [],
-        equipment: []
+        contractors: []
     };
     populateForm();
     showProjectForm();
@@ -357,7 +305,7 @@ async function renderSavedProjects() {
                             ${project.location ? ` • ${escapeHtml(project.location)}` : ''}
                         </p>
                         <p class="text-xs text-slate-400 mt-1">
-                            ${project.contractors?.length || 0} contractors • ${project.equipment?.length || 0} equipment
+                            ${project.contractors?.length || 0} contractors
                         </p>
                     </div>
                     <div class="flex items-center gap-2 shrink-0">
@@ -408,7 +356,6 @@ function populateForm() {
     }
 
     renderContractors();
-    renderEquipment();
     updateActiveProjectBadge();
 }
 
@@ -451,7 +398,6 @@ function renderContractors() {
                 <p class="text-sm text-slate-500">No contractors added</p>
             </div>
         `;
-        updateEquipmentContractorDropdown();
         return;
     }
 
@@ -490,7 +436,6 @@ function renderContractors() {
 
     // Setup drag and drop
     setupContractorDragDrop();
-    updateEquipmentContractorDropdown();
 }
 
 function showAddContractorForm() {
@@ -560,12 +505,9 @@ function saveContractor() {
 }
 
 function deleteContractor(contractorId) {
-    showDeleteModal('Delete this contractor? Any equipment assigned to them will also be removed.', () => {
+    showDeleteModal('Delete this contractor?', () => {
         currentProject.contractors = currentProject.contractors.filter(c => c.id !== contractorId);
-        // Also remove equipment for this contractor
-        currentProject.equipment = currentProject.equipment.filter(e => e.contractorId !== contractorId);
         renderContractors();
-        renderEquipment();
         showToast('Contractor deleted');
     });
 }
@@ -624,177 +566,6 @@ function handleContractorDrop(e) {
             renderContractors();
         }
     }
-}
-
-// ============ EQUIPMENT MANAGEMENT ============
-function renderEquipment() {
-    const container = document.getElementById('equipmentList');
-    const addBtn = document.getElementById('addEquipmentBtn');
-
-    if (!currentProject || currentProject.contractors.length === 0) {
-        container.innerHTML = `
-            <div class="p-6 text-center">
-                <i class="fas fa-truck-monster text-slate-300 text-2xl mb-2"></i>
-                <p class="text-sm text-slate-500">Add contractors first</p>
-            </div>
-        `;
-        addBtn.disabled = true;
-        return;
-    }
-
-    addBtn.disabled = false;
-
-    if (currentProject.equipment.length === 0) {
-        container.innerHTML = `
-            <div class="p-6 text-center">
-                <i class="fas fa-truck-monster text-slate-300 text-2xl mb-2"></i>
-                <p class="text-sm text-slate-500">No equipment added</p>
-            </div>
-        `;
-        return;
-    }
-
-    // Group equipment by contractor
-    const grouped = {};
-    currentProject.contractors.forEach(c => {
-        grouped[c.id] = {
-            contractor: c,
-            equipment: []
-        };
-    });
-
-    currentProject.equipment.forEach(eq => {
-        if (grouped[eq.contractorId]) {
-            grouped[eq.contractorId].equipment.push(eq);
-        }
-    });
-
-    let html = '';
-    Object.values(grouped).forEach(group => {
-        if (group.equipment.length === 0) return;
-
-        html += `
-            <div class="bg-slate-50 px-4 py-2 border-b border-slate-200">
-                <p class="text-xs font-bold text-slate-600 uppercase tracking-wider">
-                    <i class="fas fa-hard-hat mr-1 text-dot-orange"></i>
-                    ${escapeHtml(group.contractor.name)} (${escapeHtml(group.contractor.abbreviation)})
-                </p>
-            </div>
-        `;
-
-        group.equipment.forEach(eq => {
-            html += `
-                <div class="p-4 pl-8 flex items-center gap-3">
-                    <div class="flex-1 min-w-0">
-                        <p class="font-medium text-slate-800">${escapeHtml(eq.type)}</p>
-                        ${eq.model ? `<p class="text-xs text-slate-500">${escapeHtml(eq.model)}</p>` : ''}
-                    </div>
-                    <div class="flex items-center gap-1 shrink-0">
-                        <button onclick="editEquipment('${eq.id}')" class="w-8 h-8 text-dot-blue hover:bg-dot-blue/10 flex items-center justify-center transition-colors" title="Edit">
-                            <i class="fas fa-edit text-sm"></i>
-                        </button>
-                        <button onclick="deleteEquipment('${eq.id}')" class="w-8 h-8 text-red-600 hover:bg-red-50 flex items-center justify-center transition-colors" title="Delete">
-                            <i class="fas fa-trash text-sm"></i>
-                        </button>
-                    </div>
-                </div>
-            `;
-        });
-    });
-
-    container.innerHTML = html || `
-        <div class="p-6 text-center">
-            <i class="fas fa-truck-monster text-slate-300 text-2xl mb-2"></i>
-            <p class="text-sm text-slate-500">No equipment added</p>
-        </div>
-    `;
-}
-
-function updateEquipmentContractorDropdown() {
-    const select = document.getElementById('equipmentContractor');
-
-    if (!currentProject || currentProject.contractors.length === 0) {
-        select.innerHTML = '<option value="">No contractors available</option>';
-        return;
-    }
-
-    select.innerHTML = currentProject.contractors.map(c =>
-        `<option value="${c.id}">${escapeHtml(c.name)} (${escapeHtml(c.abbreviation)})</option>`
-    ).join('');
-}
-
-function showAddEquipmentForm() {
-    if (!currentProject || currentProject.contractors.length === 0) {
-        showToast('Add contractors first', 'warning');
-        return;
-    }
-
-    document.getElementById('addEquipmentForm').classList.remove('hidden');
-    document.getElementById('equipmentFormTitle').textContent = 'Add New Equipment';
-    document.getElementById('editEquipmentId').value = '';
-    document.getElementById('equipmentContractor').value = currentProject.contractors[0]?.id || '';
-    document.getElementById('equipmentType').value = '';
-    document.getElementById('equipmentModel').value = '';
-    document.getElementById('addEquipmentForm').scrollIntoView({ behavior: 'smooth' });
-}
-
-function hideAddEquipmentForm() {
-    document.getElementById('addEquipmentForm').classList.add('hidden');
-}
-
-function editEquipment(equipmentId) {
-    const equipment = currentProject.equipment.find(e => e.id === equipmentId);
-    if (!equipment) return;
-
-    document.getElementById('addEquipmentForm').classList.remove('hidden');
-    document.getElementById('equipmentFormTitle').textContent = 'Edit Equipment';
-    document.getElementById('editEquipmentId').value = equipmentId;
-    document.getElementById('equipmentContractor').value = equipment.contractorId;
-    document.getElementById('equipmentType').value = equipment.type;
-    document.getElementById('equipmentModel').value = equipment.model || '';
-    document.getElementById('addEquipmentForm').scrollIntoView({ behavior: 'smooth' });
-}
-
-function saveEquipment() {
-    const contractorId = document.getElementById('equipmentContractor').value;
-    const type = document.getElementById('equipmentType').value.trim();
-    const model = document.getElementById('equipmentModel').value.trim();
-    const editId = document.getElementById('editEquipmentId').value;
-
-    if (!contractorId || !type) {
-        showToast('Contractor and equipment type are required', 'error');
-        return;
-    }
-
-    if (editId) {
-        // Edit existing
-        const equipment = currentProject.equipment.find(e => e.id === editId);
-        if (equipment) {
-            equipment.contractorId = contractorId;
-            equipment.type = type;
-            equipment.model = model;
-        }
-    } else {
-        // Add new
-        currentProject.equipment.push({
-            id: generateId(),
-            contractorId,
-            type,
-            model
-        });
-    }
-
-    hideAddEquipmentForm();
-    renderEquipment();
-    showToast(editId ? 'Equipment updated' : 'Equipment added');
-}
-
-function deleteEquipment(equipmentId) {
-    showDeleteModal('Delete this equipment?', () => {
-        currentProject.equipment = currentProject.equipment.filter(e => e.id !== equipmentId);
-        renderEquipment();
-        showToast('Equipment deleted');
-    });
 }
 
 // ============ MODAL ============
@@ -1167,12 +938,9 @@ function populateFormWithExtractedData(data) {
 
     // Process contractors
     if (data.contractors && Array.isArray(data.contractors)) {
-        const contractorIdMap = {}; // Map original names to new IDs
         currentProject.contractors = data.contractors.map(contractor => {
-            const id = generateId();
-            contractorIdMap[contractor.name] = id;
             return {
-                id: id,
+                id: generateId(),
                 name: contractor.name || '',
                 abbreviation: contractor.abbreviation || generateAbbreviation(contractor.name),
                 type: contractor.type || 'subcontractor',
@@ -1180,39 +948,7 @@ function populateFormWithExtractedData(data) {
             };
         });
 
-        // Process equipment
-        if (data.equipment && Array.isArray(data.equipment)) {
-            currentProject.equipment = data.equipment.map(equip => {
-                // Try to match contractor by name
-                let contractorId = contractorIdMap[equip.contractorName];
-
-                // If not found by exact name, try to find by partial match
-                if (!contractorId && equip.contractorName) {
-                    const matchedContractor = currentProject.contractors.find(c =>
-                        c.name.toLowerCase().includes(equip.contractorName.toLowerCase()) ||
-                        equip.contractorName.toLowerCase().includes(c.name.toLowerCase())
-                    );
-                    if (matchedContractor) {
-                        contractorId = matchedContractor.id;
-                    }
-                }
-
-                // If still not found, use first contractor as fallback
-                if (!contractorId && currentProject.contractors.length > 0) {
-                    contractorId = currentProject.contractors[0].id;
-                }
-
-                return {
-                    id: generateId(),
-                    contractorId: contractorId || '',
-                    type: equip.type || '',
-                    model: equip.model || ''
-                };
-            }).filter(eq => eq.contractorId); // Only keep equipment with valid contractor
-        }
-
         renderContractors();
-        renderEquipment();
     }
 
     // Setup input listeners to clear missing indicators when user types

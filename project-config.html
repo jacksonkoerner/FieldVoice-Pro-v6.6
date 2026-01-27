@@ -230,7 +230,7 @@
                             <i class="fas fa-file-import text-dot-orange"></i>
                             Import from Existing Report
                         </h2>
-                        <p class="text-xs text-slate-600">Upload one or more RPR Daily Reports to automatically extract project details, contractors, and equipment.</p>
+                        <p class="text-xs text-slate-600">Upload one or more RPR Daily Reports to automatically extract project details and contractors.</p>
                     </div>
 
                     <!-- Success/Error Banners -->
@@ -457,60 +457,6 @@
                                 <i class="fas fa-save mr-2"></i>Save
                             </button>
                             <button onclick="hideAddContractorForm()" class="flex-1 p-3 bg-slate-400 hover:bg-slate-500 text-white font-bold uppercase transition-colors text-sm">
-                                Cancel
-                            </button>
-                        </div>
-                    </div>
-                </section>
-
-                <!-- Equipment Inventory -->
-                <section class="bg-white border-2 border-slate-200">
-                    <div class="bg-safety-green text-white p-4">
-                        <h2 class="text-sm font-bold uppercase tracking-wider flex items-center gap-2">
-                            <i class="fas fa-truck-monster"></i>
-                            Equipment Inventory
-                        </h2>
-                    </div>
-                    <div id="equipmentList" class="divide-y divide-slate-200">
-                        <!-- Equipment will be rendered here, grouped by contractor -->
-                    </div>
-                    <div class="p-4 border-t border-slate-200">
-                        <button onclick="showAddEquipmentForm()" id="addEquipmentBtn" class="w-full p-3 bg-safety-green hover:bg-green-700 text-white font-bold uppercase transition-colors flex items-center justify-center gap-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed">
-                            <i class="fas fa-plus"></i>
-                            Add Equipment
-                        </button>
-                    </div>
-                </section>
-
-                <!-- Add Equipment Form (hidden by default) -->
-                <section id="addEquipmentForm" class="hidden bg-white border-2 border-safety-green">
-                    <div class="bg-safety-green/10 p-4 border-b border-safety-green">
-                        <h3 class="text-sm font-bold text-safety-green uppercase tracking-wider flex items-center gap-2">
-                            <i class="fas fa-truck"></i>
-                            <span id="equipmentFormTitle">Add New Equipment</span>
-                        </h3>
-                    </div>
-                    <div class="p-4 space-y-4">
-                        <input type="hidden" id="editEquipmentId">
-                        <div>
-                            <label class="text-xs font-bold text-dot-blue uppercase tracking-wider">Contractor <span class="text-red-500">*</span></label>
-                            <select id="equipmentContractor" class="w-full mt-2 bg-white border-2 border-slate-300 px-4 py-3 text-sm text-slate-800 focus:outline-none focus:border-dot-blue">
-                                <!-- Options populated from contractor roster -->
-                            </select>
-                        </div>
-                        <div>
-                            <label class="text-xs font-bold text-dot-blue uppercase tracking-wider">Equipment Type <span class="text-red-500">*</span></label>
-                            <input type="text" id="equipmentType" class="w-full mt-2 bg-white border-2 border-slate-300 px-4 py-3 text-sm text-slate-800 focus:outline-none focus:border-dot-blue" placeholder="e.g., Bulldozer">
-                        </div>
-                        <div>
-                            <label class="text-xs font-bold text-dot-blue uppercase tracking-wider">Model #</label>
-                            <input type="text" id="equipmentModel" class="w-full mt-2 bg-white border-2 border-slate-300 px-4 py-3 text-sm text-slate-800 focus:outline-none focus:border-dot-blue" placeholder="e.g., John Deere 700K">
-                        </div>
-                        <div class="flex gap-3">
-                            <button onclick="saveEquipment()" class="flex-1 p-3 bg-safety-green hover:bg-green-700 text-white font-bold uppercase transition-colors text-sm">
-                                <i class="fas fa-save mr-2"></i>Save
-                            </button>
-                            <button onclick="hideAddEquipmentForm()" class="flex-1 p-3 bg-slate-400 hover:bg-slate-500 text-white font-bold uppercase transition-colors text-sm">
                                 Cancel
                             </button>
                         </div>
