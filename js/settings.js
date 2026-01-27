@@ -7,8 +7,16 @@ let currentProfileId = null;
 
 // ============ PROFILE MANAGEMENT ============
 async function loadSettings() {
+    // DEBUG: Log device ID at start
+    const deviceId = getDeviceId();
+    console.log('[loadSettings] This device ID:', deviceId);
+
     // Step 1: Load from localStorage first (local-first)
     const localProfile = getStorageItem(STORAGE_KEYS.USER_PROFILE);
+
+    // DEBUG: Log localStorage state
+    console.log('[loadSettings] localStorage profile:', localProfile);
+    console.log('[loadSettings] localStorage user_id:', getStorageItem(STORAGE_KEYS.USER_ID));
 
     if (localProfile) {
         currentProfileId = localProfile.id || null;
@@ -28,6 +36,10 @@ async function loadSettings() {
             .select('*')
             .limit(1)
             .single();
+
+        // DEBUG: Log Supabase query result
+        console.log('[loadSettings] Supabase query result:', data);
+        console.log('[loadSettings] Error:', error);
 
         if (error && error.code !== 'PGRST116') {
             // PGRST116 = no rows returned, which is fine for new users
@@ -73,6 +85,11 @@ async function loadSettings() {
 async function saveSettings() {
     // Step 1: Get device_id (generates if not exists)
     const deviceId = getDeviceId();
+
+    // DEBUG: Log device and localStorage state before building profile
+    console.log('[saveSettings] This device ID:', deviceId);
+    console.log('[saveSettings] Current user_id in localStorage:', getStorageItem(STORAGE_KEYS.USER_ID));
+    console.log('[saveSettings] currentProfileId variable:', currentProfileId);
 
     // Step 2: Get or generate user_id
     let userId = getStorageItem(STORAGE_KEYS.USER_ID);
