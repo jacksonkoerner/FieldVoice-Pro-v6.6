@@ -54,7 +54,7 @@ function fromSupabaseProject(row) {
  */
 function toSupabaseProject(project) {
     if (!project) return null;
-    return {
+    const row = {
         project_name: project.projectName || project.name || '',
         noab_project_no: project.noabProjectNo || '',
         cno_solicitation_no: project.cnoSolicitationNo || '',
@@ -70,6 +70,13 @@ function toSupabaseProject(project) {
         logo: project.logo || null,
         status: project.status || 'active'
     };
+
+    // Only include id if it exists (for updates/upserts)
+    if (project.id) {
+        row.id = project.id;
+    }
+
+    return row;
 }
 
 // ============================================================================
@@ -110,7 +117,7 @@ function fromSupabaseContractor(row) {
  */
 function toSupabaseContractor(contractor, projectId) {
     if (!contractor) return null;
-    return {
+    const row = {
         project_id: projectId || contractor.projectId,
         name: contractor.name || '',
         company: contractor.company || '',
@@ -121,6 +128,13 @@ function toSupabaseContractor(contractor, projectId) {
         added_date: contractor.addedDate || null,
         removed_date: contractor.removedDate || null
     };
+
+    // Only include id if it exists (for updates/upserts)
+    if (contractor.id) {
+        row.id = contractor.id;
+    }
+
+    return row;
 }
 
 // ============================================================================
