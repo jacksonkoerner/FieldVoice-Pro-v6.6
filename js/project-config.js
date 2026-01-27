@@ -1,5 +1,5 @@
 // ============ CONSTANTS ============
-const EXTRACT_WEBHOOK_URL = 'https://advidere.app.n8n.cloud/webhook/fieldvoice-project-extractor';
+const EXTRACT_WEBHOOK_URL = 'https://advidere.app.n8n.cloud/webhook/fieldvoice-project-extractor-6.5';
 
 // ============ STATE ============
 let currentProject = null;
