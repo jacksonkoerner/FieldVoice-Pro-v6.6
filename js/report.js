@@ -390,10 +390,9 @@
             currentReportId = reportRow.id;
 
             // Load related data in parallel
-            // Note: user_edits, contractor_work, and personnel now stored in report_raw_capture.raw_data
-            const [rawCaptureResult, equipmentUsageResult, photosResult, aiResponseResult] = await Promise.all([
+            // Note: user_edits, contractor_work, personnel, and equipment_usage now stored in report_raw_capture.raw_data
+            const [rawCaptureResult, photosResult, aiResponseResult] = await Promise.all([
                 supabaseClient.from('report_raw_capture').select('*').eq('report_id', reportRow.id).maybeSingle(),
-                supabaseClient.from('report_equipment_usage').select('*').eq('report_id', reportRow.id),
                 supabaseClient.from('photos').select('*').eq('report_id', reportRow.id).order('created_at', { ascending: true }),
                 // Get most recent AI response (handles multiple rows from retries)
                 supabaseClient.from('ai_responses').select('*').eq('report_id', reportRow.id).order('received_at', { ascending: false }).limit(1).maybeSingle()
@@ -457,9 +456,10 @@
                 }));
             }
 
-            // Equipment usage
-            if (equipmentUsageResult.data && equipmentUsageResult.data.length > 0) {
-                loadedReport.equipment = equipmentUsageResult.data.map(eu => ({
+            // Equipment usage - now stored in raw_data.equipment_usage
+            const equipmentUsageData = rawCaptureResult.data?.raw_data?.equipment_usage || [];
+            if (equipmentUsageData && equipmentUsageData.length > 0) {
+                loadedReport.equipment = equipmentUsageData.map(eu => ({
                     equipmentId: eu.equipment_id,
                     contractorId: eu.contractor_id || '',
                     type: eu.type || '',
@@ -1640,6 +1640,19 @@
                 }))
                 : [];
 
+            // Build equipment_usage array for storage in raw_data
+            const equipmentUsageArray = report.equipment && report.equipment.length > 0
+                ? report.equipment.map(e => ({
+                    equipment_id: e.equipmentId,
+                    contractor_id: e.contractorId || '',
+                    type: e.type || '',
+                    qty: e.qty || 1,
+                    status: e.status === 'IDLE' ? 'idle' : 'active',
+                    hours_used: e.status && e.status !== 'IDLE' ? parseInt(e.status) || 0 : 0,
+                    notes: ''
+                }))
+                : [];
+
             const rawCaptureData = {
                 report_id: reportId,
                 capture_mode: report.meta?.captureMode || 'guided',
@@ -1649,11 +1662,12 @@
                 safety_notes: report.safety?.notes || report.guidedNotes?.safety || '',
                 weather_data: report.overview?.weather || {},
                 captured_at: new Date().toISOString(),
-                // Store user_edits, contractor_work, and personnel in raw_data JSONB
+                // Store user_edits, contractor_work, personnel, and equipment_usage in raw_data JSONB
                 raw_data: {
                     user_edits: userEditsArray,
                     contractor_work: contractorWorkArray,
-                    personnel: personnelArray
+                    personnel: personnelArray,
+                    equipment_usage: equipmentUsageArray
                 }
             };
 
@@ -1671,27 +1685,7 @@
 
             // 4. Personnel - now stored in raw_data.personnel (handled above in rawCaptureData)
 
-            // 5. Save equipment usage
-            if (report.equipment && report.equipment.length > 0) {
-                await supabaseClient
-                    .from('report_equipment_usage')
-                    .delete()
-                    .eq('report_id', reportId);
-
-                const equipmentData = report.equipment.map(e => ({
-                    report_id: reportId,
-                    contractor_id: e.contractorId || '',
-                    type: e.type || '',
-                    qty: e.qty || 1,
-                    status: e.status === 'IDLE' ? 'idle' : 'active',
-                    hours_used: e.status && e.status !== 'IDLE' ? parseInt(e.status) || 0 : 0,
-                    notes: ''
-                }));
-
-                await supabaseClient
-                    .from('report_equipment_usage')
-                    .insert(equipmentData);
-            }
+            // 5. Equipment usage - now stored in raw_data.equipment_usage (handled above in rawCaptureData)
 
             // 6. User edits - now stored in raw_data.user_edits (handled above in rawCaptureData)
 

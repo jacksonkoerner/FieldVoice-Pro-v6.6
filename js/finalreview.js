@@ -199,10 +199,9 @@ async function loadReport() {
         currentReportId = reportRow.id;
 
         // Load related data in parallel
-        // Note: user_edits, contractor_work, and personnel now stored in report_raw_capture.raw_data
-        const [rawCaptureResult, equipmentUsageResult, photosResult, aiResponseResult] = await Promise.all([
+        // Note: user_edits, contractor_work, personnel, and equipment_usage now stored in report_raw_capture.raw_data
+        const [rawCaptureResult, photosResult, aiResponseResult] = await Promise.all([
             supabaseClient.from('report_raw_capture').select('*').eq('report_id', reportRow.id).maybeSingle(),
-            supabaseClient.from('report_equipment_usage').select('*').eq('report_id', reportRow.id),
             supabaseClient.from('photos').select('*').eq('report_id', reportRow.id).order('created_at', { ascending: true }),
             // Get most recent AI response (handles multiple rows from retries)
             supabaseClient.from('ai_responses').select('*').eq('report_id', reportRow.id).order('received_at', { ascending: false }).limit(1).maybeSingle()
@@ -273,9 +272,10 @@ async function loadReport() {
             }));
         }
 
-        // Process equipment usage
-        if (equipmentUsageResult.data && equipmentUsageResult.data.length > 0) {
-            loadedReport.equipment = equipmentUsageResult.data.map(row => ({
+        // Process equipment usage (now stored in raw_data.equipment_usage)
+        const equipmentUsageData = rawCaptureResult.data?.raw_data?.equipment_usage || [];
+        if (equipmentUsageData && equipmentUsageData.length > 0) {
+            loadedReport.equipment = equipmentUsageData.map(row => ({
                 contractorId: row.contractor_id,
                 type: row.type || '',
                 qty: row.qty || 1,

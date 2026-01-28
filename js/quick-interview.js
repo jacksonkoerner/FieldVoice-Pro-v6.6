@@ -2041,11 +2041,8 @@
                 // personnel now stored in raw_data.personnel
                 const personnel = rawCapture?.raw_data?.personnel || [];
 
-                // Load equipment usage
-                const { data: equipmentUsage } = await supabaseClient
-                    .from('report_equipment_usage')
-                    .select('*')
-                    .eq('report_id', reportRow.id);
+                // equipment_usage now stored in raw_data.equipment_usage
+                const equipmentUsage = rawCapture?.raw_data?.equipment_usage || [];
 
                 // Load photos
                 const { data: photos } = await supabaseClient
@@ -2300,6 +2297,16 @@
                     }))
                     : [];
 
+                // Build equipment_usage array for storage in raw_data
+                const equipmentUsageArray = report.equipment && report.equipment.length > 0
+                    ? report.equipment.map(e => ({
+                        equipment_id: e.equipmentId,
+                        status: e.hoursUtilized === null ? 'idle' : 'active',
+                        hours_used: e.hoursUtilized || 0,
+                        notes: ''
+                    }))
+                    : [];
+
                 const rawCaptureData = {
                     report_id: reportId,
                     capture_mode: report.meta?.captureMode || 'guided',
@@ -2309,10 +2316,11 @@
                     safety_notes: report.safety?.notes?.join('\n') || '',
                     weather_data: report.overview?.weather || {},
                     captured_at: new Date().toISOString(),
-                    // Store contractor_work and personnel in raw_data JSONB
+                    // Store contractor_work, personnel, and equipment_usage in raw_data JSONB
                     raw_data: {
                         contractor_work: contractorWorkArray,
-                        personnel: personnelArray
+                        personnel: personnelArray,
+                        equipment_usage: equipmentUsageArray
                     }
                 };
 
@@ -2330,25 +2338,7 @@
 
                 // 4. Personnel - now stored in raw_data.personnel (handled above in rawCaptureData)
 
-                // 5. Save equipment usage
-                if (report.equipment && report.equipment.length > 0) {
-                    await supabaseClient
-                        .from('report_equipment_usage')
-                        .delete()
-                        .eq('report_id', reportId);
-
-                    const equipmentData = report.equipment.map(e => ({
-                        report_id: reportId,
-                        equipment_id: e.equipmentId,
-                        status: e.hoursUtilized === null ? 'idle' : 'active',
-                        hours_used: e.hoursUtilized || 0,
-                        notes: ''
-                    }));
-
-                    await supabaseClient
-                        .from('report_equipment_usage')
-                        .insert(equipmentData);
-                }
+                // 5. Equipment usage - now stored in raw_data.equipment_usage (handled above in rawCaptureData)
 
                 // Note: Photos are saved separately when uploaded via uploadPhotoToSupabase
 
