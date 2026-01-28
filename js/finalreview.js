@@ -85,21 +85,6 @@ async function loadActiveProject() {
             projectContractors = [];
         }
 
-        // Fetch equipment for this project
-        const { data: equipmentRows, error: equipmentError } = await supabaseClient
-            .from('equipment')
-            .select('*')
-            .eq('project_id', activeId);
-
-        if (!equipmentError && equipmentRows) {
-            activeProject.equipment = equipmentRows.map(row => ({
-                id: row.id,
-                type: row.type || '',
-                model: row.model || '',
-                status: row.status || 'active'
-            }));
-        }
-
         console.log('[SUPABASE] Loaded project:', activeProject.name);
         return activeProject;
     } catch (e) {

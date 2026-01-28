@@ -278,16 +278,6 @@
                 projectContractors = [];
             }
 
-            // Fetch equipment for this project
-            const { data: equipmentRows, error: equipmentError } = await supabaseClient
-                .from('equipment')
-                .select('*')
-                .eq('project_id', activeId);
-
-            if (!equipmentError && equipmentRows) {
-                activeProject.equipment = equipmentRows.map(fromSupabaseEquipment);
-            }
-
             return activeProject;
         } catch (e) {
             console.error('Failed to load project:', e);
