@@ -1020,27 +1020,11 @@
 
         /**
          * Save AI request to Supabase
+         * DISABLED: report_ai_request table removed - debug logging not needed
          */
         async function saveAIRequest(payload) {
-            if (!currentReportId) return;
-
-            try {
-                const requestData = {
-                    report_id: currentReportId,
-                    request_payload: payload,
-                    sent_at: new Date().toISOString()
-                };
-
-                const { error } = await supabaseClient
-                    .from('report_ai_request')
-                    .insert(requestData);
-
-                if (error) {
-                    console.error('Error saving AI request:', error);
-                }
-            } catch (err) {
-                console.error('Failed to save AI request:', err);
-            }
+            // No-op: AI request logging disabled in v6.6
+            return;
         }
 
         /**
