@@ -2038,11 +2038,8 @@
                 // contractor_work now stored in raw_data.contractor_work
                 const contractorWork = rawCapture?.raw_data?.contractor_work || [];
 
-                // Load personnel
-                const { data: personnel } = await supabaseClient
-                    .from('report_personnel')
-                    .select('*')
-                    .eq('report_id', reportRow.id);
+                // personnel now stored in raw_data.personnel
+                const personnel = rawCapture?.raw_data?.personnel || [];
 
                 // Load equipment usage
                 const { data: equipmentUsage } = await supabaseClient
@@ -2290,6 +2287,19 @@
                     }))
                     : [];
 
+                // Build personnel array for storage in raw_data
+                const personnelArray = report.operations && report.operations.length > 0
+                    ? report.operations.map(o => ({
+                        contractor_id: o.contractorId,
+                        superintendents: o.superintendents || 0,
+                        foremen: o.foremen || 0,
+                        operators: o.operators || 0,
+                        laborers: o.laborers || 0,
+                        surveyors: o.surveyors || 0,
+                        others: o.others || 0
+                    }))
+                    : [];
+
                 const rawCaptureData = {
                     report_id: reportId,
                     capture_mode: report.meta?.captureMode || 'guided',
@@ -2299,9 +2309,10 @@
                     safety_notes: report.safety?.notes?.join('\n') || '',
                     weather_data: report.overview?.weather || {},
                     captured_at: new Date().toISOString(),
-                    // Store contractor_work in raw_data JSONB
+                    // Store contractor_work and personnel in raw_data JSONB
                     raw_data: {
-                        contractor_work: contractorWorkArray
+                        contractor_work: contractorWorkArray,
+                        personnel: personnelArray
                     }
                 };
 
@@ -2317,28 +2328,7 @@
 
                 // 3. Contractor work - now stored in raw_data.contractor_work (handled above in rawCaptureData)
 
-                // 4. Save personnel
-                if (report.operations && report.operations.length > 0) {
-                    await supabaseClient
-                        .from('report_personnel')
-                        .delete()
-                        .eq('report_id', reportId);
-
-                    const personnelData = report.operations.map(o => ({
-                        report_id: reportId,
-                        contractor_id: o.contractorId,
-                        superintendents: o.superintendents || 0,
-                        foremen: o.foremen || 0,
-                        operators: o.operators || 0,
-                        laborers: o.laborers || 0,
-                        surveyors: o.surveyors || 0,
-                        others: o.others || 0
-                    }));
-
-                    await supabaseClient
-                        .from('report_personnel')
-                        .insert(personnelData);
-                }
+                // 4. Personnel - now stored in raw_data.personnel (handled above in rawCaptureData)
 
                 // 5. Save equipment usage
                 if (report.equipment && report.equipment.length > 0) {

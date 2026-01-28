@@ -390,10 +390,9 @@
             currentReportId = reportRow.id;
 
             // Load related data in parallel
-            // Note: user_edits and contractor_work now stored in report_raw_capture.raw_data
-            const [rawCaptureResult, personnelResult, equipmentUsageResult, photosResult, aiResponseResult] = await Promise.all([
+            // Note: user_edits, contractor_work, and personnel now stored in report_raw_capture.raw_data
+            const [rawCaptureResult, equipmentUsageResult, photosResult, aiResponseResult] = await Promise.all([
                 supabaseClient.from('report_raw_capture').select('*').eq('report_id', reportRow.id).maybeSingle(),
-                supabaseClient.from('report_personnel').select('*').eq('report_id', reportRow.id),
                 supabaseClient.from('report_equipment_usage').select('*').eq('report_id', reportRow.id),
                 supabaseClient.from('photos').select('*').eq('report_id', reportRow.id).order('created_at', { ascending: true }),
                 // Get most recent AI response (handles multiple rows from retries)
@@ -444,9 +443,10 @@
                 }));
             }
 
-            // Personnel (operations)
-            if (personnelResult.data && personnelResult.data.length > 0) {
-                loadedReport.operations = personnelResult.data.map(p => ({
+            // Personnel (operations) - now stored in raw_data.personnel
+            const personnelData = rawCaptureResult.data?.raw_data?.personnel || [];
+            if (personnelData && personnelData.length > 0) {
+                loadedReport.operations = personnelData.map(p => ({
                     contractorId: p.contractor_id,
                     superintendents: p.superintendents || 0,
                     foremen: p.foremen || 0,
@@ -1627,6 +1627,19 @@
                 }))
                 : [];
 
+            // Build personnel array for storage in raw_data
+            const personnelArray = report.operations && report.operations.length > 0
+                ? report.operations.map(o => ({
+                    contractor_id: o.contractorId,
+                    superintendents: o.superintendents || 0,
+                    foremen: o.foremen || 0,
+                    operators: o.operators || 0,
+                    laborers: o.laborers || 0,
+                    surveyors: o.surveyors || 0,
+                    others: o.others || 0
+                }))
+                : [];
+
             const rawCaptureData = {
                 report_id: reportId,
                 capture_mode: report.meta?.captureMode || 'guided',
@@ -1636,10 +1649,11 @@
                 safety_notes: report.safety?.notes || report.guidedNotes?.safety || '',
                 weather_data: report.overview?.weather || {},
                 captured_at: new Date().toISOString(),
-                // Store user_edits and contractor_work in raw_data JSONB
+                // Store user_edits, contractor_work, and personnel in raw_data JSONB
                 raw_data: {
                     user_edits: userEditsArray,
-                    contractor_work: contractorWorkArray
+                    contractor_work: contractorWorkArray,
+                    personnel: personnelArray
                 }
             };
 
@@ -1655,28 +1669,7 @@
 
             // 3. Contractor work - now stored in raw_data.contractor_work (handled above in rawCaptureData)
 
-            // 4. Save personnel
-            if (report.operations && report.operations.length > 0) {
-                await supabaseClient
-                    .from('report_personnel')
-                    .delete()
-                    .eq('report_id', reportId);
-
-                const personnelData = report.operations.map(o => ({
-                    report_id: reportId,
-                    contractor_id: o.contractorId,
-                    superintendents: o.superintendents || 0,
-                    foremen: o.foremen || 0,
-                    operators: o.operators || 0,
-                    laborers: o.laborers || 0,
-                    surveyors: o.surveyors || 0,
-                    others: o.others || 0
-                }));
-
-                await supabaseClient
-                    .from('report_personnel')
-                    .insert(personnelData);
-            }
+            // 4. Personnel - now stored in raw_data.personnel (handled above in rawCaptureData)
 
             // 5. Save equipment usage
             if (report.equipment && report.equipment.length > 0) {

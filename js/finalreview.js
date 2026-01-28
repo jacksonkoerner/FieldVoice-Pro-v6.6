@@ -199,10 +199,9 @@ async function loadReport() {
         currentReportId = reportRow.id;
 
         // Load related data in parallel
-        // Note: user_edits and contractor_work now stored in report_raw_capture.raw_data
-        const [rawCaptureResult, personnelResult, equipmentUsageResult, photosResult, aiResponseResult] = await Promise.all([
+        // Note: user_edits, contractor_work, and personnel now stored in report_raw_capture.raw_data
+        const [rawCaptureResult, equipmentUsageResult, photosResult, aiResponseResult] = await Promise.all([
             supabaseClient.from('report_raw_capture').select('*').eq('report_id', reportRow.id).maybeSingle(),
-            supabaseClient.from('report_personnel').select('*').eq('report_id', reportRow.id),
             supabaseClient.from('report_equipment_usage').select('*').eq('report_id', reportRow.id),
             supabaseClient.from('photos').select('*').eq('report_id', reportRow.id).order('created_at', { ascending: true }),
             // Get most recent AI response (handles multiple rows from retries)
@@ -260,9 +259,10 @@ async function loadReport() {
             }));
         }
 
-        // Process personnel/operations
-        if (personnelResult.data && personnelResult.data.length > 0) {
-            loadedReport.operations = personnelResult.data.map(row => ({
+        // Process personnel/operations (now stored in raw_data.personnel)
+        const personnelData = rawCaptureResult.data?.raw_data?.personnel || [];
+        if (personnelData && personnelData.length > 0) {
+            loadedReport.operations = personnelData.map(row => ({
                 contractorId: row.contractor_id,
                 superintendents: row.superintendents || 0,
                 foremen: row.foremen || 0,
