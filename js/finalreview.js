@@ -46,7 +46,7 @@ function checkSubmittedState() {
 
 // ============ PROJECT LOADING ============
 async function loadActiveProject() {
-    const activeId = localStorage.getItem(STORAGE_KEYS.ACTIVE_PROJECT_ID);
+    const activeId = getStorageItem(STORAGE_KEYS.ACTIVE_PROJECT_ID);
     if (!activeId) {
         console.log('[SUPABASE] No active project ID found in localStorage');
         return null;

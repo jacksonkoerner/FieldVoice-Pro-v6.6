@@ -176,7 +176,7 @@ function continueEditing(index) {
 
     // Set active project
     if (draft.projectId) {
-        localStorage.setItem(STORAGE_KEYS.ACTIVE_PROJECT_ID, draft.projectId);
+        setStorageItem(STORAGE_KEYS.ACTIVE_PROJECT_ID, draft.projectId);
     }
 
     // Store the draft data for quick-interview to load
@@ -252,7 +252,7 @@ async function syncDraft(draft, index) {
 
         // Set active project for the sync
         if (draft.projectId) {
-            localStorage.setItem(STORAGE_KEYS.ACTIVE_PROJECT_ID, draft.projectId);
+            setStorageItem(STORAGE_KEYS.ACTIVE_PROJECT_ID, draft.projectId);
         }
 
         // Check if report already exists in Supabase
