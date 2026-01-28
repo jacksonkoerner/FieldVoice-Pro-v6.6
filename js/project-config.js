@@ -21,6 +21,30 @@ async function getProjects() {
             return [];
         }
 
+        // LOCAL-FIRST: Try IndexedDB first
+        let localProjects = [];
+        try {
+            const allLocalProjects = await window.idb.getAllProjects();
+            // Filter by user_id (same as Supabase query)
+            localProjects = allLocalProjects.filter(p => p.user_id === userId);
+            // Sort by created_at descending
+            localProjects.sort((a, b) => {
+                const dateA = a.created_at ? new Date(a.created_at) : new Date(0);
+                const dateB = b.created_at ? new Date(b.created_at) : new Date(0);
+                return dateB - dateA;
+            });
+        } catch (idbError) {
+            console.warn('[getProjects] IndexedDB error:', idbError);
+        }
+
+        // If we have local projects, return them
+        if (localProjects.length > 0) {
+            console.log('[getProjects] Returning', localProjects.length, 'projects from IndexedDB');
+            return localProjects;
+        }
+
+        // Fall back to Supabase if IndexedDB is empty
+        console.log('[getProjects] IndexedDB empty, fetching from Supabase...');
         const { data: projectRows, error: projectError } = await supabaseClient
             .from('projects')
             .select('*')
@@ -59,6 +83,16 @@ async function getProjects() {
 
             return project;
         });
+
+        // Cache projects to IndexedDB for future offline use
+        console.log('[getProjects] Caching', projects.length, 'projects to IndexedDB');
+        for (const project of projects) {
+            try {
+                await window.idb.saveProject(project);
+            } catch (cacheError) {
+                console.warn('[getProjects] Failed to cache project:', project.id, cacheError);
+            }
+        }
 
         return projects;
     } catch (error) {
@@ -184,8 +218,25 @@ function createNewProject() {
 
 async function loadProject(projectId) {
     try {
-        const projects = await getProjects();
-        const project = projects.find(p => p.id === projectId);
+        let project = null;
+
+        // LOCAL-FIRST: Try IndexedDB first for faster loading
+        try {
+            project = await window.idb.getProject(projectId);
+            if (project) {
+                console.log('[loadProject] Found in IndexedDB:', projectId);
+            }
+        } catch (idbError) {
+            console.warn('[loadProject] IndexedDB error:', idbError);
+        }
+
+        // Fall back to getProjects() if not found in IndexedDB
+        if (!project) {
+            console.log('[loadProject] Not in IndexedDB, falling back to getProjects()');
+            const projects = await getProjects();
+            project = projects.find(p => p.id === projectId);
+        }
+
         if (project) {
             currentProject = JSON.parse(JSON.stringify(project)); // Deep copy
             populateForm();
@@ -225,39 +276,74 @@ async function saveProject() {
     currentProject.weatherDays = parseInt(document.getElementById('weatherDays').value) || 0;
     currentProject.contractDayNo = parseInt(document.getElementById('contractDayNo').value) || '';
 
-    try {
-        // Save to Supabase
-        await saveProjectToSupabase(currentProject);
-        showToast('Project saved successfully');
-        await renderSavedProjects();
-        updateActiveProjectBadge();
-    } catch (error) {
-        console.error('Error saving project:', error);
-        showToast('Failed to save project', 'error');
+    // Ensure user_id is set for IndexedDB filtering
+    const userId = getStorageItem(STORAGE_KEYS.USER_ID);
+    if (userId && !currentProject.user_id) {
+        currentProject.user_id = userId;
     }
+
+    // Ensure created_at is set for sorting
+    if (!currentProject.created_at) {
+        currentProject.created_at = new Date().toISOString();
+    }
+
+    // LOCAL-FIRST: Save to IndexedDB first
+    try {
+        await window.idb.saveProject(currentProject);
+        console.log('[saveProject] Saved to IndexedDB:', currentProject.id);
+    } catch (idbError) {
+        console.error('[saveProject] IndexedDB save failed:', idbError);
+        // Continue to try Supabase anyway
+    }
+
+    // Then sync to Supabase (backup)
+    try {
+        await saveProjectToSupabase(currentProject);
+        console.log('[saveProject] Synced to Supabase:', currentProject.id);
+        showToast('Project saved successfully');
+    } catch (supabaseError) {
+        // Offline or Supabase error - local save succeeded, warn user
+        console.warn('[saveProject] Supabase sync failed (offline?):', supabaseError);
+        showToast('Project saved locally (offline)', 'warning');
+    }
+
+    await renderSavedProjects();
+    updateActiveProjectBadge();
 }
 
 function deleteProject(projectId) {
     showDeleteModal('Are you sure you want to delete this project? This cannot be undone.', async () => {
+        // LOCAL-FIRST: Delete from IndexedDB first
+        try {
+            await window.idb.deleteProject(projectId);
+            console.log('[deleteProject] Deleted from IndexedDB:', projectId);
+        } catch (idbError) {
+            console.error('[deleteProject] IndexedDB delete failed:', idbError);
+            // Continue to try Supabase anyway
+        }
+
+        // Then delete from Supabase (backup)
         try {
             await deleteProjectFromSupabase(projectId);
-
-            // Clear active project if it was deleted
-            if (getActiveProjectId() === projectId) {
-                removeStorageItem(STORAGE_KEYS.ACTIVE_PROJECT_ID);
-            }
-
-            // If we're currently editing this project, close the form
-            if (currentProject && currentProject.id === projectId) {
-                hideProjectForm();
-            }
-
-            await renderSavedProjects();
+            console.log('[deleteProject] Deleted from Supabase:', projectId);
             showToast('Project deleted');
-        } catch (error) {
-            console.error('Error deleting project:', error);
-            showToast('Failed to delete project', 'error');
+        } catch (supabaseError) {
+            // Offline or Supabase error - local delete succeeded, warn user
+            console.warn('[deleteProject] Supabase delete failed (offline?):', supabaseError);
+            showToast('Project deleted locally (offline)', 'warning');
         }
+
+        // Clear active project if it was deleted
+        if (getActiveProjectId() === projectId) {
+            removeStorageItem(STORAGE_KEYS.ACTIVE_PROJECT_ID);
+        }
+
+        // If we're currently editing this project, close the form
+        if (currentProject && currentProject.id === projectId) {
+            hideProjectForm();
+        }
+
+        await renderSavedProjects();
     });
 }
 
@@ -1021,6 +1107,14 @@ function handleMissingFieldInput(e) {
 
 // Initialize drop zones when DOM is ready
 document.addEventListener('DOMContentLoaded', async () => {
+    // Initialize IndexedDB first for local-first storage
+    try {
+        await window.idb.initDB();
+        console.log('[project-config] IndexedDB initialized');
+    } catch (error) {
+        console.error('[project-config] Failed to initialize IndexedDB:', error);
+    }
+
     await renderSavedProjects();
     setupDropZone();
     setupLogoDropZone();
