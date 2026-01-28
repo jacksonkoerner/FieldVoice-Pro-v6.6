@@ -199,10 +199,9 @@ async function loadReport() {
         currentReportId = reportRow.id;
 
         // Load related data in parallel
-        // Note: user_edits now stored in report_raw_capture.raw_data.user_edits
-        const [rawCaptureResult, contractorWorkResult, personnelResult, equipmentUsageResult, photosResult, aiResponseResult] = await Promise.all([
+        // Note: user_edits and contractor_work now stored in report_raw_capture.raw_data
+        const [rawCaptureResult, personnelResult, equipmentUsageResult, photosResult, aiResponseResult] = await Promise.all([
             supabaseClient.from('report_raw_capture').select('*').eq('report_id', reportRow.id).maybeSingle(),
-            supabaseClient.from('report_contractor_work').select('*').eq('report_id', reportRow.id),
             supabaseClient.from('report_personnel').select('*').eq('report_id', reportRow.id),
             supabaseClient.from('report_equipment_usage').select('*').eq('report_id', reportRow.id),
             supabaseClient.from('photos').select('*').eq('report_id', reportRow.id).order('created_at', { ascending: true }),
@@ -249,11 +248,12 @@ async function loadReport() {
             safety: { hasIncident: false, notes: '' }
         };
 
-        // Process contractor work
-        if (contractorWorkResult.data && contractorWorkResult.data.length > 0) {
-            loadedReport.activities = contractorWorkResult.data.map(row => ({
+        // Process contractor work (now stored in raw_data.contractor_work)
+        const contractorWorkData = rawCaptureResult.data?.raw_data?.contractor_work || [];
+        if (contractorWorkData && contractorWorkData.length > 0) {
+            loadedReport.activities = contractorWorkData.map(row => ({
                 contractorId: row.contractor_id,
-                noWork: row.no_work || false,
+                noWork: row.no_work_performed || false,
                 narrative: row.narrative || '',
                 equipmentUsed: row.equipment_used || '',
                 crew: row.crew || ''
@@ -1014,23 +1014,31 @@ async function submitReport() {
     try {
         const submittedAt = new Date().toISOString();
 
-        // 1. Save final version to report_final table
+        // 1. Save final version to final_reports table
+        // Note: Schema uses individual columns, not a single final_data JSONB
         const finalData = {
             report_id: currentReportId,
-            final_data: {
-                overview: report.overview,
-                activities: report.activities,
-                operations: report.operations,
-                equipment: report.equipment,
-                photos: report.photos,
-                aiGenerated: report.aiGenerated,
-                userEdits: report.userEdits,
-                issues: report.issues,
-                communications: report.communications,
-                qaqc: report.qaqc,
-                visitors: report.visitors,
-                safety: report.safety
-            },
+            // Store structured data in JSONB columns
+            contractors_json: report.activities || [],
+            personnel_json: report.operations || [],
+            equipment_json: report.equipment || [],
+            // Text summary fields
+            work_performed: report.aiGenerated?.workPerformed || '',
+            executive_summary: report.aiGenerated?.executiveSummary || '',
+            safety_observations: report.safety?.notes || '',
+            delays_issues: report.issues || '',
+            qaqc_notes: report.qaqc || '',
+            communications_notes: report.communications || '',
+            visitors_deliveries_notes: report.visitors || '',
+            // Boolean flags
+            has_contractor_personnel: (report.activities?.length > 0) || (report.operations?.length > 0),
+            has_equipment: report.equipment?.length > 0,
+            has_issues: !!report.issues,
+            has_communications: !!report.communications,
+            has_qaqc: !!report.qaqc,
+            has_safety_incidents: report.safety?.hasIncident || false,
+            has_visitors_deliveries: !!report.visitors,
+            has_photos: report.photos?.length > 0,
             submitted_at: submittedAt
         };
 
@@ -1042,17 +1050,34 @@ async function submitReport() {
             .single();
 
         if (existingFinal) {
-            // Update existing
+            // Update existing - use all individual columns
             const { error: finalError } = await supabaseClient
                 .from('final_reports')
                 .update({
-                    final_data: finalData.final_data,
+                    contractors_json: finalData.contractors_json,
+                    personnel_json: finalData.personnel_json,
+                    equipment_json: finalData.equipment_json,
+                    work_performed: finalData.work_performed,
+                    executive_summary: finalData.executive_summary,
+                    safety_observations: finalData.safety_observations,
+                    delays_issues: finalData.delays_issues,
+                    qaqc_notes: finalData.qaqc_notes,
+                    communications_notes: finalData.communications_notes,
+                    visitors_deliveries_notes: finalData.visitors_deliveries_notes,
+                    has_contractor_personnel: finalData.has_contractor_personnel,
+                    has_equipment: finalData.has_equipment,
+                    has_issues: finalData.has_issues,
+                    has_communications: finalData.has_communications,
+                    has_qaqc: finalData.has_qaqc,
+                    has_safety_incidents: finalData.has_safety_incidents,
+                    has_visitors_deliveries: finalData.has_visitors_deliveries,
+                    has_photos: finalData.has_photos,
                     submitted_at: submittedAt
                 })
                 .eq('report_id', currentReportId);
 
             if (finalError) {
-                console.error('[SUPABASE] Error updating report_final:', finalError);
+                console.error('[SUPABASE] Error updating final_reports:', finalError);
                 throw finalError;
             }
         } else {
@@ -1062,7 +1087,7 @@ async function submitReport() {
                 .insert(finalData);
 
             if (finalError) {
-                console.error('[SUPABASE] Error inserting report_final:', finalError);
+                console.error('[SUPABASE] Error inserting final_reports:', finalError);
                 throw finalError;
             }
         }

@@ -390,10 +390,9 @@
             currentReportId = reportRow.id;
 
             // Load related data in parallel
-            // Note: user_edits now stored in report_raw_capture.raw_data.user_edits
-            const [rawCaptureResult, contractorWorkResult, personnelResult, equipmentUsageResult, photosResult, aiResponseResult] = await Promise.all([
+            // Note: user_edits and contractor_work now stored in report_raw_capture.raw_data
+            const [rawCaptureResult, personnelResult, equipmentUsageResult, photosResult, aiResponseResult] = await Promise.all([
                 supabaseClient.from('report_raw_capture').select('*').eq('report_id', reportRow.id).maybeSingle(),
-                supabaseClient.from('report_contractor_work').select('*').eq('report_id', reportRow.id),
                 supabaseClient.from('report_personnel').select('*').eq('report_id', reportRow.id),
                 supabaseClient.from('report_equipment_usage').select('*').eq('report_id', reportRow.id),
                 supabaseClient.from('photos').select('*').eq('report_id', reportRow.id).order('created_at', { ascending: true }),
@@ -433,9 +432,10 @@
                 }
             }
 
-            // Contractor work (activities)
-            if (contractorWorkResult.data && contractorWorkResult.data.length > 0) {
-                loadedReport.activities = contractorWorkResult.data.map(cw => ({
+            // Contractor work (activities) - now stored in raw_data.contractor_work
+            const contractorWorkData = rawCaptureResult.data?.raw_data?.contractor_work || [];
+            if (contractorWorkData && contractorWorkData.length > 0) {
+                loadedReport.activities = contractorWorkData.map(cw => ({
                     contractorId: cw.contractor_id,
                     noWork: cw.no_work_performed || false,
                     narrative: cw.narrative || '',
@@ -1616,6 +1616,17 @@
                 }))
                 : [];
 
+            // Build contractor_work array for storage in raw_data
+            const contractorWorkArray = report.activities && report.activities.length > 0
+                ? report.activities.map(a => ({
+                    contractor_id: a.contractorId,
+                    no_work_performed: a.noWork || false,
+                    narrative: a.narrative || '',
+                    equipment_used: a.equipmentUsed || '',
+                    crew: a.crew || ''
+                }))
+                : [];
+
             const rawCaptureData = {
                 report_id: reportId,
                 capture_mode: report.meta?.captureMode || 'guided',
@@ -1625,9 +1636,10 @@
                 safety_notes: report.safety?.notes || report.guidedNotes?.safety || '',
                 weather_data: report.overview?.weather || {},
                 captured_at: new Date().toISOString(),
-                // Store user_edits in raw_data JSONB
+                // Store user_edits and contractor_work in raw_data JSONB
                 raw_data: {
-                    user_edits: userEditsArray
+                    user_edits: userEditsArray,
+                    contractor_work: contractorWorkArray
                 }
             };
 
@@ -1641,26 +1653,7 @@
                 .from('report_raw_capture')
                 .insert(rawCaptureData);
 
-            // 3. Save contractor work
-            if (report.activities && report.activities.length > 0) {
-                await supabaseClient
-                    .from('report_contractor_work')
-                    .delete()
-                    .eq('report_id', reportId);
-
-                const contractorWorkData = report.activities.map(a => ({
-                    report_id: reportId,
-                    contractor_id: a.contractorId,
-                    no_work_performed: a.noWork || false,
-                    narrative: a.narrative || '',
-                    equipment_used: a.equipmentUsed || '',
-                    crew: a.crew || ''
-                }));
-
-                await supabaseClient
-                    .from('report_contractor_work')
-                    .insert(contractorWorkData);
-            }
+            // 3. Contractor work - now stored in raw_data.contractor_work (handled above in rawCaptureData)
 
             // 4. Save personnel
             if (report.operations && report.operations.length > 0) {
