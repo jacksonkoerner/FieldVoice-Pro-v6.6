@@ -196,7 +196,8 @@ function createNewProject() {
     currentProject = {
         id: generateId(),
         name: '',
-        logo: null,
+        logoThumbnail: null,
+        logoUrl: null,
         noabProjectNo: '',
         cnoSolicitationNo: 'N/A',
         location: '',
@@ -261,7 +262,9 @@ async function saveProject() {
 
     // Update current project from form
     currentProject.name = name;
-    currentProject.logo = currentProject.logo || null;
+    // Logo fields are set by handleLogoSelect/removeLogo, preserve them
+    currentProject.logoThumbnail = currentProject.logoThumbnail || null;
+    currentProject.logoUrl = currentProject.logoUrl || null;
     currentProject.noabProjectNo = document.getElementById('noabProjectNo').value.trim();
     currentProject.cnoSolicitationNo = document.getElementById('cnoSolicitationNo').value.trim() || 'N/A';
     currentProject.location = document.getElementById('location').value.trim();
@@ -442,12 +445,14 @@ function populateForm() {
     document.getElementById('contractDayNo').value = currentProject.contractDayNo || '';
 
     // Handle logo preview
+    // Priority: logoUrl (full quality) > logoThumbnail (compressed) > logo (legacy)
     const logoUploadZone = document.getElementById('logoUploadZone');
     const logoPreviewArea = document.getElementById('logoPreviewArea');
     const logoPreviewImg = document.getElementById('logoPreviewImg');
 
-    if (currentProject.logo) {
-        logoPreviewImg.src = currentProject.logo;
+    const logoSrc = currentProject.logoUrl || currentProject.logoThumbnail || currentProject.logo;
+    if (logoSrc) {
+        logoPreviewImg.src = logoSrc;
         logoUploadZone.classList.add('hidden');
         logoPreviewArea.classList.remove('hidden');
     } else {
@@ -803,7 +808,7 @@ function clearSelectedFiles() {
 }
 
 // ============ LOGO UPLOAD FUNCTIONS ============
-function handleLogoSelect(event) {
+async function handleLogoSelect(event) {
     const file = event.target.files[0];
     if (!file) return;
 
@@ -815,36 +820,52 @@ function handleLogoSelect(event) {
         return;
     }
 
-    // Convert to base64
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        const base64Data = e.target.result;
-        currentProject.logo = base64Data;
+    try {
+        // 1. Compress image for local storage (thumbnail)
+        const thumbnailBase64 = await compressImageToThumbnail(file);
+        currentProject.logoThumbnail = thumbnailBase64;
 
-        // Show preview
+        // Show preview immediately with thumbnail
         const logoUploadZone = document.getElementById('logoUploadZone');
         const logoPreviewArea = document.getElementById('logoPreviewArea');
         const logoPreviewImg = document.getElementById('logoPreviewImg');
 
-        logoPreviewImg.src = base64Data;
+        logoPreviewImg.src = thumbnailBase64;
         logoUploadZone.classList.add('hidden');
         logoPreviewArea.classList.remove('hidden');
 
-        showToast('Logo uploaded');
-    };
-    reader.onerror = function() {
-        showToast('Error reading file', 'error');
-    };
-    reader.readAsDataURL(file);
+        // 2. Upload original to Supabase Storage (async, non-blocking)
+        const logoUrl = await uploadLogoToStorage(file, currentProject.id);
+        if (logoUrl) {
+            currentProject.logoUrl = logoUrl;
+            showToast('Logo uploaded');
+        } else {
+            // Upload failed (offline) - still works with thumbnail
+            currentProject.logoUrl = null;
+            showToast('Logo saved locally (will sync when online)', 'warning');
+        }
+
+        // Clear old logo field if it exists
+        delete currentProject.logo;
+    } catch (err) {
+        console.error('[LOGO] Error processing logo:', err);
+        showToast('Error processing logo', 'error');
+    }
 
     // Clear the input so the same file can be selected again
     event.target.value = '';
 }
 
-function removeLogo() {
+async function removeLogo() {
     if (!currentProject) return;
 
-    currentProject.logo = null;
+    // Delete from Supabase Storage (async, non-blocking)
+    deleteLogoFromStorage(currentProject.id);
+
+    // Clear logo fields
+    currentProject.logoThumbnail = null;
+    currentProject.logoUrl = null;
+    delete currentProject.logo; // Clean up old field if present
 
     const logoUploadZone = document.getElementById('logoUploadZone');
     const logoPreviewArea = document.getElementById('logoPreviewArea');

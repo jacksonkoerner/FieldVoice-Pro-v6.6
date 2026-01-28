@@ -492,9 +492,10 @@ function populateReport() {
 // ============ LOGO RENDERING ============
 function renderLogo() {
     // Check if activeProject has a logo
-    if (activeProject && activeProject.logo) {
-        const logoData = activeProject.logo;
+    // Priority: logoUrl (full quality) > logoThumbnail (compressed) > logo (legacy)
+    const logoSrc = activeProject?.logoUrl || activeProject?.logoThumbnail || activeProject?.logo;
 
+    if (logoSrc) {
         // Update all logo containers across all pages
         const logoContainers = [
             { placeholder: 'logoPlaceholder', image: 'logoImage' },
@@ -509,7 +510,7 @@ function renderLogo() {
 
             if (placeholder && image) {
                 placeholder.style.display = 'none';
-                image.src = logoData;
+                image.src = logoSrc;
                 image.style.display = 'block';
             }
         });
@@ -881,8 +882,10 @@ function addAdditionalPhotoPages(remainingPhotos) {
         }
 
         // Determine logo HTML based on whether project has a logo
-        const logoHtml = activeProject && activeProject.logo
-            ? `<img src="${activeProject.logo}" class="report-logo" alt="Project Logo">`
+        // Priority: logoUrl (full quality) > logoThumbnail (compressed) > logo (legacy)
+        const logoSrc = activeProject?.logoUrl || activeProject?.logoThumbnail || activeProject?.logo;
+        const logoHtml = logoSrc
+            ? `<img src="${logoSrc}" class="report-logo" alt="Project Logo">`
             : `<div class="report-logo-placeholder">LOUIS ARMSTRONG<br>NEW ORLEANS<br>INTERNATIONAL AIRPORT</div>`;
 
         page.innerHTML = `

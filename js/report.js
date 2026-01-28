@@ -689,10 +689,12 @@
     // ============ POPULATE FIELDS ============
     function populateAllFields() {
         // Display project logo if exists
+        // Priority: logoUrl (full quality) > logoThumbnail (compressed) > logo (legacy)
         const logoContainer = document.getElementById('projectLogoContainer');
         const logoImg = document.getElementById('projectLogo');
-        if (activeProject?.logo) {
-            logoImg.src = activeProject.logo;
+        const logoSrc = activeProject?.logoUrl || activeProject?.logoThumbnail || activeProject?.logo;
+        if (logoSrc) {
+            logoImg.src = logoSrc;
             logoContainer.classList.remove('hidden');
         } else {
             logoContainer.classList.add('hidden');

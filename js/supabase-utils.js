@@ -17,7 +17,10 @@
  * DB columns: id, user_id, project_name, noab_project_no, cno_solicitation_no,
  *             location, engineer, prime_contractor, notice_to_proceed,
  *             contract_duration, expected_completion, default_start_time,
- *             default_end_time, weather_days, logo, status, created_at, updated_at
+ *             default_end_time, weather_days, logo_thumbnail, logo_url,
+ *             logo (legacy), status, created_at, updated_at
+ *
+ * NOTE: Database migration required to add logo_thumbnail and logo_url columns
  *
  * @param {Object} row - Supabase project row
  * @returns {Object} JS project object
@@ -38,6 +41,10 @@ function fromSupabaseProject(row) {
         defaultStartTime: row.default_start_time || '',
         defaultEndTime: row.default_end_time || '',
         weatherDays: row.weather_days || null,
+        // New logo fields
+        logoThumbnail: row.logo_thumbnail || null,
+        logoUrl: row.logo_url || null,
+        // Legacy logo field for backwards compatibility
         logo: row.logo || null,
         status: row.status || 'active',
         userId: row.user_id || null,
@@ -67,7 +74,9 @@ function toSupabaseProject(project) {
         default_start_time: project.defaultStartTime || '',
         default_end_time: project.defaultEndTime || '',
         weather_days: project.weatherDays || null,
-        logo: project.logo || null,
+        // New logo fields
+        logo_thumbnail: project.logoThumbnail || null,
+        logo_url: project.logoUrl || null,
         status: project.status || 'active'
     };
 
