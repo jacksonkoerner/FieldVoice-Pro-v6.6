@@ -1060,7 +1060,7 @@
 
                 // Use upsert to handle retries/reprocessing - prevents duplicate rows
                 const { error } = await supabaseClient
-                    .from('report_ai_response')
+                    .from('ai_responses')
                     .upsert(responseData, { onConflict: 'report_id' });
 
                 if (error) {
@@ -2071,7 +2071,7 @@
 
                 // Load photos
                 const { data: photos } = await supabaseClient
-                    .from('report_photos')
+                    .from('photos')
                     .select('*')
                     .eq('report_id', reportRow.id)
                     .order('taken_at', { ascending: true });
@@ -2453,7 +2453,7 @@
                 };
 
                 const { error } = await supabaseClient
-                    .from('report_photos')
+                    .from('photos')
                     .upsert(photoData, { onConflict: 'id' });
 
                 if (error) {
@@ -2478,7 +2478,7 @@
 
                 // Delete metadata
                 await supabaseClient
-                    .from('report_photos')
+                    .from('photos')
                     .delete()
                     .eq('id', photoId);
             } catch (err) {
@@ -2816,7 +2816,7 @@
                 // Also update in Supabase directly
                 if (report.photos[index].id && currentReportId) {
                     await supabaseClient
-                        .from('report_photos')
+                        .from('photos')
                         .update({ caption: caption })
                         .eq('id', report.photos[index].id);
                 }

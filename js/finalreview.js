@@ -204,9 +204,9 @@ async function loadReport() {
             supabaseClient.from('report_contractor_work').select('*').eq('report_id', reportRow.id),
             supabaseClient.from('report_personnel').select('*').eq('report_id', reportRow.id),
             supabaseClient.from('report_equipment_usage').select('*').eq('report_id', reportRow.id),
-            supabaseClient.from('report_photos').select('*').eq('report_id', reportRow.id).order('created_at', { ascending: true }),
+            supabaseClient.from('photos').select('*').eq('report_id', reportRow.id).order('created_at', { ascending: true }),
             // Get most recent AI response (handles multiple rows from retries)
-            supabaseClient.from('report_ai_response').select('*').eq('report_id', reportRow.id).order('received_at', { ascending: false }).limit(1).maybeSingle(),
+            supabaseClient.from('ai_responses').select('*').eq('report_id', reportRow.id).order('received_at', { ascending: false }).limit(1).maybeSingle(),
             supabaseClient.from('report_user_edits').select('*').eq('report_id', reportRow.id)
         ]);
 
@@ -1035,7 +1035,7 @@ async function submitReport() {
 
         // Check if a final record already exists
         const { data: existingFinal } = await supabaseClient
-            .from('report_final')
+            .from('final_reports')
             .select('id')
             .eq('report_id', currentReportId)
             .single();
@@ -1043,7 +1043,7 @@ async function submitReport() {
         if (existingFinal) {
             // Update existing
             const { error: finalError } = await supabaseClient
-                .from('report_final')
+                .from('final_reports')
                 .update({
                     final_data: finalData.final_data,
                     submitted_at: submittedAt
@@ -1057,7 +1057,7 @@ async function submitReport() {
         } else {
             // Insert new
             const { error: finalError } = await supabaseClient
-                .from('report_final')
+                .from('final_reports')
                 .insert(finalData);
 
             if (finalError) {

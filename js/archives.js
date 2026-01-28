@@ -70,7 +70,7 @@ async function getAllReports() {
         // Get photo counts for all reports
         const reportIds = reportRows.map(r => r.id);
         const { data: photoCounts, error: photoError } = await supabaseClient
-            .from('report_photos')
+            .from('photos')
             .select('report_id')
             .in('report_id', reportIds);
 
