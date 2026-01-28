@@ -390,15 +390,15 @@
             currentReportId = reportRow.id;
 
             // Load related data in parallel
-            const [rawCaptureResult, contractorWorkResult, personnelResult, equipmentUsageResult, photosResult, aiResponseResult, userEditsResult] = await Promise.all([
+            // Note: user_edits now stored in report_raw_capture.raw_data.user_edits
+            const [rawCaptureResult, contractorWorkResult, personnelResult, equipmentUsageResult, photosResult, aiResponseResult] = await Promise.all([
                 supabaseClient.from('report_raw_capture').select('*').eq('report_id', reportRow.id).maybeSingle(),
                 supabaseClient.from('report_contractor_work').select('*').eq('report_id', reportRow.id),
                 supabaseClient.from('report_personnel').select('*').eq('report_id', reportRow.id),
                 supabaseClient.from('report_equipment_usage').select('*').eq('report_id', reportRow.id),
                 supabaseClient.from('photos').select('*').eq('report_id', reportRow.id).order('created_at', { ascending: true }),
                 // Get most recent AI response (handles multiple rows from retries)
-                supabaseClient.from('ai_responses').select('*').eq('report_id', reportRow.id).order('received_at', { ascending: false }).limit(1).maybeSingle(),
-                supabaseClient.from('report_user_edits').select('*').eq('report_id', reportRow.id)
+                supabaseClient.from('ai_responses').select('*').eq('report_id', reportRow.id).order('received_at', { ascending: false }).limit(1).maybeSingle()
             ]);
 
             // Build the report object
@@ -517,10 +517,11 @@
 
             loadedReport.aiGenerated = aiGenerated;
 
-            // User edits
-            if (userEditsResult.data && userEditsResult.data.length > 0) {
+            // User edits (now stored in raw_data.user_edits)
+            const userEditsData = rawCaptureResult.data?.raw_data?.user_edits || [];
+            if (userEditsData && userEditsData.length > 0) {
                 loadedReport.userEdits = {};
-                userEditsResult.data.forEach(ue => {
+                userEditsData.forEach(ue => {
                     loadedReport.userEdits[ue.field_path] = ue.edited_value;
                 });
             }
@@ -1606,6 +1607,15 @@
             currentReportId = reportId;
 
             // 2. Upsert raw capture data
+            // Build user_edits array for storage in raw_data
+            const userEditsArray = report.userEdits && Object.keys(report.userEdits).length > 0
+                ? Object.entries(report.userEdits).map(([fieldPath, editedValue]) => ({
+                    field_path: fieldPath,
+                    edited_value: typeof editedValue === 'string' ? editedValue : JSON.stringify(editedValue),
+                    edited_at: new Date().toISOString()
+                }))
+                : [];
+
             const rawCaptureData = {
                 report_id: reportId,
                 capture_mode: report.meta?.captureMode || 'guided',
@@ -1614,7 +1624,11 @@
                 issues_notes: report.issues || report.guidedNotes?.issues || '',
                 safety_notes: report.safety?.notes || report.guidedNotes?.safety || '',
                 weather_data: report.overview?.weather || {},
-                captured_at: new Date().toISOString()
+                captured_at: new Date().toISOString(),
+                // Store user_edits in raw_data JSONB
+                raw_data: {
+                    user_edits: userEditsArray
+                }
             };
 
             // Delete existing and insert new (simpler than upsert for child tables)
@@ -1693,24 +1707,7 @@
                     .insert(equipmentData);
             }
 
-            // 6. Save user edits
-            if (report.userEdits && Object.keys(report.userEdits).length > 0) {
-                await supabaseClient
-                    .from('report_user_edits')
-                    .delete()
-                    .eq('report_id', reportId);
-
-                const userEditsData = Object.entries(report.userEdits).map(([fieldPath, editedValue]) => ({
-                    report_id: reportId,
-                    field_path: fieldPath,
-                    edited_value: typeof editedValue === 'string' ? editedValue : JSON.stringify(editedValue),
-                    edited_at: new Date().toISOString()
-                }));
-
-                await supabaseClient
-                    .from('report_user_edits')
-                    .insert(userEditsData);
-            }
+            // 6. User edits - now stored in raw_data.user_edits (handled above in rawCaptureData)
 
             // 7. Save text sections (issues, qaqc, communications, visitors, safety)
             // These are stored in the main report data, update via raw_capture or as separate fields

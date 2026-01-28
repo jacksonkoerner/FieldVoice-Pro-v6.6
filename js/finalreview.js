@@ -199,15 +199,15 @@ async function loadReport() {
         currentReportId = reportRow.id;
 
         // Load related data in parallel
-        const [rawCaptureResult, contractorWorkResult, personnelResult, equipmentUsageResult, photosResult, aiResponseResult, userEditsResult] = await Promise.all([
+        // Note: user_edits now stored in report_raw_capture.raw_data.user_edits
+        const [rawCaptureResult, contractorWorkResult, personnelResult, equipmentUsageResult, photosResult, aiResponseResult] = await Promise.all([
             supabaseClient.from('report_raw_capture').select('*').eq('report_id', reportRow.id).maybeSingle(),
             supabaseClient.from('report_contractor_work').select('*').eq('report_id', reportRow.id),
             supabaseClient.from('report_personnel').select('*').eq('report_id', reportRow.id),
             supabaseClient.from('report_equipment_usage').select('*').eq('report_id', reportRow.id),
             supabaseClient.from('photos').select('*').eq('report_id', reportRow.id).order('created_at', { ascending: true }),
             // Get most recent AI response (handles multiple rows from retries)
-            supabaseClient.from('ai_responses').select('*').eq('report_id', reportRow.id).order('received_at', { ascending: false }).limit(1).maybeSingle(),
-            supabaseClient.from('report_user_edits').select('*').eq('report_id', reportRow.id)
+            supabaseClient.from('ai_responses').select('*').eq('report_id', reportRow.id).order('received_at', { ascending: false }).limit(1).maybeSingle()
         ]);
 
         // Build the report object
@@ -347,9 +347,10 @@ async function loadReport() {
             }
         }
 
-        // Process user edits
-        if (userEditsResult.data && userEditsResult.data.length > 0) {
-            userEditsResult.data.forEach(row => {
+        // Process user edits (now stored in raw_data.user_edits)
+        const userEditsData = rawCaptureResult.data?.raw_data?.user_edits || [];
+        if (userEditsData && userEditsData.length > 0) {
+            userEditsData.forEach(row => {
                 let value = row.edited_value;
                 // Try to parse JSON values
                 try {
