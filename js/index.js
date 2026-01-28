@@ -15,11 +15,44 @@ let activeProjectCache = null;
 
 // ============ PROJECT MANAGEMENT ============
 async function loadProjects() {
+    const userId = getStorageItem(STORAGE_KEYS.USER_ID);
+
+    // 1. Try IndexedDB first (local-first)
     try {
-        const { data, error } = await supabaseClient
+        const allLocalProjects = await window.idb.getAllProjects();
+        const localProjects = userId
+            ? allLocalProjects.filter(p => p.user_id === userId)
+            : allLocalProjects;
+
+        if (localProjects.length > 0) {
+            projectsCache = localProjects.sort((a, b) =>
+                (a.name || a.project_name || '').localeCompare(b.name || b.project_name || '')
+            );
+
+            // Also cache in localStorage for report-rules.js
+            const projectsMap = {};
+            projectsCache.forEach(p => { projectsMap[p.id] = p; });
+            setStorageItem(STORAGE_KEYS.PROJECTS, projectsMap);
+
+            console.log('[IDB] Loaded projects from IndexedDB:', projectsCache.length);
+            return projectsCache;
+        }
+    } catch (e) {
+        console.warn('[IDB] Failed to load from IndexedDB, falling back to Supabase:', e);
+    }
+
+    // 2. Fall back to Supabase (with user_id filter)
+    try {
+        let query = supabaseClient
             .from('projects')
             .select('*')
             .order('project_name', { ascending: true });
+
+        if (userId) {
+            query = query.eq('user_id', userId);
+        }
+
+        const { data, error } = await query;
 
         if (error) {
             console.error('[SUPABASE] Error loading projects:', error);
@@ -28,12 +61,17 @@ async function loadProjects() {
 
         projectsCache = data.map(fromSupabaseProject);
 
-        // Also cache projects in localStorage for offline access and report-rules.js
+        // Cache to IndexedDB for future local-first access
+        for (const project of data) {
+            await window.idb.saveProject(project);
+        }
+
+        // Also cache in localStorage for report-rules.js
         const projectsMap = {};
         projectsCache.forEach(p => { projectsMap[p.id] = p; });
         setStorageItem(STORAGE_KEYS.PROJECTS, projectsMap);
 
-        console.log('[SUPABASE] Loaded projects:', projectsCache.length);
+        console.log('[SUPABASE] Loaded projects and cached to IndexedDB:', projectsCache.length);
         return projectsCache;
     } catch (e) {
         console.error('[SUPABASE] Failed to load projects:', e);
@@ -52,12 +90,32 @@ async function loadActiveProject() {
         return null;
     }
 
+    const userId = getStorageItem(STORAGE_KEYS.USER_ID);
+
+    // 1. Try IndexedDB first (local-first)
     try {
-        const { data, error } = await supabaseClient
+        const localProject = await window.idb.getProject(activeId);
+        if (localProject && (!userId || localProject.user_id === userId)) {
+            activeProjectCache = localProject;
+            console.log('[IDB] Loaded active project from IndexedDB:', activeProjectCache.name || activeProjectCache.project_name);
+            return activeProjectCache;
+        }
+    } catch (e) {
+        console.warn('[IDB] Failed to load active project from IndexedDB:', e);
+    }
+
+    // 2. Fall back to Supabase (with user_id filter)
+    try {
+        let query = supabaseClient
             .from('projects')
             .select('*')
-            .eq('id', activeId)
-            .single();
+            .eq('id', activeId);
+
+        if (userId) {
+            query = query.eq('user_id', userId);
+        }
+
+        const { data, error } = await query.single();
 
         if (error) {
             console.error('[SUPABASE] Error loading active project:', error);
@@ -66,6 +124,10 @@ async function loadActiveProject() {
         }
 
         activeProjectCache = fromSupabaseProject(data);
+
+        // Cache to IndexedDB
+        await window.idb.saveProject(data);
+
         console.log('[SUPABASE] Loaded active project:', activeProjectCache.name);
         return activeProjectCache;
     } catch (e) {
