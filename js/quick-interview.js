@@ -340,6 +340,7 @@
                 const reportData = {
                     id: currentReportId || `draft_${activeProjectId}_${todayStr}`,
                     project_id: activeProjectId,
+                    project_name: activeProject?.projectName || activeProject?.name || activeProject?.project_name || '',
                     date: todayStr,
                     status: 'draft',
                     capture_mode: data.captureMode,
