@@ -41,6 +41,13 @@ async function loadProjects() {
         console.warn('[IDB] Failed to load from IndexedDB, falling back to Supabase:', e);
     }
 
+    // If offline and no local data, return empty gracefully
+    if (!navigator.onLine) {
+        console.log('[OFFLINE] No local projects, returning empty');
+        projectsCache = [];
+        return projectsCache;
+    }
+
     // 2. Fall back to Supabase (with user_id filter)
     try {
         let query = supabaseClient
@@ -102,6 +109,13 @@ async function loadActiveProject() {
         }
     } catch (e) {
         console.warn('[IDB] Failed to load active project from IndexedDB:', e);
+    }
+
+    // If offline and no local data, return null gracefully
+    if (!navigator.onLine) {
+        console.log('[OFFLINE] No local active project, returning null');
+        activeProjectCache = null;
+        return null;
     }
 
     // 2. Fall back to Supabase (with user_id filter)
