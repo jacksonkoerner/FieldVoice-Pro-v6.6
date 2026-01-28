@@ -686,6 +686,22 @@ document.addEventListener('DOMContentLoaded', async () => {
         year: 'numeric'
     });
 
+    // ============ ONE-TIME MIGRATION: Clear stale IndexedDB projects (v1.13.0) ============
+    // This fixes mobile PWA showing duplicate/stale projects from before user_id filtering
+    const MIGRATION_KEY = 'fvp_migration_v113_idb_clear';
+    if (!localStorage.getItem(MIGRATION_KEY)) {
+        console.log('[MIGRATION v1.13.0] Clearing stale IndexedDB projects...');
+        try {
+            await window.idb.clearStore('projects');
+            localStorage.setItem(MIGRATION_KEY, new Date().toISOString());
+            console.log('[MIGRATION v1.13.0] IndexedDB projects cleared successfully');
+        } catch (migrationErr) {
+            console.warn('[MIGRATION v1.13.0] Failed to clear IndexedDB:', migrationErr);
+            // Still set the flag to avoid retrying on every load
+            localStorage.setItem(MIGRATION_KEY, 'failed-' + new Date().toISOString());
+        }
+    }
+
     try {
         // Initialize sync manager
         initSyncManager();
