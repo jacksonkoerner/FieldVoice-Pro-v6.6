@@ -289,7 +289,7 @@ async function syncDraft(draft, index) {
         const payload = draft.payload || buildPayloadFromDraft(draft);
 
         // Call the AI processing webhook
-        const webhookUrl = 'https://advidere.app.n8n.cloud/webhook/fieldvoice-refine-text-v6.5';
+        const webhookUrl = 'https://advidere.app.n8n.cloud/webhook/fieldvoice-refine-v6.6';
         const response = await fetch(webhookUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },

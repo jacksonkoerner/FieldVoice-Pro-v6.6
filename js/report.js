@@ -23,7 +23,7 @@
     let isReadonly = false;
     let currentTab = 'form';
 
-    const N8N_PROCESS_WEBHOOK = 'https://advidere.app.n8n.cloud/webhook/fieldvoice-refine-text-v6.5';
+    const N8N_PROCESS_WEBHOOK = 'https://advidere.app.n8n.cloud/webhook/fieldvoice-refine-v6.6';
 
     // ============ INITIALIZATION ============
     document.addEventListener('DOMContentLoaded', async () => {
@@ -634,18 +634,26 @@
      * Get text field value with proper priority handling
      * Priority: userEdits > aiGenerated > fieldNotes/guidedNotes > defaults
      * @param {string} reportPath - Path in report object (e.g., 'issues')
-     * @param {string} aiPath - Path in aiGenerated object (e.g., 'generalIssues')
+     * @param {string} aiPath - Path in aiGenerated object (e.g., 'issues_delays')
      * @param {string} defaultValue - Fallback value if nothing found
+     * @param {string} legacyAiPath - Legacy field name for backwards compatibility (e.g., 'generalIssues')
      */
-    function getTextFieldValue(reportPath, aiPath, defaultValue = '') {
+    function getTextFieldValue(reportPath, aiPath, defaultValue = '', legacyAiPath = null) {
         // 1. Check user edits first - user edits always win
         if (userEdits[reportPath] !== undefined) {
             return userEdits[reportPath];
         }
 
-        // 2. Check AI-generated data
+        // 2. Check AI-generated data (try new field name first, then legacy)
         if (report.aiGenerated) {
-            const aiValue = getNestedValue(report.aiGenerated, aiPath);
+            // Try new v6.6 field name
+            let aiValue = getNestedValue(report.aiGenerated, aiPath);
+            
+            // Fallback to legacy field name for backwards compatibility
+            if ((aiValue === undefined || aiValue === null || aiValue === '') && legacyAiPath) {
+                aiValue = getNestedValue(report.aiGenerated, legacyAiPath);
+            }
+            
             if (aiValue !== undefined && aiValue !== null && aiValue !== '') {
                 if (Array.isArray(aiValue)) {
                     return aiValue.join('\n');
@@ -760,17 +768,22 @@
 
         // Text sections - check AI-generated paths with correct field names
         // Priority: userEdits > aiGenerated > guidedNotes/fieldNotes > report defaults
-        document.getElementById('issuesText').value = getTextFieldValue('issues', 'generalIssues',
-            report.guidedNotes?.issues || '');
-        document.getElementById('qaqcText').value = getTextFieldValue('qaqc', 'qaqcNotes', '');
-        document.getElementById('safetyText').value = getTextFieldValue('safety.notes', 'safety.notes',
-            report.guidedNotes?.safety || '');
+        // v6.6: Updated field names (issues_delays, qaqc_notes, communications, visitors_deliveries, safety.summary)
+        document.getElementById('issuesText').value = getTextFieldValue('issues', 'issues_delays',
+            report.guidedNotes?.issues || '', 'generalIssues');
+        document.getElementById('qaqcText').value = getTextFieldValue('qaqc', 'qaqc_notes', '', 'qaqcNotes');
+        document.getElementById('safetyText').value = getTextFieldValue('safety.notes', 'safety.summary',
+            report.guidedNotes?.safety || '', 'safety.notes');
         document.getElementById('communicationsText').value = getTextFieldValue('communications',
-            'contractorCommunications', '');
-        document.getElementById('visitorsText').value = getTextFieldValue('visitors', 'visitorsRemarks', '');
+            'communications', '', 'contractorCommunications');
+        document.getElementById('visitorsText').value = getTextFieldValue('visitors', 'visitors_deliveries', '', 'visitorsRemarks');
 
         // Safety incident toggle
-        const hasIncident = getValue('safety.hasIncident', false);
+        // v6.6: Check both old (hasIncident/hasIncidents) and new (has_incidents) field names
+        const hasIncident = getValue('safety.hasIncident', false) || 
+                            report.aiGenerated?.safety?.has_incidents || 
+                            report.aiGenerated?.safety?.hasIncidents || 
+                            false;
         document.getElementById('safetyNoIncident').checked = !hasIncident;
         document.getElementById('safetyHasIncident').checked = hasIncident;
 
@@ -943,6 +956,7 @@
 
     /**
      * Get contractor activity with priority: userEdits > aiGenerated > report.activities
+     * v6.6: Supports matching by contractorName for freeform mode (when contractorId is null)
      */
     function getContractorActivity(contractorId) {
         // Check if user has edited this contractor's activity
@@ -951,9 +965,23 @@
             return userEdits[userEditKey];
         }
 
+        // Get contractor name for freeform matching
+        const contractor = projectContractors.find(c => c.id === contractorId);
+        const contractorName = contractor?.name;
+
         // Check AI-generated activities first
         if (report.aiGenerated?.activities) {
-            const aiActivity = report.aiGenerated.activities.find(a => a.contractorId === contractorId);
+            // Try matching by contractorId first (guided mode)
+            let aiActivity = report.aiGenerated.activities.find(a => a.contractorId === contractorId);
+            
+            // v6.6: Fallback to name matching for freeform mode (where contractorId is null)
+            if (!aiActivity && contractorName) {
+                aiActivity = report.aiGenerated.activities.find(a => 
+                    a.contractorId === null && 
+                    a.contractorName?.toLowerCase() === contractorName.toLowerCase()
+                );
+            }
+            
             if (aiActivity) {
                 return {
                     contractorId: contractorId,
@@ -1080,6 +1108,7 @@
 
     /**
      * Get contractor operations/personnel with priority: userEdits > aiGenerated > report.operations
+     * v6.6: Supports matching by contractorName for freeform mode (when contractorId is null)
      */
     function getContractorOperations(contractorId) {
         // Check if user has edited this contractor's operations
@@ -1088,9 +1117,23 @@
             return userEdits[userEditKey];
         }
 
+        // Get contractor name for freeform matching
+        const contractor = projectContractors.find(c => c.id === contractorId);
+        const contractorName = contractor?.name;
+
         // Check AI-generated operations first
         if (report.aiGenerated?.operations) {
-            const aiOps = report.aiGenerated.operations.find(o => o.contractorId === contractorId);
+            // Try matching by contractorId first (guided mode)
+            let aiOps = report.aiGenerated.operations.find(o => o.contractorId === contractorId);
+            
+            // v6.6: Fallback to name matching for freeform mode (where contractorId is null)
+            if (!aiOps && contractorName) {
+                aiOps = report.aiGenerated.operations.find(o => 
+                    o.contractorId === null && 
+                    o.contractorName?.toLowerCase() === contractorName.toLowerCase()
+                );
+            }
+            
             if (aiOps) {
                 return {
                     contractorId: contractorId,
@@ -1155,6 +1198,7 @@
     // ============ RENDER EQUIPMENT TABLE ============
     /**
      * Get equipment data with priority: report.equipment (user edited) > aiGenerated.equipment
+     * v6.6: Supports resolving contractorId from contractorName for freeform mode
      */
     function getEquipmentData() {
         // If user has saved equipment data, use that
@@ -1173,8 +1217,21 @@
                         type = projectEquip.type || projectEquip.model || type;
                     }
                 }
+                
+                // v6.6: Resolve contractorId from contractorName for freeform mode
+                let contractorId = aiItem.contractorId || '';
+                if (!contractorId && aiItem.contractorName) {
+                    const matchedContractor = projectContractors.find(c => 
+                        c.name?.toLowerCase() === aiItem.contractorName?.toLowerCase()
+                    );
+                    if (matchedContractor) {
+                        contractorId = matchedContractor.id;
+                    }
+                }
+                
                 return {
-                    contractorId: aiItem.contractorId || '',
+                    contractorId: contractorId,
+                    contractorName: aiItem.contractorName || '',
                     type: type,
                     qty: aiItem.qty || aiItem.quantity || 1,
                     status: aiItem.status || aiItem.hoursUsed ? `${aiItem.hoursUsed} hrs` : 'IDLE'

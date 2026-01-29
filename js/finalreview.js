@@ -286,47 +286,57 @@ async function loadReport() {
         if (aiResponseResult.data && aiResponseResult.data.response_payload) {
             const aiPayload = aiResponseResult.data.response_payload;
 
+            // v6.6: Support both old and new field names for backwards compatibility
             // Use response_payload directly - it already contains the aiGenerated object
             loadedReport.aiGenerated = {
                 activities: aiPayload.activities || [],
                 operations: aiPayload.operations || [],
                 equipment: aiPayload.equipment || [],
-                generalIssues: aiPayload.generalIssues || [],
-                qaqcNotes: aiPayload.qaqcNotes || [],
-                safety: aiPayload.safety || { hasIncidents: false, noIncidents: true, notes: '' },
-                contractorCommunications: aiPayload.contractorCommunications || '',
-                visitorsRemarks: aiPayload.visitorsRemarks || ''
+                // v6.6: Support both old (generalIssues) and new (issues_delays) field names
+                issues_delays: aiPayload.issues_delays || aiPayload.generalIssues || [],
+                qaqc_notes: aiPayload.qaqc_notes || aiPayload.qaqcNotes || [],
+                safety: aiPayload.safety || { has_incidents: false, hasIncidents: false, noIncidents: true, summary: '', notes: '' },
+                communications: aiPayload.communications || aiPayload.contractorCommunications || '',
+                visitors_deliveries: aiPayload.visitors_deliveries || aiPayload.visitorsRemarks || '',
+                // v6.6: New fields
+                executive_summary: aiPayload.executive_summary || '',
+                work_performed: aiPayload.work_performed || '',
+                inspector_notes: aiPayload.inspector_notes || '',
+                extraction_confidence: aiPayload.extraction_confidence || 'high',
+                missing_data_flags: aiPayload.missing_data_flags || []
             };
 
             console.log('[SUPABASE] Loaded AI response from response_payload:', loadedReport.aiGenerated);
 
             // Copy AI text sections to report for easy access
-            // Handle both array and string formats for issues
-            if (Array.isArray(aiPayload.generalIssues)) {
-                loadedReport.issues = aiPayload.generalIssues.join('\n');
+            // v6.6: Handle both old and new field names
+            const issuesData = aiPayload.issues_delays || aiPayload.generalIssues;
+            if (Array.isArray(issuesData)) {
+                loadedReport.issues = issuesData.join('\n');
             } else {
-                loadedReport.issues = aiPayload.generalIssues || '';
+                loadedReport.issues = issuesData || '';
             }
 
-            loadedReport.communications = aiPayload.contractorCommunications || '';
+            loadedReport.communications = aiPayload.communications || aiPayload.contractorCommunications || '';
 
             // Handle both array and string formats for qaqc
-            if (Array.isArray(aiPayload.qaqcNotes)) {
-                loadedReport.qaqc = aiPayload.qaqcNotes.join('\n');
+            const qaqcData = aiPayload.qaqc_notes || aiPayload.qaqcNotes;
+            if (Array.isArray(qaqcData)) {
+                loadedReport.qaqc = qaqcData.join('\n');
             } else {
-                loadedReport.qaqc = aiPayload.qaqcNotes || '';
+                loadedReport.qaqc = qaqcData || '';
             }
 
-            loadedReport.visitors = aiPayload.visitorsRemarks || '';
+            loadedReport.visitors = aiPayload.visitors_deliveries || aiPayload.visitorsRemarks || '';
 
-            // Safety - handle different property names (hasIncidents vs hasIncident)
+            // Safety - handle different property names (has_incidents vs hasIncidents vs hasIncident)
             if (aiPayload.safety) {
-                const safetyNotes = Array.isArray(aiPayload.safety.notes)
-                    ? aiPayload.safety.notes.join('\n')
-                    : (aiPayload.safety.notes || '');
+                // v6.6: Support new safety.summary field alongside old safety.notes
+                const safetyNotes = aiPayload.safety.summary || 
+                    (Array.isArray(aiPayload.safety.notes) ? aiPayload.safety.notes.join('\n') : (aiPayload.safety.notes || ''));
                 loadedReport.safety = {
-                    hasIncident: aiPayload.safety.hasIncidents || aiPayload.safety.hasIncident || false,
-                    noIncidents: aiPayload.safety.noIncidents || false,
+                    hasIncident: aiPayload.safety.has_incidents || aiPayload.safety.hasIncidents || aiPayload.safety.hasIncident || false,
+                    noIncidents: aiPayload.safety.noIncidents || !aiPayload.safety.has_incidents || false,
                     notes: safetyNotes
                 };
             }
@@ -548,13 +558,30 @@ function renderWorkSummary() {
     container.innerHTML = html;
 }
 
+/**
+ * v6.6: Supports matching by contractorName for freeform mode (when contractorId is null)
+ */
 function getContractorActivity(contractorId) {
     const userEdits = report.userEdits || {};
     const userEditKey = `activity_${contractorId}`;
     if (userEdits[userEditKey]) return userEdits[userEditKey];
 
+    // Get contractor name for freeform matching
+    const contractor = projectContractors.find(c => c.id === contractorId);
+    const contractorName = contractor?.name;
+
     if (report.aiGenerated?.activities) {
-        const aiActivity = report.aiGenerated.activities.find(a => a.contractorId === contractorId);
+        // Try matching by contractorId first (guided mode)
+        let aiActivity = report.aiGenerated.activities.find(a => a.contractorId === contractorId);
+        
+        // v6.6: Fallback to name matching for freeform mode (where contractorId is null)
+        if (!aiActivity && contractorName) {
+            aiActivity = report.aiGenerated.activities.find(a => 
+                a.contractorId === null && 
+                a.contractorName?.toLowerCase() === contractorName.toLowerCase()
+            );
+        }
+        
         if (aiActivity) return aiActivity;
     }
 
@@ -594,13 +621,30 @@ function renderOperationsTable() {
     tbody.innerHTML = html;
 }
 
+/**
+ * v6.6: Supports matching by contractorName for freeform mode (when contractorId is null)
+ */
 function getContractorOperations(contractorId) {
     const userEdits = report.userEdits || {};
     const userEditKey = `operations_${contractorId}`;
     if (userEdits[userEditKey]) return userEdits[userEditKey];
 
+    // Get contractor name for freeform matching
+    const contractor = projectContractors.find(c => c.id === contractorId);
+    const contractorName = contractor?.name;
+
     if (report.aiGenerated?.operations) {
-        const aiOps = report.aiGenerated.operations.find(o => o.contractorId === contractorId);
+        // Try matching by contractorId first (guided mode)
+        let aiOps = report.aiGenerated.operations.find(o => o.contractorId === contractorId);
+        
+        // v6.6: Fallback to name matching for freeform mode (where contractorId is null)
+        if (!aiOps && contractorName) {
+            aiOps = report.aiGenerated.operations.find(o => 
+                o.contractorId === null && 
+                o.contractorName?.toLowerCase() === contractorName.toLowerCase()
+            );
+        }
+        
         if (aiOps) return aiOps;
     }
 
@@ -649,7 +693,8 @@ function renderEquipmentTable() {
 
     let html = '';
     equipmentData.forEach(item => {
-        const contractorName = getContractorName(item.contractorId);
+        // v6.6: Pass contractorName fallback for freeform mode
+        const contractorName = getContractorName(item.contractorId, item.contractorName);
         const status = item.status || 'IDLE';
         const notes = status === 'IDLE' ? 'IDLE' : `${status.replace(' hrs', '')} HOURS UTILIZED`;
 
@@ -664,46 +709,113 @@ function renderEquipmentTable() {
     tbody.innerHTML = html;
 }
 
+/**
+ * v6.6: Supports resolving contractorId from contractorName for freeform mode
+ */
 function getEquipmentData() {
     if (report.equipment && report.equipment.length > 0) {
         return report.equipment;
     }
     if (report.aiGenerated?.equipment && report.aiGenerated.equipment.length > 0) {
-        return report.aiGenerated.equipment.map(item => ({
-            contractorId: item.contractorId || '',
-            type: item.type || '',
-            qty: item.qty || item.quantity || 1,
-            status: item.status || (item.hoursUsed ? `${item.hoursUsed} hrs` : 'IDLE')
-        }));
+        return report.aiGenerated.equipment.map(item => {
+            // v6.6: Resolve contractorId from contractorName for freeform mode
+            let contractorId = item.contractorId || '';
+            if (!contractorId && item.contractorName) {
+                const matchedContractor = projectContractors.find(c => 
+                    c.name?.toLowerCase() === item.contractorName?.toLowerCase()
+                );
+                if (matchedContractor) {
+                    contractorId = matchedContractor.id;
+                }
+            }
+            
+            return {
+                contractorId: contractorId,
+                contractorName: item.contractorName || '',
+                type: item.type || '',
+                qty: item.qty || item.quantity || 1,
+                status: item.status || (item.hoursUsed ? `${item.hoursUsed} hrs` : 'IDLE')
+            };
+        });
     }
     return [];
 }
 
-function getContractorName(contractorId) {
+/**
+ * v6.6: Updated to support contractorName fallback for freeform mode
+ */
+function getContractorName(contractorId, contractorNameFallback = null) {
     const contractor = projectContractors.find(c => c.id === contractorId);
     if (contractor) {
         return contractor.abbreviation || contractor.name.substring(0, 15).toUpperCase();
+    }
+    // v6.6: Use contractorName from AI response if no matching contractor found
+    if (contractorNameFallback) {
+        return contractorNameFallback.substring(0, 15).toUpperCase();
     }
     return 'UNKNOWN';
 }
 
 // ============ TEXT SECTIONS ============
 function renderTextSections() {
+    // v6.6: Updated to use new field names with fallback to old names
     // Issues
-    const issues = getTextValue('issues', 'generalIssues', 'guidedNotes.issues', '');
+    const issues = getTextValueWithFallback('issues', 'issues_delays', 'generalIssues', 'guidedNotes.issues', '');
     document.getElementById('issuesContent').innerHTML = formatTextSection(issues);
 
     // Communications
-    const comms = getTextValue('communications', 'contractorCommunications', '', '');
+    const comms = getTextValueWithFallback('communications', 'communications', 'contractorCommunications', '', '');
     document.getElementById('communicationsContent').innerHTML = formatTextSection(comms);
 
     // QA/QC
-    const qaqc = getTextValue('qaqc', 'qaqcNotes', '', '');
+    const qaqc = getTextValueWithFallback('qaqc', 'qaqc_notes', 'qaqcNotes', '', '');
     document.getElementById('qaqcContent').innerHTML = formatTextSection(qaqc);
 
     // Visitors
-    const visitors = getTextValue('visitors', 'visitorsRemarks', '', '');
+    const visitors = getTextValueWithFallback('visitors', 'visitors_deliveries', 'visitorsRemarks', '', '');
     document.getElementById('visitorsContent').innerHTML = formatTextSection(visitors);
+}
+
+/**
+ * v6.6: Get text value with support for both new and legacy AI field names
+ */
+function getTextValueWithFallback(reportPath, aiPath, legacyAiPath, fallbackPath, defaultVal) {
+    const userEdits = report.userEdits || {};
+
+    // User edits first
+    if (userEdits[reportPath] !== undefined) {
+        return userEdits[reportPath];
+    }
+
+    // AI generated - try new field name first, then legacy
+    if (report.aiGenerated) {
+        let aiVal = getNestedValueSimple(report.aiGenerated, aiPath);
+        if ((aiVal === undefined || aiVal === null || aiVal === '') && legacyAiPath) {
+            aiVal = getNestedValueSimple(report.aiGenerated, legacyAiPath);
+        }
+        if (aiVal !== undefined && aiVal !== null && aiVal !== '') {
+            if (Array.isArray(aiVal)) return aiVal.join('\n');
+            return aiVal;
+        }
+    }
+
+    // Report value
+    const reportVal = getNestedValueSimple(report, reportPath);
+    if (reportVal !== undefined && reportVal !== null && reportVal !== '') {
+        if (Array.isArray(reportVal)) return reportVal.join('\n');
+        return reportVal;
+    }
+
+    // Fallback path
+    if (fallbackPath) {
+        const fallbackVal = getNestedValueSimple(report, fallbackPath);
+        if (fallbackVal !== undefined && fallbackVal !== null && fallbackVal !== '') {
+            if (Array.isArray(fallbackVal)) return fallbackVal.join('\n');
+            return fallbackVal;
+        }
+    }
+
+    return defaultVal;
 }
 
 function getTextValue(reportPath, aiPath, fallbackPath, defaultVal) {
@@ -765,7 +877,11 @@ function formatTextSection(text) {
 
 // ============ SAFETY SECTION ============
 function renderSafetySection() {
-    const hasIncident = report.safety?.hasIncident || report.aiGenerated?.safety?.hasIncidents || false;
+    // v6.6: Support both old (hasIncidents) and new (has_incidents) field names
+    const hasIncident = report.safety?.hasIncident || 
+                        report.aiGenerated?.safety?.has_incidents || 
+                        report.aiGenerated?.safety?.hasIncidents || 
+                        false;
     const noIncident = !hasIncident;
 
     document.getElementById('checkYes').textContent = hasIncident ? 'X' : '';
@@ -773,7 +889,8 @@ function renderSafetySection() {
     document.getElementById('checkNo').textContent = noIncident ? 'X' : '';
     document.getElementById('checkNo').classList.toggle('checked', noIncident);
 
-    const safetyNotes = getTextValue('safety.notes', 'safety.notes', 'guidedNotes.safety', '');
+    // v6.6: Support both old (safety.notes) and new (safety.summary) field names
+    const safetyNotes = getTextValueWithFallback('safety.notes', 'safety.summary', 'safety.notes', 'guidedNotes.safety', '');
     document.getElementById('safetyContent').innerHTML = formatTextSection(safetyNotes);
 }
 
