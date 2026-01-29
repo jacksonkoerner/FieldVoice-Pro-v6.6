@@ -1247,7 +1247,7 @@
         }
 
         // ============ AI PROCESSING WEBHOOK ============
-        const N8N_PROCESS_WEBHOOK = 'https://advidere.app.n8n.cloud/webhook/fieldvoice-refine-text-v6.5';
+        const N8N_PROCESS_WEBHOOK = 'https://advidere.app.n8n.cloud/webhook/fieldvoice-refine-v6.6';
 
         /**
          * Build the payload for AI processing
