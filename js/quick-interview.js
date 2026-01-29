@@ -1830,16 +1830,10 @@
             const grandTotal = totals.superintendents + totals.foremen + totals.operators +
                               totals.laborers + totals.surveyors + totals.others;
 
-            document.getElementById('total-supt').textContent = totals.superintendents || '-';
-            document.getElementById('total-frmn').textContent = totals.foremen || '-';
-            document.getElementById('total-oper').textContent = totals.operators || '-';
-            document.getElementById('total-labr').textContent = totals.laborers || '-';
-            document.getElementById('total-surv').textContent = totals.surveyors || '-';
-            document.getElementById('total-othr').textContent = totals.others || '-';
-
-            const grandTotalEl = document.getElementById('total-personnel');
+            // Update the personnel total count element (v6 simplified UI)
+            const grandTotalEl = document.getElementById('personnel-total-count');
             if (grandTotalEl) {
-                grandTotalEl.textContent = grandTotal || '-';
+                grandTotalEl.textContent = grandTotal || '0';
             }
         }
 
