@@ -346,8 +346,12 @@
                 // Weather data
                 weather: report.overview?.weather || {},
 
-                // Minimal mode - freeform notes
+                // Minimal/Freeform mode - legacy single-string notes (for migration)
                 freeformNotes: report.fieldNotes?.freeformNotes || '',
+                
+                // v6.6: Freeform mode - timestamped entries + visual checklist
+                freeform_entries: report.freeform_entries || [],
+                freeform_checklist: report.freeform_checklist || {},
 
                 // Guided mode sections
                 workSummary: report.guidedNotes?.workSummary || '',
@@ -479,9 +483,17 @@
                 report.overview.weather = localData.weather;
             }
 
-            // Restore freeform notes (minimal mode)
+            // Restore freeform notes (minimal mode - legacy)
             if (localData.freeformNotes) {
                 report.fieldNotes.freeformNotes = localData.freeformNotes;
+            }
+
+            // v6.6: Restore freeform entries and checklist
+            if (localData.freeform_entries && Array.isArray(localData.freeform_entries)) {
+                report.freeform_entries = localData.freeform_entries;
+            }
+            if (localData.freeform_checklist) {
+                report.freeform_checklist = localData.freeform_checklist;
             }
 
             // Restore guided sections
@@ -592,7 +604,8 @@
             const hasActivities = report.activities?.length > 0;
             const hasIssues = report.generalIssues?.length > 0;
             const hasNotes = report.additionalNotes?.trim().length > 0;
-            const hasFieldNotes = report.fieldNotes?.freeformNotes?.trim().length > 0;
+            const hasFieldNotes = report.fieldNotes?.freeformNotes?.trim().length > 0 || 
+                                  (report.freeform_entries?.length > 0 && report.freeform_entries.some(e => e.content?.trim()));
             const hasReporterName = report.reporter?.name?.trim().length > 0;
 
             // If any data exists, don't show mode selection
@@ -662,8 +675,10 @@
             // Set target mode text
             if (currentMode === 'minimal') {
                 targetSpan.textContent = 'Guided Sections';
-                // Show warning if there are field notes
-                if (report.fieldNotes?.freeformNotes?.trim()) {
+                // Show warning if there are freeform entries or legacy notes
+                const hasEntries = report.freeform_entries?.some(e => e.content?.trim());
+                const hasLegacyNotes = report.fieldNotes?.freeformNotes?.trim();
+                if (hasEntries || hasLegacyNotes) {
                     warning.classList.remove('hidden');
                 } else {
                     warning.classList.add('hidden');
@@ -692,13 +707,22 @@
 
             // Preserve data when switching
             if (currentMode === 'minimal' && newMode === 'guided') {
-                // Move field notes to additionalNotes if not empty
-                if (report.fieldNotes?.freeformNotes?.trim()) {
+                // v6.6: Combine freeform entries into additionalNotes
+                const entriesText = (report.freeform_entries || [])
+                    .filter(e => e.content?.trim())
+                    .sort((a, b) => a.created_at - b.created_at)
+                    .map(e => e.content.trim())
+                    .join('\n\n');
+                
+                // Also check legacy freeformNotes
+                const legacyNotes = report.fieldNotes?.freeformNotes?.trim() || '';
+                const allNotes = [entriesText, legacyNotes].filter(Boolean).join('\n\n');
+                
+                if (allNotes) {
                     const existingNotes = report.additionalNotes?.trim() || '';
-                    const fieldNotes = report.fieldNotes.freeformNotes.trim();
                     report.additionalNotes = existingNotes
-                        ? `${existingNotes}\n\n--- Field Notes ---\n${fieldNotes}`
-                        : fieldNotes;
+                        ? `${existingNotes}\n\n--- Field Notes ---\n${allNotes}`
+                        : allNotes;
                 }
             }
 
@@ -710,7 +734,16 @@
             showModeUI(newMode);
         }
 
-        // ============ MINIMAL MODE UI ============
+        // ============ MINIMAL/FREEFORM MODE UI ============
+        
+        /**
+         * Checklist items for freeform mode (visual only, no functionality)
+         */
+        const FREEFORM_CHECKLIST_ITEMS = [
+            'Weather', 'Work Performed', 'Contractors', 'Equipment', 'Issues',
+            'Communications', 'QA/QC', 'Safety', 'Visitors', 'Photos'
+        ];
+
         /**
          * Initialize the minimal mode UI
          */
@@ -719,13 +752,11 @@
             const dateStr = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
             document.getElementById('minimalCurrentDate').textContent = dateStr;
 
-            // Load field notes
-            const notesInput = document.getElementById('freeform-notes-input');
-            if (notesInput) {
-                notesInput.value = report.fieldNotes?.freeformNotes || '';
-                autoExpandFieldNotes(notesInput);
-                updateFieldNotesCharCount();
-            }
+            // Migrate old freeformNotes string to entries array (one-time)
+            migrateFreeformNotesToEntries();
+
+            // Initialize freeform entries and checklist
+            initFreeformEntries();
 
             // Update weather display
             updateMinimalWeatherDisplay();
@@ -738,6 +769,215 @@
             if (photoInput) {
                 photoInput.addEventListener('change', handleMinimalPhotoInput);
             }
+        }
+
+        /**
+         * Migrate old single-string freeformNotes to freeform_entries array
+         */
+        function migrateFreeformNotesToEntries() {
+            // Check if there's old-style notes that need migration
+            const oldNotes = report.fieldNotes?.freeformNotes;
+            if (oldNotes && oldNotes.trim() && (!report.freeform_entries || report.freeform_entries.length === 0)) {
+                // Create first entry from old notes
+                report.freeform_entries = [{
+                    id: crypto.randomUUID(),
+                    content: oldNotes.trim(),
+                    created_at: report.meta?.createdAt || Date.now(),
+                    updated_at: Date.now(),
+                    synced: false
+                }];
+                // Clear old notes to prevent re-migration
+                report.fieldNotes.freeformNotes = '';
+                saveReport();
+                console.log('[Freeform] Migrated old notes to entries array');
+            }
+        }
+
+        /**
+         * Initialize freeform entries and checklist data structures
+         */
+        function initFreeformEntries() {
+            if (!report.freeform_entries) report.freeform_entries = [];
+            if (!report.freeform_checklist) {
+                report.freeform_checklist = {};
+                FREEFORM_CHECKLIST_ITEMS.forEach(item => {
+                    report.freeform_checklist[item] = false;
+                });
+            }
+            renderFreeformEntries();
+            renderFreeformChecklist();
+        }
+
+        /**
+         * Add a new freeform entry
+         */
+        function addFreeformEntry() {
+            const entry = {
+                id: crypto.randomUUID(),
+                content: '',
+                created_at: Date.now(),
+                updated_at: Date.now(),
+                synced: false
+            };
+            report.freeform_entries.push(entry);
+            renderFreeformEntries();
+            saveReport();
+            // Start editing the new entry immediately
+            startFreeformEdit(entry.id);
+        }
+
+        /**
+         * Render all freeform entries in chronological order
+         */
+        function renderFreeformEntries() {
+            const container = document.getElementById('freeformEntriesContainer');
+            const countEl = document.getElementById('freeformEntriesCount');
+            if (!container || !countEl) return;
+
+            const entries = report.freeform_entries || [];
+            
+            // Update count
+            countEl.textContent = entries.length === 0 
+                ? 'No entries yet' 
+                : `${entries.length} ${entries.length === 1 ? 'entry' : 'entries'}`;
+            
+            if (entries.length === 0) {
+                container.innerHTML = '<p class="text-slate-400 text-center py-4 text-sm">Tap "+ Add Entry" to start</p>';
+                return;
+            }
+            
+            // Sort chronologically (oldest first)
+            const sorted = [...entries].sort((a, b) => a.created_at - b.created_at);
+            
+            container.innerHTML = sorted.map(entry => {
+                const time = new Date(entry.created_at).toLocaleTimeString('en-US', { 
+                    hour: 'numeric', 
+                    minute: '2-digit'
+                });
+                const escapedContent = escapeHtml(entry.content);
+                const displayContent = escapedContent || '<span class="text-slate-400 italic">Empty entry</span>';
+                
+                return `
+                    <div class="freeform-entry border border-slate-200 rounded" data-freeform-entry-id="${entry.id}">
+                        <div class="flex items-center justify-between px-3 py-2 bg-slate-50 border-b border-slate-200">
+                            <span class="text-xs text-slate-500 font-medium">${time}</span>
+                            <div class="flex items-center gap-3">
+                                <button onclick="startFreeformEdit('${entry.id}')" class="freeform-edit-btn text-slate-400 hover:text-dot-blue p-1" title="Edit">
+                                    <i class="fas fa-pencil-alt text-xs"></i>
+                                </button>
+                                <button onclick="deleteFreeformEntry('${entry.id}')" class="text-slate-400 hover:text-red-500 p-1" title="Delete">
+                                    <i class="fas fa-trash text-xs"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="p-3">
+                            <p class="freeform-entry-content whitespace-pre-wrap text-slate-700 text-sm">${displayContent}</p>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        /**
+         * Start editing a freeform entry (inline edit pattern matching guided mode)
+         */
+        function startFreeformEdit(entryId) {
+            const entry = report.freeform_entries?.find(e => e.id === entryId);
+            if (!entry) return;
+
+            const entryDiv = document.querySelector(`[data-freeform-entry-id="${entryId}"]`);
+            if (!entryDiv) return;
+
+            const contentP = entryDiv.querySelector('.freeform-entry-content');
+            const editBtn = entryDiv.querySelector('.freeform-edit-btn');
+            
+            if (contentP && editBtn) {
+                // Create textarea with current content
+                const textarea = document.createElement('textarea');
+                textarea.id = `freeform-edit-textarea-${entryId}`;
+                textarea.className = 'w-full text-sm text-slate-700 border border-slate-300 rounded p-2 bg-white focus:outline-none focus:border-dot-blue';
+                textarea.value = entry.content;
+                textarea.rows = 3;
+                textarea.placeholder = 'Enter your field notes...';
+                
+                // Replace p with textarea
+                contentP.replaceWith(textarea);
+                
+                // Auto-expand and focus
+                autoExpand(textarea);
+                textarea.focus();
+                textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+                
+                // Change edit button to save button (pencil → check)
+                editBtn.innerHTML = '<i class="fas fa-check text-xs"></i>';
+                editBtn.className = 'freeform-save-btn text-safety-green hover:text-green-700 p-1';
+                editBtn.title = 'Save';
+                editBtn.onclick = () => saveFreeformEdit(entryId);
+            }
+        }
+
+        /**
+         * Save freeform entry edit
+         */
+        function saveFreeformEdit(entryId) {
+            const textarea = document.getElementById(`freeform-edit-textarea-${entryId}`);
+            if (!textarea) return;
+
+            const newContent = textarea.value.trim();
+            const entry = report.freeform_entries?.find(e => e.id === entryId);
+            
+            if (entry) {
+                entry.content = newContent;
+                entry.updated_at = Date.now();
+                entry.synced = false;
+                saveReport();
+            }
+
+            renderFreeformEntries();
+            showToast('Entry saved', 'success');
+        }
+
+        /**
+         * Delete a freeform entry
+         */
+        function deleteFreeformEntry(entryId) {
+            if (!confirm('Delete this entry?')) return;
+            
+            report.freeform_entries = report.freeform_entries.filter(e => e.id !== entryId);
+            saveReport();
+            renderFreeformEntries();
+            showToast('Entry deleted', 'success');
+        }
+
+        /**
+         * Render the freeform checklist (visual only)
+         */
+        function renderFreeformChecklist() {
+            const container = document.getElementById('freeformChecklist');
+            if (!container) return;
+
+            container.innerHTML = FREEFORM_CHECKLIST_ITEMS.map(item => {
+                const checked = report.freeform_checklist?.[item] || false;
+                const checkedClass = checked ? 'bg-green-50 border-green-300' : 'bg-white';
+                return `
+                    <label class="flex items-center gap-2 p-2 border border-slate-200 rounded cursor-pointer hover:bg-slate-50 transition-colors ${checkedClass}">
+                        <input type="checkbox" ${checked ? 'checked' : ''} 
+                            onchange="toggleFreeformChecklistItem('${item}', this.checked)" 
+                            class="w-4 h-4 accent-safety-green rounded">
+                        <span class="text-sm text-slate-700">${item}</span>
+                    </label>
+                `;
+            }).join('');
+        }
+
+        /**
+         * Toggle a freeform checklist item (visual only, no validation impact)
+         */
+        function toggleFreeformChecklistItem(item, checked) {
+            if (!report.freeform_checklist) report.freeform_checklist = {};
+            report.freeform_checklist[item] = checked;
+            renderFreeformChecklist();
+            saveReport();
         }
 
         /**
@@ -768,40 +1008,6 @@
             initAllAutoExpandTextareas();
         }
 
-        /**
-         * Auto-expand the field notes textarea (uses shared autoExpand with page-specific dimensions)
-         */
-        function autoExpandFieldNotes(textarea) {
-            autoExpand(textarea, 200, Math.round(window.innerHeight * 0.6));
-        }
-
-        /**
-         * Update field notes in the report
-         */
-        function updateFieldNotes(value) {
-            if (!report.fieldNotes) report.fieldNotes = { freeformNotes: "" };
-            report.fieldNotes.freeformNotes = value;
-            saveReport();
-            updateFieldNotesCharCount();
-        }
-
-        /**
-         * Update the character count display for field notes
-         */
-        function updateFieldNotesCharCount() {
-            const charCount = document.getElementById('fieldNotesCharCount');
-            const notes = report.fieldNotes?.freeformNotes || '';
-            const len = notes.length;
-            if (len > 0) {
-                charCount.textContent = `${len.toLocaleString()} characters`;
-            } else {
-                charCount.textContent = '';
-            }
-        }
-
-        /**
-         * Update work summary in guided mode (simplified single textarea)
-         */
         /**
          * v6.6: Get work entries for a specific contractor
          * @param {string} contractorId - The contractor ID
@@ -1045,7 +1251,16 @@
                 },
 
                 fieldNotes: report.meta.captureMode === 'minimal'
-                    ? { freeformNotes: report.fieldNotes?.freeformNotes || '' }
+                    ? { 
+                        // v6.6: Combine all freeform entries into single string for AI processing
+                        freeformNotes: (report.freeform_entries || [])
+                            .filter(e => e.content && e.content.trim())
+                            .sort((a, b) => a.created_at - b.created_at)
+                            .map(e => e.content.trim())
+                            .join('\n\n') || report.fieldNotes?.freeformNotes || '',
+                        // Also include raw entries for future AI improvements
+                        freeform_entries: report.freeform_entries || []
+                      }
                     : {
                         workSummary: report.guidedNotes?.workSummary || '',
                         issues: report.guidedNotes?.issues || '',
@@ -1229,11 +1444,11 @@
          * Finish the minimal mode report with AI processing
          */
         async function finishMinimalReport() {
-            // Validate
-            const freeformNotes = report.fieldNotes?.freeformNotes?.trim();
-            if (!freeformNotes) {
-                showToast('Field notes are required', 'error');
-                document.getElementById('minimalNotesInput')?.focus();
+            // Validate - check for at least one entry with content
+            const entries = report.freeform_entries || [];
+            const hasContent = entries.some(e => e.content && e.content.trim());
+            if (!hasContent) {
+                showToast('Please add at least one field note entry', 'error');
                 return;
             }
 
