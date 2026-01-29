@@ -155,6 +155,9 @@
                 <a href="index.html" class="w-10 h-10 flex items-center justify-center border border-slate-600 hover:bg-slate-800 transition-colors">
                     <i class="fas fa-arrow-left text-slate-400"></i>
                 </a>
+                <button onclick="showCancelReportModal()" class="w-10 h-10 flex items-center justify-center border border-red-600 hover:bg-red-600 transition-colors group" title="Cancel Report">
+                    <i class="fas fa-times text-red-500 group-hover:text-white"></i>
+                </button>
                 <div class="text-center flex-1 mx-4">
                     <p id="modeSelectionProjectName" class="text-sm font-bold text-white truncate">Daily Report</p>
                     <p id="modeSelectionDate" class="text-xs text-slate-400"></p>
@@ -211,6 +214,9 @@
                 <a href="index.html" class="w-10 h-10 flex items-center justify-center border border-slate-600 hover:bg-slate-800 transition-colors">
                     <i class="fas fa-arrow-left text-slate-400"></i>
                 </a>
+                <button onclick="showCancelReportModal()" class="w-10 h-10 flex items-center justify-center border border-red-600 hover:bg-red-600 transition-colors group" title="Cancel Report">
+                    <i class="fas fa-times text-red-500 group-hover:text-white"></i>
+                </button>
                 <div class="text-center flex-1 mx-4">
                     <p class="text-[10px] font-bold text-dot-blue uppercase tracking-widest">Quick Notes</p>
                     <p id="minimalCurrentDate" class="text-sm text-slate-400"></p>
@@ -374,6 +380,9 @@
                 <a href="index.html" class="w-10 h-10 flex items-center justify-center border border-slate-600 hover:bg-slate-800 transition-colors">
                     <i class="fas fa-arrow-left text-slate-400"></i>
                 </a>
+                <button onclick="showCancelReportModal()" class="w-10 h-10 flex items-center justify-center border border-red-600 hover:bg-red-600 transition-colors group" title="Cancel Report">
+                    <i class="fas fa-times text-red-500 group-hover:text-white"></i>
+                </button>
                 <div class="text-center flex-1 mx-2">
                     <p class="text-[10px] font-bold text-safety-green uppercase tracking-widest">Guided Sections</p>
                     <p id="currentDate" class="text-sm text-slate-400"></p>
@@ -762,6 +771,26 @@
             <div class="p-4 pt-0 space-y-2">
                 <button id="permissionsContinueBtn" onclick="closePermissionsModal()" class="w-full p-4 bg-dot-navy hover:bg-dot-blue text-white font-bold uppercase transition-colors">Continue</button>
                 <button onclick="closePermissionsModal()" class="w-full p-3 text-slate-500 hover:text-slate-700 text-sm font-medium">Skip for now</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cancel Report Modal -->
+    <div id="cancelReportModal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white max-w-sm w-full shadow-xl">
+            <div class="bg-red-600 p-4">
+                <div class="flex items-center gap-3 text-white">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <h3 class="font-bold uppercase tracking-wider">Cancel Report</h3>
+                </div>
+            </div>
+            <div class="p-6">
+                <p class="text-slate-700 mb-2">Are you sure you want to cancel this report?</p>
+                <p class="text-sm text-slate-500">All data will be permanently deleted. This cannot be undone.</p>
+            </div>
+            <div class="p-4 border-t border-slate-200 flex gap-3">
+                <button onclick="hideCancelReportModal()" class="flex-1 p-3 border-2 border-slate-300 text-slate-700 font-bold uppercase tracking-wider hover:bg-slate-50 transition-colors">Keep Working</button>
+                <button onclick="confirmCancelReport()" id="confirmCancelBtn" class="flex-1 p-3 bg-red-600 text-white font-bold uppercase tracking-wider hover:bg-red-700 transition-colors">Delete Report</button>
             </div>
         </div>
     </div>
