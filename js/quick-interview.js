@@ -418,7 +418,24 @@
             }
 
             // Restore guided sections
-            if (localData.workSummary) {
+            // v6.6: Migrate legacy workSummary string to entry-based system
+            if (localData.workSummary && localData.workSummary.trim()) {
+                // Check if we already have workSummary entries
+                const existingWorkEntries = (report.entries || []).filter(e => e.section === 'workSummary' && !e.is_deleted);
+                if (existingWorkEntries.length === 0) {
+                    // Migrate legacy workSummary to a single entry
+                    if (!report.entries) report.entries = [];
+                    report.entries.push({
+                        id: `entry_legacy_${Date.now()}`,
+                        section: 'workSummary',
+                        content: localData.workSummary.trim(),
+                        timestamp: localData.lastSaved || new Date().toISOString(),
+                        entry_order: 1,
+                        is_deleted: false
+                    });
+                    console.log('[MIGRATION] Migrated legacy workSummary to entry-based system');
+                }
+                // Keep legacy data for backward compatibility
                 report.guidedNotes.workSummary = localData.workSummary;
             }
             if (localData.siteConditions) {
@@ -688,11 +705,8 @@
             updateProgress();
             updateNAButtons();
 
-            // Populate simplified guided mode fields
-            const workSummaryInput = document.getElementById('work-summary-input');
-            if (workSummaryInput) {
-                workSummaryInput.value = report.guidedNotes?.workSummary || '';
-            }
+            // Work Summary entries are rendered by renderSection('activities')
+            // Input field starts empty for new entries
 
             // Safety checkboxes - sync with report state
             document.getElementById('no-incidents').checked = report.safety?.noIncidents || false;
@@ -736,6 +750,10 @@
         /**
          * Update work summary in guided mode (simplified single textarea)
          */
+        /**
+         * @deprecated Use addWorkSummaryEntry() instead
+         * Kept for backward compatibility during migration
+         */
         function updateWorkSummary(value) {
             if (!report.guidedNotes) report.guidedNotes = { workSummary: "" };
             report.guidedNotes.workSummary = value;
@@ -744,16 +762,36 @@
         }
 
         /**
-         * Update the activities section preview based on work summary
+         * Add a new work summary entry
+         */
+        function addWorkSummaryEntry() {
+            const input = document.getElementById('work-summary-input');
+            const text = input.value.trim();
+            if (text) {
+                createEntry('workSummary', text);
+                renderSection('activities');
+                input.value = '';
+                updateAllPreviews();
+                updateProgress();
+            }
+        }
+
+        /**
+         * Update the activities section preview based on work summary entries
          */
         function updateActivitiesPreview() {
             const preview = document.getElementById('activities-preview');
             const status = document.getElementById('activities-status');
-            const workSummary = report.guidedNotes?.workSummary || '';
+            const entries = getEntriesForSection('workSummary');
+            // Also check legacy data for backward compatibility
+            const legacyWorkSummary = report.guidedNotes?.workSummary || '';
 
-            if (workSummary.trim()) {
-                // Truncate for preview
-                const truncated = workSummary.length > 40 ? workSummary.substring(0, 40) + '...' : workSummary;
+            if (entries.length > 0) {
+                preview.textContent = `${entries.length} entr${entries.length === 1 ? 'y' : 'ies'} logged`;
+                status.innerHTML = '<i class="fas fa-check text-safety-green text-xs"></i>';
+            } else if (legacyWorkSummary.trim()) {
+                // Legacy data exists but not migrated yet
+                const truncated = legacyWorkSummary.length > 40 ? legacyWorkSummary.substring(0, 40) + '...' : legacyWorkSummary;
                 preview.textContent = truncated;
                 status.innerHTML = '<i class="fas fa-check text-safety-green text-xs"></i>';
             } else {
@@ -2793,6 +2831,23 @@
         function renderSection(section) {
             switch (section) {
                 case 'activities':
+                    // Render work summary entries
+                    const workSummaryEntries = getEntriesForSection('workSummary');
+                    const workSummaryList = document.getElementById('work-summary-list');
+                    if (workSummaryList) {
+                        workSummaryList.innerHTML = workSummaryEntries.map(entry => `
+                            <div class="bg-green-50 border border-green-200 p-3 flex items-start gap-3" data-entry-id="${entry.id}">
+                                <i class="fas fa-tasks text-safety-green mt-0.5"></i>
+                                <div class="flex-1">
+                                    <p class="text-sm text-slate-700">${escapeHtml(entry.content)}</p>
+                                    <p class="text-[10px] text-slate-400 mt-1">${new Date(entry.timestamp).toLocaleTimeString()}</p>
+                                </div>
+                                <button onclick="deleteEntryById('${entry.id}'); renderSection('activities'); updateAllPreviews(); updateProgress();" class="text-red-400 hover:text-red-600">
+                                    <i class="fas fa-trash text-xs"></i>
+                                </button>
+                            </div>
+                        `).join('');
+                    }
                     // Contractor-based work cards are rendered by renderContractorWorkCards()
                     renderContractorWorkCards();
                     break;
@@ -3094,7 +3149,7 @@
 
         function renderAllSections() {
             // v6: All guided mode sections
-            ['personnel', 'equipment', 'issues', 'communications', 'qaqc', 'safety', 'visitors', 'photos'].forEach(renderSection);
+            ['activities', 'personnel', 'equipment', 'issues', 'communications', 'qaqc', 'safety', 'visitors', 'photos'].forEach(renderSection);
             updateWeatherDisplay();
             updateEquipmentPreview();
         }
@@ -3105,10 +3160,13 @@
             const w = report.overview.weather;
             document.getElementById('weather-preview').textContent = w.jobSiteCondition || `${w.generalCondition}, ${w.highTemp}`;
 
-            // Work Summary preview (simplified single textarea)
-            const workSummary = report.guidedNotes?.workSummary || '';
-            if (workSummary.trim()) {
-                const truncated = workSummary.length > 40 ? workSummary.substring(0, 40) + '...' : workSummary;
+            // Work Summary preview - check entries first, then legacy data
+            const workSummaryEntries = getEntriesForSection('workSummary');
+            const legacyWorkSummary = report.guidedNotes?.workSummary || '';
+            if (workSummaryEntries.length > 0) {
+                document.getElementById('activities-preview').textContent = `${workSummaryEntries.length} entr${workSummaryEntries.length === 1 ? 'y' : 'ies'} logged`;
+            } else if (legacyWorkSummary.trim()) {
+                const truncated = legacyWorkSummary.length > 40 ? legacyWorkSummary.substring(0, 40) + '...' : legacyWorkSummary;
                 document.getElementById('activities-preview').textContent = truncated;
             } else {
                 document.getElementById('activities-preview').textContent = 'Tap to add';
@@ -3214,7 +3272,7 @@
             // Sections with status icons
             const sections = {
                 'weather': report.overview.weather.jobSiteCondition,
-                'activities': report.guidedNotes?.workSummary?.trim(),
+                'activities': getEntriesForSection('workSummary').length > 0 || report.guidedNotes?.workSummary?.trim(),
                 'personnel': personnelToggle !== null || hasOperationsData(),
                 'equipment': hasEquipmentData,
                 'issues': getEntriesForSection('issues').length > 0 || report.generalIssues.length > 0 || naMarked.issues,
@@ -3247,8 +3305,8 @@
             // Weather - has site condition text
             if (report.overview.weather.jobSiteCondition) filled++;
 
-            // Work Summary - has work summary text (simplified single textarea)
-            if (report.guidedNotes?.workSummary?.trim()) filled++;
+            // Work Summary - has entries OR legacy work summary text
+            if (getEntriesForSection('workSummary').length > 0 || report.guidedNotes?.workSummary?.trim()) filled++;
 
             // v6: Personnel - toggle answered OR has data
             const personnelToggleVal = getToggleState('personnel_onsite');
@@ -3427,11 +3485,13 @@
 
         async function finishReport() {
             // Validate required fields before finishing
-            const workSummary = report.guidedNotes?.workSummary?.trim();
+            const workSummaryEntries = getEntriesForSection('workSummary');
+            const legacyWorkSummary = report.guidedNotes?.workSummary?.trim();
+            const hasWorkSummary = workSummaryEntries.length > 0 || legacyWorkSummary;
             const safetyAnswered = report.safety.noIncidents === true || report.safety.hasIncidents === true;
 
-            if (!workSummary) {
-                showToast('Work Summary is required', 'error');
+            if (!hasWorkSummary) {
+                showToast('Work Summary is required - add at least one entry', 'error');
                 // Open the activities section to show user where to fill
                 const activitiesCard = document.querySelector('[data-section="activities"]');
                 if (activitiesCard && !activitiesCard.classList.contains('expanded')) {
