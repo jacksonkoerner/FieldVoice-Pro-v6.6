@@ -303,8 +303,11 @@
                 // Personnel/operations
                 operations: report.operations || [],
 
-                // Equipment usage
+                // Equipment usage (legacy)
                 equipment: report.equipment || [],
+
+                // v6.6: Structured equipment rows
+                equipmentRows: report.equipmentRows || [],
 
                 // Photos (metadata only - actual files uploaded separately)
                 photos: (report.photos || []).map(p => ({
@@ -476,9 +479,14 @@
                 report.operations = localData.operations;
             }
 
-            // Restore equipment
+            // Restore equipment (legacy)
             if (localData.equipment && Array.isArray(localData.equipment)) {
                 report.equipment = localData.equipment;
+            }
+
+            // v6.6: Restore structured equipment rows
+            if (localData.equipmentRows && Array.isArray(localData.equipmentRows)) {
+                report.equipmentRows = localData.equipmentRows;
             }
 
             // Restore photos
@@ -1929,42 +1937,128 @@
          * v6: Render simple text-based equipment input
          * Equipment is entered fresh per-report instead of selecting from project config
          */
-        function renderEquipmentCards() {
-            const container = document.getElementById('equipment-list');
+        /**
+         * v6.6: Render structured equipment rows
+         */
+        function renderEquipmentSection() {
+            const container = document.getElementById('equipment-rows-list');
             if (!container) return;
 
-            // v6: Equipment is entered fresh per-report
-            container.innerHTML = `
-                <div class="bg-white border-2 border-slate-200 p-4">
-                    <label class="text-xs font-bold text-slate-500 uppercase">Equipment Used Today</label>
-                    <textarea
-                        id="equipment-input"
-                        class="w-full mt-2 bg-white border-2 border-slate-300 px-4 py-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-dot-blue auto-expand"
-                        rows="3"
-                        placeholder="List equipment used today, e.g.:
-- CAT 320 Excavator (2) - 8 hrs
-- John Deere Dozer (1) - 6 hrs
-- Concrete pump truck - 4 hrs"
-                        oninput="updateEquipmentNotes(this.value)"
-                    >${report.equipmentNotes || ''}</textarea>
-                    <p class="text-xs text-slate-400 mt-1"><i class="fas fa-microphone mr-1"></i>Dictate or type</p>
-                </div>
+            const rows = report.equipmentRows || [];
+
+            // Build contractor options HTML
+            const contractorOptions = `
+                <option value="">-- Select Contractor --</option>
+                ${projectContractors.map(c => `
+                    <option value="${c.id}">${escapeHtml(c.name)} (${c.type === 'prime' ? 'Prime' : 'Sub'})</option>
+                `).join('')}
             `;
 
-            // Hide v5 UI elements that are no longer used
-            const warningEl = document.getElementById('no-project-warning-equip');
-            const noEquipWarningEl = document.getElementById('no-equipment-warning');
-            const totalsEl = document.getElementById('equipment-totals');
-            const markAllBtn = document.getElementById('mark-all-idle-btn');
+            if (rows.length === 0) {
+                container.innerHTML = `
+                    <p class="text-sm text-slate-400 text-center py-4">No equipment added yet. Click "+ Add Equipment" below.</p>
+                `;
+                return;
+            }
 
-            if (warningEl) warningEl.classList.add('hidden');
-            if (noEquipWarningEl) noEquipWarningEl.classList.add('hidden');
-            if (totalsEl) totalsEl.classList.add('hidden');
-            if (markAllBtn) markAllBtn.classList.add('hidden');
+            container.innerHTML = rows.map(row => {
+                // Build contractor options with correct selection
+                const contractorOptionsWithSelection = contractorOptions.replace(
+                    `value="${row.contractorId}"`,
+                    `value="${row.contractorId}" selected`
+                );
+
+                return `
+                    <div class="equipment-row bg-orange-50 border border-orange-200 p-3 rounded" data-equipment-id="${row.id}">
+                        <!-- Mobile: Stack vertically, Desktop: Grid -->
+                        <div class="space-y-2 sm:space-y-0 sm:grid sm:grid-cols-12 sm:gap-2 sm:items-center">
+                            <!-- Contractor Dropdown -->
+                            <select class="w-full sm:col-span-3 text-xs border border-slate-300 rounded px-2 py-2 bg-white"
+                                    onchange="updateEquipmentRow('${row.id}', 'contractorId', this.value)">
+                                ${contractorOptionsWithSelection}
+                            </select>
+                            
+                            <!-- Type/Model -->
+                            <input type="text" 
+                                   class="w-full sm:col-span-4 text-xs border border-slate-300 rounded px-2 py-2"
+                                   placeholder="Equipment type/model"
+                                   value="${escapeHtml(row.type || '')}"
+                                   onchange="updateEquipmentRow('${row.id}', 'type', this.value)">
+                            
+                            <!-- Qty + Status + Delete row on mobile -->
+                            <div class="flex gap-2 sm:contents">
+                                <!-- Qty -->
+                                <input type="number" 
+                                       class="w-20 sm:w-full sm:col-span-2 text-xs border border-slate-300 rounded px-2 py-2 text-center"
+                                       placeholder="Qty" min="1" value="${row.qty || 1}"
+                                       onchange="updateEquipmentRow('${row.id}', 'qty', parseInt(this.value) || 1)">
+                                
+                                <!-- Status Dropdown -->
+                                <select class="flex-1 sm:flex-none sm:col-span-2 text-xs border border-slate-300 rounded px-2 py-2 bg-white"
+                                        onchange="updateEquipmentRow('${row.id}', 'status', this.value)">
+                                    <option value="ACTIVE" ${row.status === 'ACTIVE' ? 'selected' : ''}>Active</option>
+                                    <option value="IDLE" ${row.status === 'IDLE' ? 'selected' : ''}>Idle</option>
+                                    <option value="STANDBY" ${row.status === 'STANDBY' ? 'selected' : ''}>Standby</option>
+                                    <option value="MAINTENANCE" ${row.status === 'MAINTENANCE' ? 'selected' : ''}>Maint.</option>
+                                </select>
+                                
+                                <!-- Delete -->
+                                <button onclick="deleteEquipmentRow('${row.id}')" 
+                                        class="px-3 py-2 sm:col-span-1 text-red-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors">
+                                    <i class="fas fa-trash text-xs"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
         }
 
         /**
-         * v6: Update equipment notes from text input
+         * v6.6: Add a new equipment row
+         */
+        function addEquipmentRow() {
+            const row = {
+                id: `eq_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                contractorId: '',
+                type: '',
+                qty: 1,
+                status: 'ACTIVE',
+                timestamp: new Date().toISOString()
+            };
+            if (!report.equipmentRows) report.equipmentRows = [];
+            report.equipmentRows.push(row);
+            saveReport();
+            renderEquipmentSection();
+            updateEquipmentPreview();
+            updateProgress();
+        }
+
+        /**
+         * v6.6: Update a field in an equipment row
+         */
+        function updateEquipmentRow(rowId, field, value) {
+            const row = report.equipmentRows?.find(r => r.id === rowId);
+            if (!row) return;
+            row[field] = value;
+            saveReport();
+            updateEquipmentPreview();
+        }
+
+        /**
+         * v6.6: Delete an equipment row
+         */
+        function deleteEquipmentRow(rowId) {
+            if (!report.equipmentRows) return;
+            report.equipmentRows = report.equipmentRows.filter(r => r.id !== rowId);
+            saveReport();
+            renderEquipmentSection();
+            updateEquipmentPreview();
+            updateProgress();
+        }
+
+        /**
+         * @deprecated Use structured equipmentRows instead
          */
         function updateEquipmentNotes(value) {
             report.equipmentNotes = value;
@@ -1973,29 +2067,28 @@
         }
 
         /**
-         * v6: Update equipment preview text
+         * v6.6: Update equipment preview text based on row count
          */
         function updateEquipmentPreview() {
             const preview = document.getElementById('equipment-preview');
             if (!preview) return;
-            const notes = report.equipmentNotes || '';
-            preview.textContent = notes.trim() ? 'Equipment logged' : 'Tap to add';
+            const count = (report.equipmentRows || []).length;
+            preview.textContent = count > 0 ? `${count} equipment logged` : 'Tap to add';
         }
 
         /**
-         * v6: Get equipment preview text for section card
+         * v6.6: Get equipment preview text for section card
          */
         function getEquipmentPreview() {
-            const notes = report.equipmentNotes || '';
-            return notes.trim() ? 'Equipment logged' : 'Tap to add';
+            const count = (report.equipmentRows || []).length;
+            return count > 0 ? `${count} equipment logged` : 'Tap to add';
         }
 
         /**
-         * v6: Check if equipment data exists
+         * v6.6: Check if equipment data exists
          */
         function hasEquipmentData() {
-            const notes = report.equipmentNotes || '';
-            return notes.trim().length > 0;
+            return (report.equipmentRows || []).length > 0;
         }
 
         // ============ STORAGE (SUPABASE) ============
@@ -2214,7 +2307,8 @@
                 fieldNotes: { freeformNotes: "" },
                 guidedNotes: { workSummary: "" },
                 entries: [],           // v6: entry-based notes
-                toggleStates: {}       // v6: locked toggle states (section -> true/false/null)
+                toggleStates: {},      // v6: locked toggle states (section -> true/false/null)
+                equipmentRows: []      // v6.6: structured equipment rows
             };
         }
 
@@ -2968,7 +3062,7 @@
                     }
                     break;
                 case 'equipment':
-                    renderEquipmentCards();
+                    renderEquipmentSection();
                     break;
                 case 'communications':
                     // Render toggle
@@ -3260,8 +3354,8 @@
             const naMarked = report.meta.naMarked || {};
             // Check if any contractor has work logged
             const hasContractorWork = report.activities?.some(a => !a.noWork || a.narrative) || false;
-            // Check if equipment has any active items (v6: check equipmentNotes)
-            const hasEquipmentData = (report.equipmentNotes && report.equipmentNotes.trim()) ||
+            // Check if equipment has any rows (v6.6: check equipmentRows)
+            const hasEquipmentData = (report.equipmentRows && report.equipmentRows.length > 0) ||
                                      report.equipment?.some(e => e.hoursUtilized !== null && e.hoursUtilized > 0) || false;
             // v6: Check toggle states and entries for new sections
             const personnelToggle = getToggleState('personnel_onsite');
@@ -3312,8 +3406,8 @@
             const personnelToggleVal = getToggleState('personnel_onsite');
             if (personnelToggleVal !== null || hasOperationsData()) filled++;
 
-            // v6: Equipment - has equipment notes
-            if (report.equipmentNotes?.trim()) filled++;
+            // v6.6: Equipment - has equipment rows
+            if ((report.equipmentRows || []).length > 0) filled++;
 
             // v6: Issues - has entries OR legacy issues OR marked N/A
             const issueEntryCount = getEntriesForSection('issues').length;
