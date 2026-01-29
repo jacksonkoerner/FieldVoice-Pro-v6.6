@@ -431,17 +431,21 @@ Example: 'ABC Concrete had 5 workers pouring the foundation today. Weather was g
                 </button>
                 <div class="section-content">
                     <div class="px-4 pb-4 space-y-3 border-t border-slate-200 pt-4">
-                        <div>
-                            <label class="text-xs font-bold text-slate-500 uppercase">Work Performed Today</label>
+                        <!-- Work Summary entries list -->
+                        <div id="work-summary-list" class="space-y-2"></div>
+                        <!-- Add new entry input -->
+                        <div class="flex items-start gap-2">
                             <textarea
                                 id="work-summary-input"
-                                class="w-full mt-2 bg-white border-2 border-slate-300 px-4 py-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-dot-blue auto-expand"
-                                rows="4"
-                                placeholder="Describe all work performed today. Mention contractors, crews, equipment used, locations, quantities..."
-                                oninput="updateWorkSummary(this.value)"
+                                class="flex-1 bg-white border-2 border-slate-300 px-4 py-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-safety-green auto-expand"
+                                rows="3"
+                                placeholder="Describe work performed today..."
                             ></textarea>
-                            <p class="text-xs text-slate-400 mt-1"><i class="fas fa-microphone mr-1"></i>Tap keyboard mic to dictate</p>
+                            <button onclick="addWorkSummaryEntry()" class="px-4 py-3 bg-safety-green hover:bg-green-700 text-white font-bold transition-colors">
+                                <i class="fas fa-plus"></i>
+                            </button>
                         </div>
+                        <p class="text-xs text-slate-400"><i class="fas fa-microphone mr-1"></i>Tap keyboard mic to dictate</p>
                     </div>
                 </div>
             </div>
