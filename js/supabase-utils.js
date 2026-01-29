@@ -192,7 +192,9 @@ function toSupabaseReport(report, projectId, userId, deviceId) {
     report_date: report.reportDate || report.date || new Date().toISOString().split('T')[0],
     status: report.status || 'draft',
     capture_mode: report.captureMode || report.capture_mode || 'guided',
-    updated_at: new Date().toISOString()
+    updated_at: new Date().toISOString(),
+    toggle_states: report.toggleStates || {},
+    safety_no_incidents: report.safety?.noIncidents ?? null
   };
 
   // Only include id if it exists (for updates)

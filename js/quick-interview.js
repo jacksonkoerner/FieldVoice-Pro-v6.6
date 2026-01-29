@@ -2632,7 +2632,9 @@
                     report_date: todayStr,
                     inspector_name: report.overview?.completedBy || userSettings?.full_name || '',
                     status: report.meta?.status || 'draft',
-                    updated_at: new Date().toISOString()
+                    updated_at: new Date().toISOString(),
+                    toggle_states: report.toggleStates || {},
+                    safety_no_incidents: report.safety?.noIncidents ?? null
                 };
 
                 const { error: reportError } = await supabaseClient
