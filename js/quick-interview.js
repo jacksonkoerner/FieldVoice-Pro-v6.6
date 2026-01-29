@@ -2462,6 +2462,16 @@
             report.meta.status = reportRow.status;
             report.meta.interviewCompleted = reportRow.status === 'refined' || reportRow.status === 'submitted';
 
+            // Restore toggle states from database
+            if (reportRow.toggle_states && typeof reportRow.toggle_states === 'object') {
+                report.toggleStates = reportRow.toggle_states;
+            }
+            
+            // Restore safety_no_incidents flag
+            if (reportRow.safety_no_incidents !== null && reportRow.safety_no_incidents !== undefined) {
+                report.safety.noIncidents = reportRow.safety_no_incidents;
+            }
+
             // Set raw capture data
             if (rawCapture) {
                 report.meta.captureMode = rawCapture.capture_mode;
