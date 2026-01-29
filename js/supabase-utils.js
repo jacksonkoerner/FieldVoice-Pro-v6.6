@@ -250,14 +250,35 @@ function fromSupabaseEntry(row) {
  * @returns {Object} Supabase row format
  */
 function toSupabaseEntry(entry, reportId) {
+  // Extract contractor_id from section if it's a work entry (format: "work_<uuid>")
+  let contractorId = null;
+  if (entry.section && entry.section.startsWith('work_')) {
+    contractorId = entry.section.substring(5); // Remove "work_" prefix
+  }
+
+  // Handle timestamp - could be ISO string or Unix number (from freeform)
+  let timestamp = null;
+  if (entry.timestamp) {
+    timestamp = entry.timestamp; // Already ISO string
+  } else if (entry.created_at) {
+    // Freeform uses created_at as Unix timestamp
+    timestamp = typeof entry.created_at === 'number' 
+      ? new Date(entry.created_at).toISOString()
+      : entry.created_at;
+  }
+
   const row = {
     report_id: reportId,
     local_id: entry.localId || entry.id || null,
-    section: entry.section || '',
+    section: entry.section || 'minimal',  // Default to 'minimal' for freeform
     content: entry.content || '',
     entry_order: entry.entryOrder ?? entry.order ?? 0,
-    updated_at: new Date().toISOString(),
-    is_deleted: entry.isDeleted ?? false
+    timestamp: timestamp,
+    contractor_id: contractorId,
+    updated_at: entry.updated_at 
+      ? (typeof entry.updated_at === 'number' ? new Date(entry.updated_at).toISOString() : entry.updated_at)
+      : new Date().toISOString(),
+    is_deleted: entry.isDeleted ?? entry.is_deleted ?? false
   };
 
   // Only include id if it exists (for updates)

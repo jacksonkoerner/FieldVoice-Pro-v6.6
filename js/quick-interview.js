@@ -820,6 +820,12 @@
                 synced: false
             };
             report.freeform_entries.push(entry);
+            
+            // Queue for real-time backup to Supabase
+            if (currentReportId) {
+                queueEntryBackup(currentReportId, entry);
+            }
+            
             renderFreeformEntries();
             saveReport();
             // Start editing the new entry immediately
@@ -930,6 +936,12 @@
                 entry.content = newContent;
                 entry.updated_at = Date.now();
                 entry.synced = false;
+                
+                // Queue for real-time backup to Supabase
+                if (currentReportId) {
+                    queueEntryBackup(currentReportId, entry);
+                }
+                
                 saveReport();
             }
 
@@ -2586,20 +2598,7 @@
             }
             localSaveTimeout = setTimeout(() => {
                 saveToLocalStorage();
-
-                // v6: Queue for real-time backup if online
-                if (currentReportId && navigator.onLine) {
-                    // Build entry data from current report state
-                    const entryData = {
-                        id: generateId(),
-                        section: report.meta?.captureMode || 'guided',
-                        content: report.meta?.captureMode === 'minimal'
-                            ? report.fieldNotes?.freeformNotes
-                            : report.guidedNotes?.workSummary,
-                        timestamp: new Date().toISOString()
-                    };
-                    queueEntryBackup(currentReportId, entryData);
-                }
+                // Entry backup handled by individual entry functions (createEntry, addFreeformEntry, saveFreeformEdit, etc.)
             }, 500); // 500ms debounce for localStorage
         }
 
