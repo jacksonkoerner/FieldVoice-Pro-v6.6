@@ -1996,10 +1996,17 @@
                                 <!-- Status Dropdown -->
                                 <select class="flex-1 sm:flex-none sm:col-span-2 text-xs border border-slate-300 rounded px-2 py-2 bg-white"
                                         onchange="updateEquipmentRow('${row.id}', 'status', this.value)">
-                                    <option value="ACTIVE" ${row.status === 'ACTIVE' ? 'selected' : ''}>Active</option>
-                                    <option value="IDLE" ${row.status === 'IDLE' ? 'selected' : ''}>Idle</option>
-                                    <option value="STANDBY" ${row.status === 'STANDBY' ? 'selected' : ''}>Standby</option>
-                                    <option value="MAINTENANCE" ${row.status === 'MAINTENANCE' ? 'selected' : ''}>Maint.</option>
+                                    <option value="Idle" ${row.status === 'Idle' ? 'selected' : ''}>Idle</option>
+                                    <option value="1hr" ${row.status === '1hr' ? 'selected' : ''}>1hr</option>
+                                    <option value="2hr" ${row.status === '2hr' ? 'selected' : ''}>2hr</option>
+                                    <option value="3hr" ${row.status === '3hr' ? 'selected' : ''}>3hr</option>
+                                    <option value="4hr" ${row.status === '4hr' ? 'selected' : ''}>4hr</option>
+                                    <option value="5hr" ${row.status === '5hr' ? 'selected' : ''}>5hr</option>
+                                    <option value="6hr" ${row.status === '6hr' ? 'selected' : ''}>6hr</option>
+                                    <option value="7hr" ${row.status === '7hr' ? 'selected' : ''}>7hr</option>
+                                    <option value="8hr" ${row.status === '8hr' ? 'selected' : ''}>8hr</option>
+                                    <option value="9hr" ${row.status === '9hr' ? 'selected' : ''}>9hr</option>
+                                    <option value="10hr" ${row.status === '10hr' ? 'selected' : ''}>10hr</option>
                                 </select>
                                 
                                 <!-- Delete -->
@@ -2023,7 +2030,7 @@
                 contractorId: '',
                 type: '',
                 qty: 1,
-                status: 'ACTIVE',
+                status: 'Idle',
                 timestamp: new Date().toISOString()
             };
             if (!report.equipmentRows) report.equipmentRows = [];
