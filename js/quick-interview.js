@@ -76,7 +76,7 @@
             if (!entry) return null;
 
             entry.content = newContent.trim();
-            entry.timestamp = new Date().toISOString();  // Update timestamp on edit
+            // Note: timestamp preserved (not updated on edit)
 
             if (currentReportId) {
                 queueEntryBackup(currentReportId, entry);
@@ -101,6 +101,70 @@
             }
 
             saveReport();
+        }
+
+        /**
+         * v6.6: Start editing an entry (swap to textarea)
+         * @param {string} entryId - The entry ID to edit
+         * @param {string} sectionType - The section type for re-rendering
+         */
+        function startEditEntry(entryId, sectionType) {
+            const entry = report.entries?.find(e => e.id === entryId);
+            if (!entry) return;
+
+            const entryDiv = document.querySelector(`[data-entry-id="${entryId}"]`);
+            if (!entryDiv) return;
+
+            // Find the content paragraph and replace with textarea
+            const contentP = entryDiv.querySelector('.entry-content');
+            const editBtn = entryDiv.querySelector('.edit-btn');
+            
+            if (contentP && editBtn) {
+                // Create textarea with current content
+                const textarea = document.createElement('textarea');
+                textarea.id = `edit-textarea-${entryId}`;
+                textarea.className = 'entry-edit-textarea w-full text-sm text-slate-700 border border-slate-300 rounded p-2 bg-white focus:outline-none focus:border-dot-blue auto-expand';
+                textarea.value = entry.content;
+                textarea.rows = 2;
+                
+                // Replace p with textarea
+                contentP.replaceWith(textarea);
+                
+                // Auto-expand and focus
+                autoExpand(textarea);
+                textarea.focus();
+                textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+                
+                // Change edit button to save button
+                editBtn.innerHTML = '<i class="fas fa-check text-xs"></i>';
+                editBtn.className = 'save-btn text-safety-green hover:text-green-700 p-1';
+                editBtn.onclick = () => saveEditEntry(entryId, sectionType);
+            }
+        }
+
+        /**
+         * v6.6: Save edited entry and return to read-only
+         * @param {string} entryId - The entry ID being edited
+         * @param {string} sectionType - The section type for re-rendering
+         */
+        function saveEditEntry(entryId, sectionType) {
+            const textarea = document.getElementById(`edit-textarea-${entryId}`);
+            if (!textarea) return;
+
+            const newContent = textarea.value.trim();
+            if (newContent) {
+                updateEntry(entryId, newContent);
+            }
+
+            // Re-render the appropriate section
+            if (sectionType === 'contractor-work') {
+                renderContractorWorkCards();
+            } else {
+                renderSection(sectionType);
+            }
+            
+            updateAllPreviews();
+            showToast('Entry updated', 'success');
         }
 
         // ============ TOGGLE STATE MANAGEMENT (v6) ============
@@ -1412,16 +1476,22 @@
                         hour12: true 
                     });
                     return `
-                        <div class="bg-white border border-slate-200 p-3 relative group">
+                        <div class="bg-white border border-slate-200 p-3 relative group" data-entry-id="${entry.id}">
                             <div class="flex items-start justify-between gap-2">
                                 <div class="flex-1">
                                     <p class="text-[10px] font-medium text-slate-400 uppercase">${time}</p>
-                                    <p class="text-sm text-slate-700 mt-1">${escapeHtml(entry.content)}</p>
+                                    <p class="entry-content text-sm text-slate-700 mt-1">${escapeHtml(entry.content)}</p>
                                 </div>
-                                <button onclick="deleteContractorWorkEntry('${entry.id}')" 
-                                        class="text-red-400 hover:text-red-600 opacity-50 group-hover:opacity-100 transition-opacity p-1">
-                                    <i class="fas fa-trash text-xs"></i>
-                                </button>
+                                <div class="flex items-center gap-1 opacity-50 group-hover:opacity-100 transition-opacity">
+                                    <button onclick="startEditEntry('${entry.id}', 'contractor-work')" 
+                                            class="edit-btn text-slate-400 hover:text-dot-blue p-1">
+                                        <i class="fas fa-pencil-alt text-xs"></i>
+                                    </button>
+                                    <button onclick="deleteContractorWorkEntry('${entry.id}')" 
+                                            class="text-red-400 hover:text-red-600 p-1">
+                                        <i class="fas fa-trash text-xs"></i>
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     `;
@@ -2914,15 +2984,20 @@
                     // Render entry-based issues first
                     if (issueEntries.length > 0) {
                         issuesHtml += issueEntries.map(entry => `
-                            <div class="bg-red-50 border border-red-200 p-3 flex items-start gap-3" data-entry-id="${entry.id}">
+                            <div class="bg-red-50 border border-red-200 p-3 flex items-start gap-3 group" data-entry-id="${entry.id}">
                                 <i class="fas fa-exclamation-circle text-red-500 mt-0.5"></i>
                                 <div class="flex-1">
-                                    <p class="text-sm text-slate-700">${escapeHtml(entry.content)}</p>
+                                    <p class="entry-content text-sm text-slate-700">${escapeHtml(entry.content)}</p>
                                     <p class="text-[10px] text-slate-400 mt-1">${new Date(entry.timestamp).toLocaleTimeString()}</p>
                                 </div>
-                                <button onclick="deleteEntryById('${entry.id}'); renderSection('issues'); updateAllPreviews(); updateProgress();" class="text-red-400 hover:text-red-600">
-                                    <i class="fas fa-trash text-xs"></i>
-                                </button>
+                                <div class="flex items-center gap-1 opacity-50 group-hover:opacity-100 transition-opacity">
+                                    <button onclick="startEditEntry('${entry.id}', 'issues')" class="edit-btn text-slate-400 hover:text-dot-blue p-1">
+                                        <i class="fas fa-pencil-alt text-xs"></i>
+                                    </button>
+                                    <button onclick="deleteEntryById('${entry.id}'); renderSection('issues'); updateAllPreviews(); updateProgress();" class="text-red-400 hover:text-red-600 p-1">
+                                        <i class="fas fa-trash text-xs"></i>
+                                    </button>
+                                </div>
                             </div>
                         `).join('');
                     }
@@ -2960,15 +3035,20 @@
                     // Render entry-based safety notes
                     if (safetyEntries.length > 0) {
                         safetyEntriesHtml += safetyEntries.map(entry => `
-                            <div class="bg-green-50 border border-green-200 p-3 flex items-start gap-3" data-entry-id="${entry.id}">
+                            <div class="bg-green-50 border border-green-200 p-3 flex items-start gap-3 group" data-entry-id="${entry.id}">
                                 <i class="fas fa-shield-alt text-safety-green mt-0.5"></i>
                                 <div class="flex-1">
-                                    <p class="text-sm text-slate-700">${escapeHtml(entry.content)}</p>
+                                    <p class="entry-content text-sm text-slate-700">${escapeHtml(entry.content)}</p>
                                     <p class="text-[10px] text-slate-400 mt-1">${new Date(entry.timestamp).toLocaleTimeString()}</p>
                                 </div>
-                                <button onclick="deleteEntryById('${entry.id}'); renderSection('safety'); updateAllPreviews(); updateProgress();" class="text-red-400 hover:text-red-600">
-                                    <i class="fas fa-trash text-xs"></i>
-                                </button>
+                                <div class="flex items-center gap-1 opacity-50 group-hover:opacity-100 transition-opacity">
+                                    <button onclick="startEditEntry('${entry.id}', 'safety')" class="edit-btn text-slate-400 hover:text-dot-blue p-1">
+                                        <i class="fas fa-pencil-alt text-xs"></i>
+                                    </button>
+                                    <button onclick="deleteEntryById('${entry.id}'); renderSection('safety'); updateAllPreviews(); updateProgress();" class="text-red-400 hover:text-red-600 p-1">
+                                        <i class="fas fa-trash text-xs"></i>
+                                    </button>
+                                </div>
                             </div>
                         `).join('');
                     }
@@ -3037,15 +3117,20 @@
                         const commsEntries = getEntriesForSection('communications');
                         if (commsList) {
                             commsList.innerHTML = commsEntries.map(entry => `
-                                <div class="bg-violet-50 border border-violet-200 p-3 flex items-start gap-3" data-entry-id="${entry.id}">
+                                <div class="bg-violet-50 border border-violet-200 p-3 flex items-start gap-3 group" data-entry-id="${entry.id}">
                                     <i class="fas fa-comment text-violet-500 mt-0.5"></i>
                                     <div class="flex-1">
-                                        <p class="text-sm text-slate-700">${escapeHtml(entry.content)}</p>
+                                        <p class="entry-content text-sm text-slate-700">${escapeHtml(entry.content)}</p>
                                         <p class="text-[10px] text-slate-400 mt-1">${new Date(entry.timestamp).toLocaleTimeString()}</p>
                                     </div>
-                                    <button onclick="deleteEntryById('${entry.id}'); renderSection('communications'); updateAllPreviews(); updateProgress();" class="text-red-400 hover:text-red-600">
-                                        <i class="fas fa-trash text-xs"></i>
-                                    </button>
+                                    <div class="flex items-center gap-1 opacity-50 group-hover:opacity-100 transition-opacity">
+                                        <button onclick="startEditEntry('${entry.id}', 'communications')" class="edit-btn text-slate-400 hover:text-dot-blue p-1">
+                                            <i class="fas fa-pencil-alt text-xs"></i>
+                                        </button>
+                                        <button onclick="deleteEntryById('${entry.id}'); renderSection('communications'); updateAllPreviews(); updateProgress();" class="text-red-400 hover:text-red-600 p-1">
+                                            <i class="fas fa-trash text-xs"></i>
+                                        </button>
+                                    </div>
                                 </div>
                             `).join('');
                         }
@@ -3082,15 +3167,20 @@
                         const qaqcEntries = getEntriesForSection('qaqc');
                         if (qaqcList) {
                             qaqcList.innerHTML = qaqcEntries.map(entry => `
-                                <div class="bg-indigo-50 border border-indigo-200 p-3 flex items-start gap-3" data-entry-id="${entry.id}">
+                                <div class="bg-indigo-50 border border-indigo-200 p-3 flex items-start gap-3 group" data-entry-id="${entry.id}">
                                     <i class="fas fa-clipboard-check text-indigo-500 mt-0.5"></i>
                                     <div class="flex-1">
-                                        <p class="text-sm text-slate-700">${escapeHtml(entry.content)}</p>
+                                        <p class="entry-content text-sm text-slate-700">${escapeHtml(entry.content)}</p>
                                         <p class="text-[10px] text-slate-400 mt-1">${new Date(entry.timestamp).toLocaleTimeString()}</p>
                                     </div>
-                                    <button onclick="deleteEntryById('${entry.id}'); renderSection('qaqc'); updateAllPreviews(); updateProgress();" class="text-red-400 hover:text-red-600">
-                                        <i class="fas fa-trash text-xs"></i>
-                                    </button>
+                                    <div class="flex items-center gap-1 opacity-50 group-hover:opacity-100 transition-opacity">
+                                        <button onclick="startEditEntry('${entry.id}', 'qaqc')" class="edit-btn text-slate-400 hover:text-dot-blue p-1">
+                                            <i class="fas fa-pencil-alt text-xs"></i>
+                                        </button>
+                                        <button onclick="deleteEntryById('${entry.id}'); renderSection('qaqc'); updateAllPreviews(); updateProgress();" class="text-red-400 hover:text-red-600 p-1">
+                                            <i class="fas fa-trash text-xs"></i>
+                                        </button>
+                                    </div>
                                 </div>
                             `).join('');
                         }
@@ -3127,15 +3217,20 @@
                         const visitorsEntries = getEntriesForSection('visitors');
                         if (visitorsList) {
                             visitorsList.innerHTML = visitorsEntries.map(entry => `
-                                <div class="bg-teal-50 border border-teal-200 p-3 flex items-start gap-3" data-entry-id="${entry.id}">
+                                <div class="bg-teal-50 border border-teal-200 p-3 flex items-start gap-3 group" data-entry-id="${entry.id}">
                                     <i class="fas fa-truck-loading text-teal-500 mt-0.5"></i>
                                     <div class="flex-1">
-                                        <p class="text-sm text-slate-700">${escapeHtml(entry.content)}</p>
+                                        <p class="entry-content text-sm text-slate-700">${escapeHtml(entry.content)}</p>
                                         <p class="text-[10px] text-slate-400 mt-1">${new Date(entry.timestamp).toLocaleTimeString()}</p>
                                     </div>
-                                    <button onclick="deleteEntryById('${entry.id}'); renderSection('visitors'); updateAllPreviews(); updateProgress();" class="text-red-400 hover:text-red-600">
-                                        <i class="fas fa-trash text-xs"></i>
-                                    </button>
+                                    <div class="flex items-center gap-1 opacity-50 group-hover:opacity-100 transition-opacity">
+                                        <button onclick="startEditEntry('${entry.id}', 'visitors')" class="edit-btn text-slate-400 hover:text-dot-blue p-1">
+                                            <i class="fas fa-pencil-alt text-xs"></i>
+                                        </button>
+                                        <button onclick="deleteEntryById('${entry.id}'); renderSection('visitors'); updateAllPreviews(); updateProgress();" class="text-red-400 hover:text-red-600 p-1">
+                                            <i class="fas fa-trash text-xs"></i>
+                                        </button>
+                                    </div>
                                 </div>
                             `).join('');
                         }
