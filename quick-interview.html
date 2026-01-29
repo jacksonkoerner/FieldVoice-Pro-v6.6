@@ -242,31 +242,47 @@
                 </div>
             </div>
 
-            <!-- Field Notes Section -->
+            <!-- Coverage Checklist (Visual Only) -->
+            <div class="bg-white border-2 border-slate-200 p-4">
+                <div class="flex items-center gap-3 mb-3">
+                    <div class="w-10 h-10 bg-dot-blue flex items-center justify-center">
+                        <i class="fas fa-clipboard-check text-white"></i>
+                    </div>
+                    <div>
+                        <p class="font-bold text-slate-800 uppercase text-sm">Coverage Checklist</p>
+                        <p class="text-xs text-slate-500">Track what you've covered</p>
+                    </div>
+                </div>
+                <div id="freeformChecklist" class="grid grid-cols-2 gap-2">
+                    <!-- Rendered by JS -->
+                </div>
+            </div>
+
+            <!-- Field Notes Entries -->
             <div class="bg-white border-2 border-slate-200 p-4">
                 <div class="flex items-center gap-3 mb-3">
                     <div class="w-10 h-10 bg-dot-navy flex items-center justify-center">
-                        <i class="fas fa-microphone text-dot-yellow"></i>
+                        <i class="fas fa-list-alt text-dot-yellow"></i>
                     </div>
                     <div>
                         <p class="font-bold text-slate-800 uppercase text-sm">Field Notes</p>
-                        <p class="text-xs text-slate-500">Dictate or type everything here</p>
+                        <p id="freeformEntriesCount" class="text-xs text-slate-500">No entries yet</p>
                     </div>
                 </div>
-                <textarea
-                    id="freeform-notes-input"
-                    class="w-full bg-slate-50 border-2 border-slate-200 px-4 py-4 text-slate-800 placeholder-slate-400 focus:outline-none focus:border-dot-blue focus:bg-white field-notes-textarea"
-                    placeholder="Dictate everything here - contractors, work performed, issues, observations. AI will organize it later.
-
-Example: 'ABC Concrete had 5 workers pouring the foundation today. Weather was good, no delays. Noticed some rebar spacing issues in section 3 that need attention. Safety meeting held at 7am.'"
-                    oninput="updateFieldNotes(this.value); autoExpandFieldNotes(this);"
-                ></textarea>
-                <div class="flex items-center justify-between mt-2">
-                    <p class="text-xs text-slate-400">
-                        <i class="fas fa-microphone mr-1"></i>Use keyboard mic to dictate
-                    </p>
-                    <p id="fieldNotesCharCount" class="text-xs text-slate-400"></p>
+                
+                <!-- Entries Container -->
+                <div id="freeformEntriesContainer" class="space-y-3 mb-3">
+                    <!-- Rendered by JS -->
                 </div>
+                
+                <!-- Add Entry Button -->
+                <button onclick="addFreeformEntry()" class="w-full p-3 border-2 border-dashed border-slate-300 hover:border-dot-blue text-slate-500 hover:text-dot-blue transition-colors flex items-center justify-center gap-2">
+                    <i class="fas fa-plus"></i>
+                    <span class="font-bold uppercase text-sm">Add Entry</span>
+                </button>
+                <p class="text-xs text-slate-400 mt-2 text-center">
+                    <i class="fas fa-microphone mr-1"></i>Use keyboard mic to dictate
+                </p>
             </div>
 
             <!-- Photos Section (Minimal) -->
