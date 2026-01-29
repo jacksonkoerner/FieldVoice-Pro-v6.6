@@ -807,57 +807,61 @@
          * @param {string} reportId - The report UUID to delete
          */
         async function deleteReportFromSupabase(reportId) {
-            if (!reportId) return;
+            if (!reportId || !supabaseClient) return;
 
             console.log('[CANCEL] Deleting report from Supabase:', reportId);
 
             try {
-                // 1. Delete report_entries
-                const { error: entriesError } = await supabaseClient
-                    .from('report_entries')
-                    .delete()
-                    .eq('report_id', reportId);
-                if (entriesError) console.warn('[CANCEL] Error deleting entries:', entriesError);
-
-                // 2. Delete photos (storage + metadata)
+                // 1. Get photos to delete from storage
                 const { data: photos } = await supabaseClient
                     .from('photos')
                     .select('id, storage_path')
                     .eq('report_id', reportId);
 
+                // 2. Delete photos from storage bucket
                 if (photos && photos.length > 0) {
-                    for (const photo of photos) {
-                        if (photo.storage_path) {
-                            await supabaseClient.storage
-                                .from('photos')
-                                .remove([photo.storage_path]);
-                        }
+                    const storagePaths = photos.map(p => p.storage_path).filter(Boolean);
+                    if (storagePaths.length > 0) {
+                        await supabaseClient.storage
+                            .from('report-photos')
+                            .remove(storagePaths);
                     }
-                    const { error: photosError } = await supabaseClient
-                        .from('photos')
-                        .delete()
-                        .eq('report_id', reportId);
-                    if (photosError) console.warn('[CANCEL] Error deleting photos:', photosError);
                 }
 
-                // 3. Delete report_raw_capture
-                const { error: rawError } = await supabaseClient
+                // 3. Delete from photos table
+                await supabaseClient
+                    .from('photos')
+                    .delete()
+                    .eq('report_id', reportId);
+
+                // 4. Delete from report_entries
+                await supabaseClient
+                    .from('report_entries')
+                    .delete()
+                    .eq('report_id', reportId);
+
+                // 5. Delete from report_raw_capture
+                await supabaseClient
                     .from('report_raw_capture')
                     .delete()
                     .eq('report_id', reportId);
-                if (rawError) console.warn('[CANCEL] Error deleting raw capture:', rawError);
 
-                // 4. Delete main report record
-                const { error: reportError } = await supabaseClient
+                // 6. Delete from ai_responses (if any)
+                await supabaseClient
+                    .from('ai_responses')
+                    .delete()
+                    .eq('report_id', reportId);
+
+                // 7. Delete from reports (last, as it's the parent)
+                await supabaseClient
                     .from('reports')
                     .delete()
                     .eq('id', reportId);
-                if (reportError) console.warn('[CANCEL] Error deleting report:', reportError);
 
-                console.log('[CANCEL] Report deleted from Supabase successfully');
+                console.log('[CANCEL] Report deleted from Supabase');
 
             } catch (error) {
-                console.error('[CANCEL] Supabase deletion failed:', error);
+                console.error('[CANCEL] Supabase deletion error:', error);
                 throw error;
             }
         }
@@ -870,12 +874,12 @@
             if (!reportId) return;
 
             try {
-                const queue = JSON.parse(localStorage.getItem('fvp_sync_queue') || '[]');
+                const queue = getStorageItem(STORAGE_KEYS.SYNC_QUEUE) || [];
                 const filtered = queue.filter(item => item.reportId !== reportId);
-                localStorage.setItem('fvp_sync_queue', JSON.stringify(filtered));
+                setStorageItem(STORAGE_KEYS.SYNC_QUEUE, filtered);
                 console.log('[CANCEL] Cleared sync queue for report:', reportId);
-            } catch (e) {
-                console.warn('[CANCEL] Error clearing sync queue:', e);
+            } catch (error) {
+                console.error('[CANCEL] Error clearing sync queue:', error);
             }
         }
 
