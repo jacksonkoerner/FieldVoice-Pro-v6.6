@@ -694,15 +694,9 @@
                 workSummaryInput.value = report.guidedNotes?.workSummary || '';
             }
 
-            // Safety checkboxes - sync with toggle state if set
-            const safetyToggleVal = getToggleState('safety_incidents');
-            if (safetyToggleVal !== null) {
-                document.getElementById('no-incidents').checked = safetyToggleVal === false;
-                document.getElementById('has-incidents').checked = safetyToggleVal === true;
-            } else {
-                document.getElementById('no-incidents').checked = report.safety?.noIncidents || false;
-                document.getElementById('has-incidents').checked = report.safety?.hasIncidents || false;
-            }
+            // Safety checkboxes - sync with report state
+            document.getElementById('no-incidents').checked = report.safety?.noIncidents || false;
+            document.getElementById('has-incidents').checked = report.safety?.hasIncidents || false;
 
             // Initialize auto-expand for all textareas
             initAllAutoExpandTextareas();
@@ -2853,9 +2847,6 @@
                     `).join('') || '';
                     break;
                 case 'safety':
-                    // v6: Render toggle for incidents first
-                    const safetyToggle = renderToggleButtons('safety_incidents', 'Any safety incidents today?');
-
                     // v6: Use entry-based notes
                     const safetyEntries = getEntriesForSection('safety');
                     // Also check legacy safety.notes array for backward compatibility
@@ -2890,17 +2881,11 @@
                         `).join('');
                     }
 
-                    document.getElementById('safety-list').innerHTML = safetyToggle + safetyEntriesHtml;
+                    document.getElementById('safety-list').innerHTML = safetyEntriesHtml;
 
-                    // Sync legacy checkboxes with toggle state
-                    const safetyToggleState = getToggleState('safety_incidents');
-                    if (safetyToggleState !== null) {
-                        document.getElementById('has-incidents').checked = safetyToggleState === true;
-                        document.getElementById('no-incidents').checked = safetyToggleState === false;
-                    } else {
-                        document.getElementById('has-incidents').checked = report.safety.hasIncidents;
-                        document.getElementById('no-incidents').checked = report.safety.noIncidents;
-                    }
+                    // Sync checkboxes with report state
+                    document.getElementById('has-incidents').checked = report.safety.hasIncidents;
+                    document.getElementById('no-incidents').checked = report.safety.noIncidents;
                     break;
                 case 'personnel':
                     // Render toggle for contractors on site
@@ -3185,13 +3170,10 @@
                 }
             }
 
-            // v6: Safety preview - check toggle state first, then entries
-            const safetyToggleVal = getToggleState('safety_incidents');
+            // v6: Safety preview - check report state and entries
             const safetyEntryCount = getEntriesForSection('safety').length;
             const legacySafetyCount = (report.safety?.notes || []).length;
             document.getElementById('safety-preview').textContent =
-                safetyToggleVal === false ? 'No incidents (confirmed)' :
-                safetyToggleVal === true ? 'INCIDENT REPORTED' :
                 report.safety.hasIncidents ? 'INCIDENT REPORTED' :
                 report.safety.noIncidents ? 'No incidents (confirmed)' :
                 (safetyEntryCount + legacySafetyCount) > 0 ? 'Notes added' :
@@ -3228,7 +3210,6 @@
             const commsToggle = getToggleState('communications_made');
             const qaqcToggle = getToggleState('qaqc_performed');
             const visitorsToggle = getToggleState('visitors_present');
-            const safetyToggle = getToggleState('safety_incidents');
 
             // Sections with status icons
             const sections = {
@@ -3239,7 +3220,7 @@
                 'issues': getEntriesForSection('issues').length > 0 || report.generalIssues.length > 0 || naMarked.issues,
                 'communications': commsToggle !== null || getEntriesForSection('communications').length > 0,
                 'qaqc': qaqcToggle !== null || getEntriesForSection('qaqc').length > 0,
-                'safety': safetyToggle !== null || report.safety.noIncidents || report.safety.hasIncidents || report.safety.notes.length > 0 || getEntriesForSection('safety').length > 0,
+                'safety': report.safety.noIncidents || report.safety.hasIncidents || report.safety.notes.length > 0 || getEntriesForSection('safety').length > 0,
                 'visitors': visitorsToggle !== null || getEntriesForSection('visitors').length > 0,
                 'photos': report.photos.length > 0 || naMarked.photos
             };
@@ -3289,12 +3270,10 @@
             const qaqcToggleVal = getToggleState('qaqc_performed');
             if (qaqcToggleVal !== null || getEntriesForSection('qaqc').length > 0) filled++;
 
-            // v6: Safety - toggle answered OR has entries OR legacy notes
-            const safetyToggleVal = getToggleState('safety_incidents');
+            // v6: Safety - checkbox answered OR has entries OR legacy notes
             const safetyEntryCount = getEntriesForSection('safety').length;
             const legacySafetyCount = (report.safety?.notes || []).length;
-            if (safetyToggleVal !== null ||
-                report.safety.noIncidents === true ||
+            if (report.safety.noIncidents === true ||
                 report.safety.hasIncidents === true ||
                 safetyEntryCount > 0 ||
                 legacySafetyCount > 0) filled++;
