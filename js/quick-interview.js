@@ -771,21 +771,21 @@
                 confirmBtn.disabled = true;
                 confirmBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Deleting...';
 
-                // Get current report ID
-                const reportId = currentReportId;
+                // Get the correct draft ID (same pattern as saveToLocalStorage)
+                const activeProjectId = getStorageItem(STORAGE_KEYS.ACTIVE_PROJECT_ID);
+                const todayStr = getTodayDateString();
+                const draftId = currentReportId || `draft_${activeProjectId}_${todayStr}`;
 
-                if (reportId) {
-                    // Delete from Supabase (order matters for foreign keys)
-                    await deleteReportFromSupabase(reportId);
+                // Delete from Supabase only if we have a real Supabase ID (UUID format, 36 chars)
+                if (currentReportId && currentReportId.length === 36) {
+                    await deleteReportFromSupabase(currentReportId);
                 }
 
-                // Delete from localStorage
-                if (reportId) {
-                    deleteCurrentReport(reportId);
-                }
+                // Always delete from localStorage using the correct key
+                deleteCurrentReport(draftId);
 
                 // Clear any sync queue items for this report
-                clearSyncQueueForReport(reportId);
+                clearSyncQueueForReport(draftId);
 
                 // Reset local state
                 currentReportId = null;
