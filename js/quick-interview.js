@@ -262,8 +262,17 @@
 
             const success = setToggleState(section, value);
             if (success) {
+                // Map toggle section names to render section names
+                const sectionMap = {
+                    'communications_made': 'communications',
+                    'qaqc_performed': 'qaqc',
+                    'visitors_present': 'visitors',
+                    'personnel_onsite': 'personnel'
+                };
+                const renderSectionName = sectionMap[section] || section;
+                
                 // Re-render the section to show locked state
-                renderSection(section);
+                renderSection(renderSectionName);
                 updateAllPreviews();
                 updateProgress();
             }
