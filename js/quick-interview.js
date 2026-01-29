@@ -743,6 +743,142 @@
             showModeUI(newMode);
         }
 
+        // ============ CANCEL REPORT FUNCTIONS ============
+
+        /**
+         * Show the cancel report confirmation modal
+         */
+        function showCancelReportModal() {
+            document.getElementById('cancelReportModal').classList.remove('hidden');
+        }
+
+        /**
+         * Hide the cancel report confirmation modal
+         */
+        function hideCancelReportModal() {
+            document.getElementById('cancelReportModal').classList.add('hidden');
+        }
+
+        /**
+         * Confirm cancellation and delete the report
+         */
+        async function confirmCancelReport() {
+            const confirmBtn = document.getElementById('confirmCancelBtn');
+            const originalText = confirmBtn.textContent;
+
+            try {
+                // Show loading state
+                confirmBtn.disabled = true;
+                confirmBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Deleting...';
+
+                // Get current report ID
+                const reportId = currentReportId;
+
+                if (reportId) {
+                    // Delete from Supabase (order matters for foreign keys)
+                    await deleteReportFromSupabase(reportId);
+                }
+
+                // Delete from localStorage
+                if (reportId) {
+                    deleteCurrentReport(reportId);
+                }
+
+                // Clear any sync queue items for this report
+                clearSyncQueueForReport(reportId);
+
+                // Reset local state
+                currentReportId = null;
+                report = {};
+
+                // Navigate to home
+                window.location.href = 'index.html';
+
+            } catch (error) {
+                console.error('[CANCEL] Error canceling report:', error);
+                alert('Error deleting report. Please try again.');
+                confirmBtn.disabled = false;
+                confirmBtn.textContent = originalText;
+            }
+        }
+
+        /**
+         * Delete report and all related data from Supabase
+         * @param {string} reportId - The report UUID to delete
+         */
+        async function deleteReportFromSupabase(reportId) {
+            if (!reportId) return;
+
+            console.log('[CANCEL] Deleting report from Supabase:', reportId);
+
+            try {
+                // 1. Delete report_entries
+                const { error: entriesError } = await supabaseClient
+                    .from('report_entries')
+                    .delete()
+                    .eq('report_id', reportId);
+                if (entriesError) console.warn('[CANCEL] Error deleting entries:', entriesError);
+
+                // 2. Delete photos (storage + metadata)
+                const { data: photos } = await supabaseClient
+                    .from('photos')
+                    .select('id, storage_path')
+                    .eq('report_id', reportId);
+
+                if (photos && photos.length > 0) {
+                    for (const photo of photos) {
+                        if (photo.storage_path) {
+                            await supabaseClient.storage
+                                .from('photos')
+                                .remove([photo.storage_path]);
+                        }
+                    }
+                    const { error: photosError } = await supabaseClient
+                        .from('photos')
+                        .delete()
+                        .eq('report_id', reportId);
+                    if (photosError) console.warn('[CANCEL] Error deleting photos:', photosError);
+                }
+
+                // 3. Delete report_raw_capture
+                const { error: rawError } = await supabaseClient
+                    .from('report_raw_capture')
+                    .delete()
+                    .eq('report_id', reportId);
+                if (rawError) console.warn('[CANCEL] Error deleting raw capture:', rawError);
+
+                // 4. Delete main report record
+                const { error: reportError } = await supabaseClient
+                    .from('reports')
+                    .delete()
+                    .eq('id', reportId);
+                if (reportError) console.warn('[CANCEL] Error deleting report:', reportError);
+
+                console.log('[CANCEL] Report deleted from Supabase successfully');
+
+            } catch (error) {
+                console.error('[CANCEL] Supabase deletion failed:', error);
+                throw error;
+            }
+        }
+
+        /**
+         * Clear sync queue items for a specific report
+         * @param {string} reportId - The report UUID
+         */
+        function clearSyncQueueForReport(reportId) {
+            if (!reportId) return;
+
+            try {
+                const queue = JSON.parse(localStorage.getItem('fvp_sync_queue') || '[]');
+                const filtered = queue.filter(item => item.reportId !== reportId);
+                localStorage.setItem('fvp_sync_queue', JSON.stringify(filtered));
+                console.log('[CANCEL] Cleared sync queue for report:', reportId);
+            } catch (e) {
+                console.warn('[CANCEL] Error clearing sync queue:', e);
+            }
+        }
+
         // ============ MINIMAL/FREEFORM MODE UI ============
         
         /**
