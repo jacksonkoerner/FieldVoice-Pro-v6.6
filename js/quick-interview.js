@@ -167,6 +167,210 @@
             showToast('Entry updated', 'success');
         }
 
+        // ============ AUTO-SAVE ON TYPING (v6.6) ============
+        
+        // Track active auto-save sessions to prevent duplicates
+        const guidedAutoSaveSessions = {};
+        
+        /**
+         * Initialize auto-save on typing for guided section textareas
+         * Creates entry on first keystroke, updates on subsequent keystrokes
+         * @param {string} textareaId - The textarea element ID
+         * @param {string} section - The section identifier (e.g., 'communications', 'qaqc')
+         */
+        function initGuidedAutoSave(textareaId, section) {
+            const textarea = document.getElementById(textareaId);
+            if (!textarea) return;
+            
+            // Prevent duplicate initialization
+            if (textarea.dataset.autoSaveInit === 'true') return;
+            textarea.dataset.autoSaveInit = 'true';
+            
+            let currentEntryId = null;
+            let saveTimeout = null;
+            
+            textarea.addEventListener('input', () => {
+                if (saveTimeout) clearTimeout(saveTimeout);
+                
+                saveTimeout = setTimeout(() => {
+                    const text = textarea.value.trim();
+                    if (!text) return;
+                    
+                    if (!currentEntryId) {
+                        // Create new entry on first meaningful keystroke
+                        const entry = {
+                            id: `entry_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                            section: section,
+                            content: text,
+                            timestamp: new Date().toISOString(),
+                            entry_order: getNextEntryOrder(section),
+                            is_deleted: false
+                        };
+                        
+                        if (!report.entries) report.entries = [];
+                        report.entries.push(entry);
+                        currentEntryId = entry.id;
+                        
+                        if (currentReportId) {
+                            queueEntryBackup(currentReportId, entry);
+                        }
+                        
+                        saveReport();
+                        console.log('[AUTOSAVE] Created guided entry:', section, currentEntryId);
+                    } else {
+                        // Update existing entry
+                        const entry = report.entries?.find(e => e.id === currentEntryId);
+                        if (entry) {
+                            entry.content = text;
+                            if (currentReportId) {
+                                queueEntryBackup(currentReportId, entry);
+                            }
+                            saveReport();
+                            console.log('[AUTOSAVE] Updated guided entry:', section, currentEntryId);
+                        }
+                    }
+                }, 500);
+            });
+            
+            // Save on blur as safety net
+            textarea.addEventListener('blur', () => {
+                if (saveTimeout) clearTimeout(saveTimeout);
+                const text = textarea.value.trim();
+                if (text && currentEntryId) {
+                    const entry = report.entries?.find(e => e.id === currentEntryId);
+                    if (entry && entry.content !== text) {
+                        entry.content = text;
+                        if (currentReportId) queueEntryBackup(currentReportId, entry);
+                        saveReport();
+                        console.log('[AUTOSAVE] Guided entry saved on blur:', section, currentEntryId);
+                    }
+                }
+            });
+            
+            // Store session for potential cleanup
+            guidedAutoSaveSessions[textareaId] = { section, currentEntryId };
+        }
+        
+        /**
+         * Initialize auto-save for contractor work entry textareas
+         * @param {string} contractorId - The contractor ID
+         */
+        function initContractorWorkAutoSave(contractorId) {
+            const textareaId = `work-input-${contractorId}`;
+            const section = `work_${contractorId}`;
+            
+            const textarea = document.getElementById(textareaId);
+            if (!textarea) return;
+            
+            // Prevent duplicate initialization
+            if (textarea.dataset.autoSaveInit === 'true') return;
+            textarea.dataset.autoSaveInit = 'true';
+            
+            let currentEntryId = null;
+            let saveTimeout = null;
+            
+            textarea.addEventListener('input', () => {
+                if (saveTimeout) clearTimeout(saveTimeout);
+                
+                saveTimeout = setTimeout(() => {
+                    const text = textarea.value.trim();
+                    if (!text) return;
+                    
+                    if (!currentEntryId) {
+                        // Create new entry on first meaningful keystroke
+                        const entry = {
+                            id: `entry_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                            section: section,
+                            content: text,
+                            timestamp: new Date().toISOString(),
+                            entry_order: getNextEntryOrder(section),
+                            is_deleted: false
+                        };
+                        
+                        if (!report.entries) report.entries = [];
+                        report.entries.push(entry);
+                        currentEntryId = entry.id;
+                        
+                        if (currentReportId) {
+                            queueEntryBackup(currentReportId, entry);
+                        }
+                        
+                        saveReport();
+                        renderContractorWorkCards();  // Re-render to show new entry
+                        
+                        // Re-focus and restore cursor position
+                        const newTextarea = document.getElementById(textareaId);
+                        if (newTextarea) {
+                            newTextarea.focus();
+                            newTextarea.value = '';  // Clear since entry is now in list
+                        }
+                        
+                        console.log('[AUTOSAVE] Created contractor work entry:', contractorId, currentEntryId);
+                        currentEntryId = null;  // Reset for next entry
+                    } else {
+                        // Update existing entry
+                        const entry = report.entries?.find(e => e.id === currentEntryId);
+                        if (entry) {
+                            entry.content = text;
+                            if (currentReportId) {
+                                queueEntryBackup(currentReportId, entry);
+                            }
+                            saveReport();
+                            console.log('[AUTOSAVE] Updated contractor work entry:', contractorId, currentEntryId);
+                        }
+                    }
+                }, 500);
+            });
+            
+            // Save on blur as safety net
+            textarea.addEventListener('blur', () => {
+                if (saveTimeout) clearTimeout(saveTimeout);
+                const text = textarea.value.trim();
+                if (text && !currentEntryId) {
+                    // Create entry if there's text but no entry yet
+                    const entry = {
+                        id: `entry_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                        section: section,
+                        content: text,
+                        timestamp: new Date().toISOString(),
+                        entry_order: getNextEntryOrder(section),
+                        is_deleted: false
+                    };
+                    
+                    if (!report.entries) report.entries = [];
+                    report.entries.push(entry);
+                    
+                    if (currentReportId) {
+                        queueEntryBackup(currentReportId, entry);
+                    }
+                    
+                    saveReport();
+                    renderContractorWorkCards();
+                    console.log('[AUTOSAVE] Contractor work entry saved on blur:', contractorId);
+                }
+            });
+        }
+        
+        /**
+         * Initialize all guided section auto-save listeners
+         * Called after sections are rendered
+         */
+        function initAllGuidedAutoSave() {
+            // Only init if toggle state is Yes (input container visible)
+            if (getToggleState('communications_made') === true) {
+                initGuidedAutoSave('communications-input', 'communications');
+            }
+            if (getToggleState('qaqc_performed') === true) {
+                initGuidedAutoSave('qaqc-input', 'qaqc');
+            }
+            if (getToggleState('visitors_present') === true) {
+                initGuidedAutoSave('visitors-input', 'visitors');
+            }
+            // Issues and Safety don't have toggles - always visible
+            initGuidedAutoSave('issue-input', 'issues');
+            initGuidedAutoSave('safety-input', 'safety');
+        }
+
         // ============ TOGGLE STATE MANAGEMENT (v6) ============
 
         /**
@@ -275,6 +479,22 @@
                 renderSection(renderSectionName);
                 updateAllPreviews();
                 updateProgress();
+                
+                // v6.6: Initialize auto-save if toggle was set to Yes
+                if (value === true) {
+                    const autoSaveMap = {
+                        'communications_made': { textareaId: 'communications-input', section: 'communications' },
+                        'qaqc_performed': { textareaId: 'qaqc-input', section: 'qaqc' },
+                        'visitors_present': { textareaId: 'visitors-input', section: 'visitors' }
+                    };
+                    const config = autoSaveMap[section];
+                    if (config) {
+                        // Small delay to ensure DOM is updated
+                        setTimeout(() => {
+                            initGuidedAutoSave(config.textareaId, config.section);
+                        }, 100);
+                    }
+                }
             }
         }
 
@@ -1055,6 +1275,42 @@
                 textarea.rows = 3;
                 textarea.placeholder = 'Enter your field notes...';
                 
+                // v6.6: Auto-save on typing (debounced 500ms)
+                let freeformSaveTimeout = null;
+                textarea.addEventListener('input', () => {
+                    if (freeformSaveTimeout) clearTimeout(freeformSaveTimeout);
+                    freeformSaveTimeout = setTimeout(() => {
+                        const entry = report.freeform_entries?.find(e => e.id === entryId);
+                        if (entry) {
+                            entry.content = textarea.value.trim();
+                            entry.updated_at = Date.now();
+                            entry.synced = false;
+                            if (currentReportId) {
+                                queueEntryBackup(currentReportId, entry);
+                            }
+                            saveReport();
+                            console.log('[AUTOSAVE] Freeform entry saved:', entryId);
+                        }
+                    }, 500);
+                });
+                
+                // v6.6: Also save on blur (safety net)
+                textarea.addEventListener('blur', () => {
+                    if (freeformSaveTimeout) clearTimeout(freeformSaveTimeout);
+                    const entry = report.freeform_entries?.find(e => e.id === entryId);
+                    if (entry) {
+                        const newContent = textarea.value.trim();
+                        if (newContent !== entry.content) {
+                            entry.content = newContent;
+                            entry.updated_at = Date.now();
+                            entry.synced = false;
+                            if (currentReportId) queueEntryBackup(currentReportId, entry);
+                            saveReport();
+                            console.log('[AUTOSAVE] Freeform entry saved on blur:', entryId);
+                        }
+                    }
+                });
+                
                 // Replace p with textarea
                 contentP.replaceWith(textarea);
                 
@@ -1167,6 +1423,9 @@
 
             // Initialize auto-expand for all textareas
             initAllAutoExpandTextareas();
+            
+            // v6.6: Initialize auto-save on typing for guided sections
+            initAllGuidedAutoSave();
         }
 
         /**
@@ -1934,6 +2193,11 @@
 
             // Initialize auto-expand for dynamically created textareas
             initAllAutoExpandTextareas();
+            
+            // v6.6: Initialize auto-save for contractor work entry textareas
+            projectContractors.forEach(contractor => {
+                initContractorWorkAutoSave(contractor.id);
+            });
         }
 
         /**
