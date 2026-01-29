@@ -421,26 +421,6 @@
             }
 
             // Restore guided sections
-            // v6.6: Migrate legacy workSummary string to entry-based system
-            if (localData.workSummary && localData.workSummary.trim()) {
-                // Check if we already have workSummary entries
-                const existingWorkEntries = (report.entries || []).filter(e => e.section === 'workSummary' && !e.is_deleted);
-                if (existingWorkEntries.length === 0) {
-                    // Migrate legacy workSummary to a single entry
-                    if (!report.entries) report.entries = [];
-                    report.entries.push({
-                        id: `entry_legacy_${Date.now()}`,
-                        section: 'workSummary',
-                        content: localData.workSummary.trim(),
-                        timestamp: localData.lastSaved || new Date().toISOString(),
-                        entry_order: 1,
-                        is_deleted: false
-                    });
-                    console.log('[MIGRATION] Migrated legacy workSummary to entry-based system');
-                }
-                // Keep legacy data for backward compatibility
-                report.guidedNotes.workSummary = localData.workSummary;
-            }
             if (localData.siteConditions) {
                 report.overview.weather.jobSiteCondition = localData.siteConditions;
             }
@@ -759,48 +739,77 @@
          * Update work summary in guided mode (simplified single textarea)
          */
         /**
-         * @deprecated Use addWorkSummaryEntry() instead
-         * Kept for backward compatibility during migration
+         * v6.6: Get work entries for a specific contractor
+         * @param {string} contractorId - The contractor ID
+         * @returns {Array} Array of entry objects for this contractor
          */
-        function updateWorkSummary(value) {
-            if (!report.guidedNotes) report.guidedNotes = { workSummary: "" };
-            report.guidedNotes.workSummary = value;
-            saveReport();
-            updateActivitiesPreview();
+        function getContractorWorkEntries(contractorId) {
+            return getEntriesForSection(`work_${contractorId}`);
         }
 
         /**
-         * Add a new work summary entry
+         * v6.6: Add a work entry for a specific contractor
+         * @param {string} contractorId - The contractor ID
          */
-        function addWorkSummaryEntry() {
-            const input = document.getElementById('work-summary-input');
+        function addContractorWorkEntry(contractorId) {
+            const input = document.getElementById(`work-input-${contractorId}`);
+            if (!input) return;
+            
             const text = input.value.trim();
             if (text) {
-                createEntry('workSummary', text);
-                renderSection('activities');
+                createEntry(`work_${contractorId}`, text);
                 input.value = '';
+                renderContractorWorkCards();
                 updateAllPreviews();
                 updateProgress();
             }
         }
 
         /**
-         * Update the activities section preview based on work summary entries
+         * v6.6: Delete a contractor work entry
+         * @param {string} entryId - The entry ID to delete
+         */
+        function deleteContractorWorkEntry(entryId) {
+            deleteEntryById(entryId);
+            renderContractorWorkCards();
+            updateAllPreviews();
+            updateProgress();
+        }
+
+        /**
+         * v6.6: Update the activities section preview based on contractor work
+         * Format: "X contractors, Y no work" or "Tap to add"
          */
         function updateActivitiesPreview() {
             const preview = document.getElementById('activities-preview');
             const status = document.getElementById('activities-status');
-            const entries = getEntriesForSection('workSummary');
-            // Also check legacy data for backward compatibility
-            const legacyWorkSummary = report.guidedNotes?.workSummary || '';
 
-            if (entries.length > 0) {
-                preview.textContent = `${entries.length} entr${entries.length === 1 ? 'y' : 'ies'} logged`;
-                status.innerHTML = '<i class="fas fa-check text-safety-green text-xs"></i>';
-            } else if (legacyWorkSummary.trim()) {
-                // Legacy data exists but not migrated yet
-                const truncated = legacyWorkSummary.length > 40 ? legacyWorkSummary.substring(0, 40) + '...' : legacyWorkSummary;
-                preview.textContent = truncated;
+            if (!projectContractors || projectContractors.length === 0) {
+                preview.textContent = 'No contractors configured';
+                status.innerHTML = '<i class="fas fa-chevron-down text-slate-400 text-xs"></i>';
+                return;
+            }
+
+            // Count contractors with work logged
+            let withWork = 0;
+            let noWork = 0;
+
+            projectContractors.forEach(contractor => {
+                const activity = getContractorActivity(contractor.id);
+                const entries = getContractorWorkEntries(contractor.id);
+                
+                if (activity?.noWork && entries.length === 0) {
+                    noWork++;
+                } else if (entries.length > 0 || !activity?.noWork) {
+                    withWork++;
+                }
+            });
+
+            if (withWork > 0 || noWork > 0) {
+                const parts = [];
+                if (withWork > 0) parts.push(`${withWork} with work`);
+                if (noWork > 0) parts.push(`${noWork} no work`);
+                preview.textContent = parts.join(', ');
                 status.innerHTML = '<i class="fas fa-check text-safety-green text-xs"></i>';
             } else {
                 preview.textContent = 'Tap to add';
@@ -1343,60 +1352,99 @@
             return report.activities.find(a => a.contractorId === contractorId);
         }
 
+        /**
+         * v6.6: Initialize contractor activities (simplified - noWork flag only)
+         */
         function initializeContractorActivities() {
             if (!report.activities) report.activities = [];
 
-            // Ensure each contractor has an activity entry
+            // Ensure each contractor has an activity entry (noWork flag only)
             projectContractors.forEach(contractor => {
                 const existing = report.activities.find(a => a.contractorId === contractor.id);
                 if (!existing) {
                     report.activities.push({
                         contractorId: contractor.id,
-                        noWork: true,
-                        narrative: '',
-                        equipmentUsed: '',
-                        crew: ''
+                        noWork: true
                     });
                 }
             });
         }
 
+        /**
+         * v6.6: Render contractor work cards with timestamped entries
+         */
         function renderContractorWorkCards() {
             const container = document.getElementById('contractor-work-list');
             const warningEl = document.getElementById('no-project-warning');
+            const footerEl = document.getElementById('contractor-work-footer');
 
             if (!activeProject || projectContractors.length === 0) {
-                warningEl.classList.remove('hidden');
+                warningEl?.classList.remove('hidden');
+                footerEl?.classList.add('hidden');
                 container.innerHTML = '';
                 return;
             }
 
-            warningEl.classList.add('hidden');
+            warningEl?.classList.add('hidden');
+            footerEl?.classList.remove('hidden');
             initializeContractorActivities();
 
             const todayDate = getTodayDateFormatted();
 
-            container.innerHTML = projectContractors.map((contractor, index) => {
-                const activity = getContractorActivity(contractor.id) || { noWork: true, narrative: '', equipmentUsed: '', crew: '' };
-                const isExpanded = !activity.noWork || activity.narrative;
-                const typeLabel = contractor.type === 'prime' ? 'PRIME' : 'SUBCONTRACTOR';
-                const tradesText = contractor.trades ? ` (${contractor.trades.toUpperCase()})` : '';
+            container.innerHTML = projectContractors.map((contractor) => {
+                const activity = getContractorActivity(contractor.id) || { noWork: true };
+                const entries = getContractorWorkEntries(contractor.id);
+                const hasWork = !activity.noWork || entries.length > 0;
+                const isExpanded = hasWork || !activity.noWork;
+                
+                const typeLabel = contractor.type === 'prime' ? 'PRIME' : 'SUB';
+                const tradesText = contractor.trades ? ` • ${contractor.trades.toUpperCase()}` : '';
                 const headerText = `${contractor.name.toUpperCase()} – ${typeLabel}${tradesText}`;
                 const borderColor = contractor.type === 'prime' ? 'border-safety-green' : 'border-dot-blue';
                 const bgColor = contractor.type === 'prime' ? 'bg-safety-green' : 'bg-dot-blue';
+                const textColor = contractor.type === 'prime' ? 'text-safety-green' : 'text-dot-blue';
+
+                // Build entries HTML
+                const entriesHtml = entries.length > 0 ? entries.map(entry => {
+                    const time = new Date(entry.timestamp).toLocaleTimeString('en-US', { 
+                        hour: 'numeric', 
+                        minute: '2-digit',
+                        hour12: true 
+                    });
+                    return `
+                        <div class="bg-white border border-slate-200 p-3 relative group">
+                            <div class="flex items-start justify-between gap-2">
+                                <div class="flex-1">
+                                    <p class="text-[10px] font-medium text-slate-400 uppercase">${time}</p>
+                                    <p class="text-sm text-slate-700 mt-1">${escapeHtml(entry.content)}</p>
+                                </div>
+                                <button onclick="deleteContractorWorkEntry('${entry.id}')" 
+                                        class="text-red-400 hover:text-red-600 opacity-50 group-hover:opacity-100 transition-opacity p-1">
+                                    <i class="fas fa-trash text-xs"></i>
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                }).join('') : '';
+
+                // Subtitle text
+                let subtitleText = 'Tap to add work';
+                if (activity.noWork && entries.length === 0) {
+                    subtitleText = 'No work performed';
+                } else if (entries.length > 0) {
+                    subtitleText = `${entries.length} note${entries.length === 1 ? '' : 's'} logged`;
+                }
 
                 return `
-                    <div class="contractor-work-card border-2 ${activity.noWork && !activity.narrative ? 'border-slate-200' : borderColor}" data-contractor-id="${contractor.id}">
+                    <div class="contractor-work-card border-2 ${hasWork ? borderColor : 'border-slate-200'} rounded-lg overflow-hidden" data-contractor-id="${contractor.id}">
                         <!-- Header -->
-                        <button onclick="toggleContractorCard('${contractor.id}')" class="w-full p-3 flex items-center gap-3 text-left ${activity.noWork && !activity.narrative ? 'bg-slate-50' : bgColor + '/10'}">
-                            <div class="w-8 h-8 ${activity.noWork && !activity.narrative ? 'bg-slate-300' : bgColor} flex items-center justify-center shrink-0">
-                                <i class="fas ${activity.noWork && !activity.narrative ? 'fa-minus' : 'fa-hard-hat'} text-white text-sm"></i>
+                        <button onclick="toggleContractorCard('${contractor.id}')" class="w-full p-3 flex items-center gap-3 text-left ${hasWork ? bgColor + '/10' : 'bg-slate-50'}">
+                            <div class="w-8 h-8 ${hasWork ? bgColor : 'bg-slate-300'} rounded flex items-center justify-center shrink-0">
+                                <i class="fas ${hasWork ? 'fa-hard-hat' : 'fa-minus'} text-white text-sm"></i>
                             </div>
                             <div class="flex-1 min-w-0">
-                                <p class="text-xs font-bold ${activity.noWork && !activity.narrative ? 'text-slate-500' : (contractor.type === 'prime' ? 'text-safety-green' : 'text-dot-blue')} uppercase leading-tight truncate">${escapeHtml(headerText)}</p>
-                                <p class="text-[10px] text-slate-500 mt-0.5">
-                                    ${activity.noWork && !activity.narrative ? 'No work performed' : (activity.narrative ? 'Work logged' : 'Tap to add work')}
-                                </p>
+                                <p class="text-xs font-bold ${hasWork ? textColor : 'text-slate-500'} uppercase leading-tight truncate">${escapeHtml(headerText)}</p>
+                                <p class="text-[10px] text-slate-500 mt-0.5">${subtitleText}</p>
                             </div>
                             <i id="contractor-chevron-${contractor.id}" class="fas fa-chevron-down text-slate-400 text-xs transition-transform ${isExpanded ? 'rotate-180' : ''}"></i>
                         </button>
@@ -1404,7 +1452,7 @@
                         <!-- Expandable Content -->
                         <div id="contractor-content-${contractor.id}" class="contractor-content ${isExpanded ? '' : 'hidden'} border-t border-slate-200 p-3 space-y-3">
                             <!-- No Work Toggle -->
-                            <label class="flex items-center gap-3 p-3 bg-slate-100 border border-slate-300 cursor-pointer hover:bg-slate-200 transition-colors">
+                            <label class="flex items-center gap-3 p-3 bg-slate-100 border border-slate-300 rounded cursor-pointer hover:bg-slate-200 transition-colors">
                                 <input type="checkbox"
                                     id="no-work-${contractor.id}"
                                     ${activity.noWork ? 'checked' : ''}
@@ -1414,46 +1462,24 @@
                             </label>
 
                             <!-- Work Entry Fields (hidden when no work checked) -->
-                            <div id="work-fields-${contractor.id}" class="${activity.noWork ? 'hidden' : ''}">
-                                <!-- Narrative -->
-                                <div class="mb-3">
-                                    <label class="text-xs font-bold text-slate-500 uppercase">Work Narrative</label>
+                            <div id="work-fields-${contractor.id}" class="${activity.noWork ? 'hidden' : ''} space-y-3">
+                                <!-- Existing entries -->
+                                ${entriesHtml ? `<div class="space-y-2">${entriesHtml}</div>` : ''}
+                                
+                                <!-- Add new entry -->
+                                <div class="flex items-start gap-2">
                                     <textarea
-                                        id="narrative-${contractor.id}"
-                                        class="w-full mt-2 bg-white border-2 border-slate-300 px-4 py-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-dot-blue auto-expand"
-                                        rows="3"
-                                        placeholder="Describe work performed by ${contractor.name}..."
-                                        onchange="updateContractorWork('${contractor.id}')"
-                                    >${escapeHtml(activity.narrative)}</textarea>
+                                        id="work-input-${contractor.id}"
+                                        class="flex-1 bg-white border-2 border-slate-300 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-${contractor.type === 'prime' ? 'safety-green' : 'dot-blue'} rounded auto-expand"
+                                        rows="2"
+                                        placeholder="Describe work performed..."
+                                    ></textarea>
+                                    <button onclick="addContractorWorkEntry('${contractor.id}')" 
+                                            class="px-4 py-2 ${bgColor} hover:opacity-90 text-white font-bold rounded transition-colors">
+                                        <i class="fas fa-plus"></i>
+                                    </button>
                                 </div>
-
-                                <!-- Equipment Used -->
-                                <div class="mb-3">
-                                    <label class="text-xs font-bold text-slate-500 uppercase">Equipment Used</label>
-                                    <input
-                                        type="text"
-                                        id="equipment-${contractor.id}"
-                                        class="w-full mt-2 bg-white border-2 border-slate-300 px-4 py-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-dot-blue"
-                                        placeholder="e.g., JOHN DEERE 550K GP BULLDOZER (1)"
-                                        value="${escapeHtml(activity.equipmentUsed)}"
-                                        onchange="updateContractorWork('${contractor.id}')"
-                                    >
-                                    <p class="text-xs text-slate-400 mt-1">Format: EQUIPMENT TYPE (QTY)</p>
-                                </div>
-
-                                <!-- Crew -->
-                                <div>
-                                    <label class="text-xs font-bold text-slate-500 uppercase">Crew</label>
-                                    <input
-                                        type="text"
-                                        id="crew-${contractor.id}"
-                                        class="w-full mt-2 bg-white border-2 border-slate-300 px-4 py-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-dot-blue"
-                                        placeholder="e.g., SUPERINTENDENT (1); FOREMAN (3); OPERATORS (4)"
-                                        value="${escapeHtml(activity.crew)}"
-                                        onchange="updateContractorWork('${contractor.id}')"
-                                    >
-                                    <p class="text-xs text-slate-400 mt-1">Format: ROLE (QTY); separated by semicolons</p>
-                                </div>
+                                <p class="text-xs text-slate-400"><i class="fas fa-microphone mr-1"></i>Tap keyboard mic to dictate</p>
                             </div>
                         </div>
                     </div>
@@ -1464,6 +1490,9 @@
             initAllAutoExpandTextareas();
         }
 
+        /**
+         * Toggle contractor card expand/collapse
+         */
         function toggleContractorCard(contractorId) {
             const content = document.getElementById(`contractor-content-${contractorId}`);
             const chevron = document.getElementById(`contractor-chevron-${contractorId}`);
@@ -1477,6 +1506,9 @@
             }
         }
 
+        /**
+         * v6.6: Toggle "no work performed" for a contractor
+         */
         function toggleNoWork(contractorId, isNoWork) {
             const activity = report.activities.find(a => a.contractorId === contractorId);
             if (!activity) return;
@@ -1485,86 +1517,18 @@
 
             const workFields = document.getElementById(`work-fields-${contractorId}`);
             if (isNoWork) {
-                workFields.classList.add('hidden');
-                // Clear work fields when marking no work
-                activity.narrative = '';
-                activity.equipmentUsed = '';
-                activity.crew = '';
+                workFields?.classList.add('hidden');
             } else {
-                workFields.classList.remove('hidden');
-                // Focus the narrative field
+                workFields?.classList.remove('hidden');
+                // Focus the input field
                 setTimeout(() => {
-                    document.getElementById(`narrative-${contractorId}`)?.focus();
+                    document.getElementById(`work-input-${contractorId}`)?.focus();
                 }, 100);
             }
 
             saveReport();
-            updateContractorCardStyle(contractorId);
+            renderContractorWorkCards();
             updateAllPreviews();
-        }
-
-        function updateContractorWork(contractorId) {
-            const activity = report.activities.find(a => a.contractorId === contractorId);
-            if (!activity) return;
-
-            const narrative = document.getElementById(`narrative-${contractorId}`)?.value.trim() || '';
-            const equipment = document.getElementById(`equipment-${contractorId}`)?.value.trim() || '';
-            const crew = document.getElementById(`crew-${contractorId}`)?.value.trim() || '';
-
-            activity.narrative = narrative;
-            activity.equipmentUsed = equipment;
-            activity.crew = crew;
-
-            // If user entered work, uncheck "no work"
-            if (narrative || equipment || crew) {
-                activity.noWork = false;
-                const checkbox = document.getElementById(`no-work-${contractorId}`);
-                if (checkbox) checkbox.checked = false;
-            }
-
-            saveReport();
-            updateContractorCardStyle(contractorId);
-            updateAllPreviews();
-        }
-
-        function updateContractorCardStyle(contractorId) {
-            const activity = report.activities.find(a => a.contractorId === contractorId);
-            const contractor = projectContractors.find(c => c.id === contractorId);
-            if (!activity || !contractor) return;
-
-            const card = document.querySelector(`[data-contractor-id="${contractorId}"]`);
-            if (!card) return;
-
-            const hasWork = !activity.noWork || activity.narrative;
-            const borderColor = contractor.type === 'prime' ? 'border-safety-green' : 'border-dot-blue';
-            const bgColor = contractor.type === 'prime' ? 'bg-safety-green' : 'bg-dot-blue';
-
-            // Update border
-            card.classList.remove('border-slate-200', 'border-safety-green', 'border-dot-blue');
-            card.classList.add(hasWork ? borderColor : 'border-slate-200');
-
-            // Update header background
-            const header = card.querySelector('button');
-            header.classList.remove('bg-slate-50', 'bg-safety-green/10', 'bg-dot-blue/10');
-            header.classList.add(hasWork ? bgColor + '/10' : 'bg-slate-50');
-
-            // Update icon
-            const iconDiv = header.querySelector('div');
-            iconDiv.classList.remove('bg-slate-300', 'bg-safety-green', 'bg-dot-blue');
-            iconDiv.classList.add(hasWork ? bgColor : 'bg-slate-300');
-
-            const icon = iconDiv.querySelector('i');
-            icon.classList.remove('fa-minus', 'fa-hard-hat');
-            icon.classList.add(hasWork ? 'fa-hard-hat' : 'fa-minus');
-
-            // Update text color
-            const titleP = header.querySelectorAll('p')[0];
-            titleP.classList.remove('text-slate-500', 'text-safety-green', 'text-dot-blue');
-            titleP.classList.add(hasWork ? (contractor.type === 'prime' ? 'text-safety-green' : 'text-dot-blue') : 'text-slate-500');
-
-            // Update subtitle
-            const subtitleP = header.querySelectorAll('p')[1];
-            subtitleP.textContent = activity.noWork && !activity.narrative ? 'No work performed' : (activity.narrative ? 'Work logged' : 'Tap to add work');
         }
 
         function getWorkSummaryPreview() {
@@ -2932,24 +2896,7 @@
         function renderSection(section) {
             switch (section) {
                 case 'activities':
-                    // Render work summary entries
-                    const workSummaryEntries = getEntriesForSection('workSummary');
-                    const workSummaryList = document.getElementById('work-summary-list');
-                    if (workSummaryList) {
-                        workSummaryList.innerHTML = workSummaryEntries.map(entry => `
-                            <div class="bg-green-50 border border-green-200 p-3 flex items-start gap-3" data-entry-id="${entry.id}">
-                                <i class="fas fa-tasks text-safety-green mt-0.5"></i>
-                                <div class="flex-1">
-                                    <p class="text-sm text-slate-700">${escapeHtml(entry.content)}</p>
-                                    <p class="text-[10px] text-slate-400 mt-1">${new Date(entry.timestamp).toLocaleTimeString()}</p>
-                                </div>
-                                <button onclick="deleteEntryById('${entry.id}'); renderSection('activities'); updateAllPreviews(); updateProgress();" class="text-red-400 hover:text-red-600">
-                                    <i class="fas fa-trash text-xs"></i>
-                                </button>
-                            </div>
-                        `).join('');
-                    }
-                    // Contractor-based work cards are rendered by renderContractorWorkCards()
+                    // v6.6: Contractor work cards with timestamped entries
                     renderContractorWorkCards();
                     break;
                 case 'operations':
@@ -3261,17 +3208,8 @@
             const w = report.overview.weather;
             document.getElementById('weather-preview').textContent = w.jobSiteCondition || `${w.generalCondition}, ${w.highTemp}`;
 
-            // Work Summary preview - check entries first, then legacy data
-            const workSummaryEntries = getEntriesForSection('workSummary');
-            const legacyWorkSummary = report.guidedNotes?.workSummary || '';
-            if (workSummaryEntries.length > 0) {
-                document.getElementById('activities-preview').textContent = `${workSummaryEntries.length} entr${workSummaryEntries.length === 1 ? 'y' : 'ies'} logged`;
-            } else if (legacyWorkSummary.trim()) {
-                const truncated = legacyWorkSummary.length > 40 ? legacyWorkSummary.substring(0, 40) + '...' : legacyWorkSummary;
-                document.getElementById('activities-preview').textContent = truncated;
-            } else {
-                document.getElementById('activities-preview').textContent = 'Tap to add';
-            }
+            // v6.6: Work Summary preview - contractor-based format
+            updateActivitiesPreview();
 
             const naMarked = report.meta.naMarked || {};
 
@@ -3359,8 +3297,6 @@
 
         function updateStatusIcons() {
             const naMarked = report.meta.naMarked || {};
-            // Check if any contractor has work logged
-            const hasContractorWork = report.activities?.some(a => !a.noWork || a.narrative) || false;
             // Check if equipment has any rows (v6.6: check equipmentRows)
             const hasEquipmentData = (report.equipmentRows && report.equipmentRows.length > 0) ||
                                      report.equipment?.some(e => e.hoursUtilized !== null && e.hoursUtilized > 0) || false;
@@ -3370,10 +3306,17 @@
             const qaqcToggle = getToggleState('qaqc_performed');
             const visitorsToggle = getToggleState('visitors_present');
 
+            // v6.6: Check if any contractor has work logged
+            const hasContractorWork = projectContractors?.some(contractor => {
+                const activity = getContractorActivity(contractor.id);
+                const entries = getContractorWorkEntries(contractor.id);
+                return (activity?.noWork) || entries.length > 0;
+            }) || false;
+
             // Sections with status icons
             const sections = {
                 'weather': report.overview.weather.jobSiteCondition,
-                'activities': getEntriesForSection('workSummary').length > 0 || report.guidedNotes?.workSummary?.trim(),
+                'activities': hasContractorWork,
                 'personnel': personnelToggle !== null || hasOperationsData(),
                 'equipment': hasEquipmentData,
                 'issues': getEntriesForSection('issues').length > 0 || report.generalIssues.length > 0 || naMarked.issues,
@@ -3406,8 +3349,15 @@
             // Weather - has site condition text
             if (report.overview.weather.jobSiteCondition) filled++;
 
-            // Work Summary - has entries OR legacy work summary text
-            if (getEntriesForSection('workSummary').length > 0 || report.guidedNotes?.workSummary?.trim()) filled++;
+            // v6.6: Work Summary - contractor work entries or all marked no work
+            if (projectContractors && projectContractors.length > 0) {
+                const anyAccountedFor = projectContractors.some(contractor => {
+                    const activity = getContractorActivity(contractor.id);
+                    const entries = getContractorWorkEntries(contractor.id);
+                    return (activity?.noWork) || entries.length > 0;
+                });
+                if (anyAccountedFor) filled++;
+            }
 
             // v6: Personnel - toggle answered OR has data
             const personnelToggleVal = getToggleState('personnel_onsite');
@@ -3585,20 +3535,34 @@
         }
 
         async function finishReport() {
-            // Validate required fields before finishing
-            const workSummaryEntries = getEntriesForSection('workSummary');
-            const legacyWorkSummary = report.guidedNotes?.workSummary?.trim();
-            const hasWorkSummary = workSummaryEntries.length > 0 || legacyWorkSummary;
+            // v6.6: Validate required fields - check contractor work entries
+            let hasWorkSummary = false;
+            if (projectContractors && projectContractors.length > 0) {
+                // Check if any contractor has work logged OR all marked as no work
+                const allAccountedFor = projectContractors.every(contractor => {
+                    const activity = getContractorActivity(contractor.id);
+                    const entries = getContractorWorkEntries(contractor.id);
+                    return (activity?.noWork && entries.length === 0) || entries.length > 0;
+                });
+                // Check if at least one has entries OR all are marked no work
+                const anyWork = projectContractors.some(contractor => {
+                    return getContractorWorkEntries(contractor.id).length > 0;
+                });
+                const allNoWork = projectContractors.every(contractor => {
+                    const activity = getContractorActivity(contractor.id);
+                    return activity?.noWork;
+                });
+                hasWorkSummary = allAccountedFor && (anyWork || allNoWork);
+            }
             const safetyAnswered = report.safety.noIncidents === true || report.safety.hasIncidents === true;
 
             if (!hasWorkSummary) {
-                showToast('Work Summary is required - add at least one entry', 'error');
+                showToast('Work Summary is required - log work for each contractor or mark "No work"', 'error');
                 // Open the activities section to show user where to fill
                 const activitiesCard = document.querySelector('[data-section="activities"]');
                 if (activitiesCard && !activitiesCard.classList.contains('expanded')) {
                     toggleSection('activities');
                 }
-                document.getElementById('work-summary-input')?.focus();
                 return;
             }
 
