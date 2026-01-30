@@ -1750,22 +1750,129 @@
             }
         }
 
+        /**
+         * Sync all pending/failed photos to Supabase
+         * Called on page load and when coming back online
+         */
+        async function syncPendingPhotos() {
+            // 1. Get all photos that need syncing
+            const pending = await idb.getPhotosBySyncStatus('pending');
+            const failed = await idb.getPhotosBySyncStatus('failed');
+            const pendingDelete = await idb.getPhotosBySyncStatus('pending-delete');
+
+            console.log(`[PHOTO SYNC] Found: ${pending.length} pending, ${failed.length} failed, ${pendingDelete.length} pending-delete`);
+
+            // 2. Handle pending uploads
+            for (const photo of pending) {
+                try {
+                    await syncPhotoToSupabase(photo.id);
+                } catch (err) {
+                    console.warn('[PHOTO SYNC] Failed to sync pending photo:', photo.id, err);
+                }
+            }
+
+            // 3. Handle failed uploads (with backoff)
+            for (const photo of failed) {
+                // Exponential backoff: wait 2^retryCount minutes before retry
+                // Max 5 retries (32 min max wait)
+                if (photo.retryCount >= 5) {
+                    console.warn('[PHOTO SYNC] Max retries reached for:', photo.id);
+                    continue;
+                }
+
+                const lastAttempt = photo.lastSyncAttempt ? new Date(photo.lastSyncAttempt) : null;
+                const backoffMs = Math.pow(2, photo.retryCount) * 60 * 1000; // 2^n minutes
+                const now = Date.now();
+
+                if (lastAttempt && (now - lastAttempt.getTime()) < backoffMs) {
+                    console.log('[PHOTO SYNC] Backoff not elapsed for:', photo.id);
+                    continue;
+                }
+
+                try {
+                    await syncPhotoToSupabase(photo.id);
+                } catch (err) {
+                    console.warn('[PHOTO SYNC] Retry failed for:', photo.id, err);
+                }
+            }
+
+            // 4. Handle pending deletes
+            for (const photo of pendingDelete) {
+                try {
+                    await deletePhotoFromSupabaseAndLocal(photo);
+                } catch (err) {
+                    console.warn('[PHOTO SYNC] Failed to delete:', photo.id, err);
+                }
+            }
+        }
+
+        /**
+         * Delete photo from Supabase (if synced) and IndexedDB
+         * @param {Object} photo - The photo object from IndexedDB
+         */
+        async function deletePhotoFromSupabaseAndLocal(photo) {
+            // If it was synced, delete from Supabase
+            if (photo.storagePath) {
+                await supabaseClient.storage
+                    .from('report-photos')
+                    .remove([photo.storagePath]);
+
+                await supabaseClient
+                    .from('photos')
+                    .delete()
+                    .eq('id', photo.id);
+            }
+
+            // Delete from IndexedDB
+            await idb.deletePhoto(photo.id);
+            console.log('[PHOTO SYNC] Deleted photo:', photo.id);
+        }
+
         // readFileAsDataURL() and dataURLtoBlob() moved to /js/media-utils.js
 
         /**
          * Delete a photo in minimal mode
+         * If online and synced → delete immediately from Supabase
+         * If offline or not synced → mark as 'pending-delete' for later
          */
         async function deleteMinimalPhoto(idx) {
             if (!confirm('Delete this photo?')) return;
 
             const photo = report.photos[idx];
-            if (photo) {
-                await deletePhotoFromSupabase(photo.id, photo.storagePath);
-            }
+            if (!photo) return;
 
+            // Remove from in-memory report immediately (UI feedback)
             report.photos.splice(idx, 1);
             saveReport();
             renderMinimalPhotos();
+
+            // Clean up blob URL if it exists
+            if (photo.url && photo.url.startsWith('blob:')) {
+                URL.revokeObjectURL(photo.url);
+            }
+
+            // Get the IndexedDB record
+            const idbPhoto = await idb.getPhotoById(photo.id);
+
+            if (navigator.onLine && idbPhoto?.syncStatus === 'synced') {
+                // Online and synced → delete from Supabase immediately
+                try {
+                    await deletePhotoFromSupabaseAndLocal(idbPhoto);
+                    showToast('Photo deleted', 'success');
+                } catch (err) {
+                    console.error('[PHOTO] Failed to delete from Supabase:', err);
+                    showToast('Photo removed locally', 'warning');
+                }
+            } else if (idbPhoto) {
+                // Offline or not synced → mark as pending-delete
+                idbPhoto.syncStatus = 'pending-delete';
+                await idb.savePhoto(idbPhoto);
+                console.log('[PHOTO] Marked for pending delete:', photo.id);
+                showToast('Photo will be deleted when online', 'info');
+            } else {
+                // No IndexedDB record (shouldn't happen, but handle gracefully)
+                showToast('Photo deleted', 'success');
+            }
         }
 
         // ============ AI PROCESSING WEBHOOK ============
@@ -4701,9 +4808,18 @@
 
                 checkAndShowWarningBanner();
                 checkDictationHintBanner();
+
+                // Sync any pending photos from IndexedDB
+                syncPendingPhotos();
             } catch (error) {
                 console.error('Initialization failed:', error);
                 hideLoadingOverlay();
                 showToast('Failed to load data. Please refresh.', 'error');
             }
+        });
+
+        // Sync photos when coming back online
+        window.addEventListener('online', () => {
+            console.log('[SYNC] Back online, syncing photos...');
+            syncPendingPhotos();
         });
