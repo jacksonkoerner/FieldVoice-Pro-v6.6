@@ -362,14 +362,15 @@
          * Called after sections are rendered
          */
         function initAllGuidedAutoSave() {
-            // Only init if toggle state is Yes (input container visible)
-            if (getToggleState('communications_made') === true) {
+            // Init if toggle is Yes OR not yet answered (textarea visible in both cases)
+            // Only skip if toggle is explicitly No (false)
+            if (getToggleState('communications_made') !== false) {
                 initGuidedAutoSave('communications-input', 'communications');
             }
-            if (getToggleState('qaqc_performed') === true) {
+            if (getToggleState('qaqc_performed') !== false) {
                 initGuidedAutoSave('qaqc-input', 'qaqc');
             }
-            if (getToggleState('visitors_present') === true) {
+            if (getToggleState('visitors_present') !== false) {
                 initGuidedAutoSave('visitors-input', 'visitors');
             }
             // Issues and Safety don't have toggles - always visible
