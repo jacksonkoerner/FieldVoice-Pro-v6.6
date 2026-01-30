@@ -1994,6 +1994,7 @@
         }
 
         // ============ PROJECT & CONTRACTOR LOADING ============
+        /* DEPRECATED — now using window.dataLayer.loadActiveProject()
         async function loadActiveProject() {
             // v6: Use getStorageItem with STORAGE_KEYS.ACTIVE_PROJECT_ID
             const activeId = getStorageItem(STORAGE_KEYS.ACTIVE_PROJECT_ID);
@@ -2050,7 +2051,9 @@
                 return null;
             }
         }
+        */
 
+        /* DEPRECATED — now using window.dataLayer.loadUserSettings()
         async function loadUserSettings() {
             try {
                 const { data, error } = await supabaseClient
@@ -2081,6 +2084,7 @@
                 return null;
             }
         }
+        */
 
         function getTodayDateFormatted() {
             return new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
@@ -4544,14 +4548,17 @@
 
                 // Load user settings from Supabase
                 updateLoadingStatus('Loading user settings...');
-                await loadUserSettings();
+                userSettings = await window.dataLayer.loadUserSettings();
 
                 // v6: Initialize sync manager for real-time backup
                 initSyncManager();
 
                 // Load active project and contractors from Supabase
                 updateLoadingStatus('Loading project data...');
-                await loadActiveProject();
+                activeProject = await window.dataLayer.loadActiveProject();
+                if (activeProject) {
+                    projectContractors = activeProject.contractors || [];
+                }
 
                 // Load report from Supabase (baseline)
                 updateLoadingStatus('Loading report data...');
