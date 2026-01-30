@@ -219,6 +219,309 @@
     }
 
     // ========================================
+    // USER SETTINGS
+    // ========================================
+
+    /**
+     * Load user settings (localStorage-first, Supabase-fallback)
+     * @returns {Promise<Object|null>} User settings object or null
+     */
+    async function loadUserSettings() {
+        const deviceId = getStorageItem(STORAGE_KEYS.DEVICE_ID);
+
+        // 1. Try localStorage first
+        const localSettings = getStorageItem(STORAGE_KEYS.USER_PROFILE);
+        if (localSettings) {
+            console.log('[DATA] Loaded user settings from localStorage');
+            return normalizeUserSettings(localSettings);
+        }
+
+        // 2. Check if offline
+        if (!navigator.onLine) {
+            console.log('[DATA] Offline, no cached user settings');
+            return null;
+        }
+
+        // 3. Fetch from Supabase
+        if (!deviceId) {
+            console.log('[DATA] No device ID, cannot fetch user settings');
+            return null;
+        }
+
+        try {
+            const { data, error } = await supabaseClient
+                .from('user_profiles')
+                .select('*')
+                .eq('device_id', deviceId)
+                .maybeSingle();
+
+            if (error) {
+                console.warn('[DATA] Supabase user settings error:', error);
+                return null;
+            }
+
+            if (!data) {
+                console.log('[DATA] No user profile found for device:', deviceId);
+                return null;
+            }
+
+            // 4. Cache to localStorage
+            const settings = normalizeUserSettings(data);
+            setStorageItem(STORAGE_KEYS.USER_PROFILE, settings);
+            console.log('[DATA] Loaded user settings from Supabase');
+
+            return settings;
+        } catch (e) {
+            console.error('[DATA] Failed to load user settings:', e);
+            return null;
+        }
+    }
+
+    /**
+     * Normalize user settings to consistent JS format
+     */
+    function normalizeUserSettings(s) {
+        if (!s) return null;
+        return {
+            id: s.id,
+            deviceId: s.deviceId || s.device_id || '',
+            fullName: s.fullName || s.full_name || '',
+            title: s.title || '',
+            company: s.company || '',
+            email: s.email || '',
+            phone: s.phone || ''
+        };
+    }
+
+    // ========================================
+    // DRAFTS (localStorage only — temporary data)
+    // ========================================
+
+    /**
+     * Get current draft for a project/date
+     */
+    function getCurrentDraft(projectId, date) {
+        const reports = getStorageItem(STORAGE_KEYS.CURRENT_REPORTS) || {};
+        const key = `${projectId}_${date}`;
+        return reports[key] || null;
+    }
+
+    /**
+     * Save draft (called on every keystroke, debounced by caller)
+     */
+    function saveDraft(projectId, date, data) {
+        const reports = getStorageItem(STORAGE_KEYS.CURRENT_REPORTS) || {};
+        const key = `${projectId}_${date}`;
+        reports[key] = {
+            ...data,
+            updatedAt: new Date().toISOString()
+        };
+        setStorageItem(STORAGE_KEYS.CURRENT_REPORTS, reports);
+        console.log('[DATA] Draft saved:', key);
+    }
+
+    /**
+     * Delete a draft
+     */
+    function deleteDraft(projectId, date) {
+        const reports = getStorageItem(STORAGE_KEYS.CURRENT_REPORTS) || {};
+        const key = `${projectId}_${date}`;
+        delete reports[key];
+        setStorageItem(STORAGE_KEYS.CURRENT_REPORTS, reports);
+        console.log('[DATA] Draft deleted:', key);
+    }
+
+    /**
+     * Get all drafts (for drafts.html)
+     */
+    function getAllDrafts() {
+        const reports = getStorageItem(STORAGE_KEYS.CURRENT_REPORTS) || {};
+        return Object.entries(reports).map(([key, data]) => ({
+            key,
+            ...data
+        }));
+    }
+
+    // ========================================
+    // PHOTOS (IndexedDB — temporary until submitted)
+    // ========================================
+
+    /**
+     * Save photo to IndexedDB
+     */
+    async function savePhoto(photo) {
+        const photoRecord = {
+            id: photo.id || `photo_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            reportId: photo.reportId,
+            blob: photo.blob,
+            caption: photo.caption || '',
+            timestamp: photo.timestamp || new Date().toISOString(),
+            gps: photo.gps || null,
+            syncStatus: 'pending',
+            supabaseId: null,
+            storagePath: null
+        };
+        await window.idb.savePhoto(photoRecord);
+        console.log('[DATA] Photo saved to IndexedDB:', photoRecord.id);
+        return photoRecord;
+    }
+
+    /**
+     * Get all photos for a report
+     */
+    async function getPhotos(reportId) {
+        try {
+            const photos = await window.idb.getPhotosByReportId(reportId);
+            return photos || [];
+        } catch (e) {
+            console.warn('[DATA] Failed to get photos:', e);
+            return [];
+        }
+    }
+
+    /**
+     * Delete photo from IndexedDB
+     */
+    async function deletePhoto(photoId) {
+        try {
+            await window.idb.deletePhoto(photoId);
+            console.log('[DATA] Photo deleted:', photoId);
+        } catch (e) {
+            console.warn('[DATA] Failed to delete photo:', e);
+        }
+    }
+
+    // ========================================
+    // AI RESPONSE CACHE (localStorage — temporary)
+    // ========================================
+
+    /**
+     * Cache AI response locally
+     */
+    function cacheAIResponse(reportId, response) {
+        const cache = getStorageItem('fvp_ai_cache') || {};
+        cache[reportId] = {
+            response,
+            cachedAt: new Date().toISOString()
+        };
+        setStorageItem('fvp_ai_cache', cache);
+        console.log('[DATA] AI response cached:', reportId);
+    }
+
+    /**
+     * Get cached AI response
+     */
+    function getCachedAIResponse(reportId) {
+        const cache = getStorageItem('fvp_ai_cache') || {};
+        return cache[reportId]?.response || null;
+    }
+
+    /**
+     * Clear AI response cache for a report
+     */
+    function clearAIResponseCache(reportId) {
+        const cache = getStorageItem('fvp_ai_cache') || {};
+        delete cache[reportId];
+        setStorageItem('fvp_ai_cache', cache);
+    }
+
+    // ========================================
+    // ARCHIVES (last 3 in IndexedDB, rest from Supabase)
+    // ========================================
+
+    /**
+     * Load archived reports
+     */
+    async function loadArchivedReports(limit = 20) {
+        if (!navigator.onLine) {
+            console.log('[DATA] Offline, cannot load archives');
+            return [];
+        }
+
+        try {
+            const userId = getStorageItem(STORAGE_KEYS.USER_ID);
+
+            let query = supabaseClient
+                .from('reports')
+                .select('*, projects(id, project_name)')
+                .eq('status', 'submitted')
+                .order('created_at', { ascending: false })
+                .limit(limit);
+
+            if (userId) {
+                query = query.eq('user_id', userId);
+            }
+
+            const { data, error } = await query;
+
+            if (error) throw error;
+
+            return data || [];
+        } catch (e) {
+            console.error('[DATA] Failed to load archives:', e);
+            return [];
+        }
+    }
+
+    // ========================================
+    // SUBMIT (Supabase — final destination)
+    // ========================================
+
+    /**
+     * Submit final report to Supabase
+     */
+    async function submitFinalReport(finalData) {
+        if (!navigator.onLine) {
+            throw new Error('Cannot submit offline — internet required');
+        }
+
+        const { reportId, sections } = finalData;
+
+        try {
+            for (const section of sections) {
+                await supabaseClient
+                    .from('final_report_sections')
+                    .upsert({
+                        report_id: reportId,
+                        section_key: section.key,
+                        section_title: section.title,
+                        content: section.content,
+                        order: section.order
+                    }, { onConflict: 'report_id,section_key' });
+            }
+
+            await supabaseClient
+                .from('reports')
+                .update({
+                    status: 'submitted',
+                    submitted_at: new Date().toISOString()
+                })
+                .eq('id', reportId);
+
+            console.log('[DATA] Final report submitted:', reportId);
+            return true;
+        } catch (e) {
+            console.error('[DATA] Submit failed:', e);
+            throw e;
+        }
+    }
+
+    /**
+     * Clear all temporary data after successful submit
+     */
+    async function clearAfterSubmit(projectId, date, reportId) {
+        deleteDraft(projectId, date);
+        clearAIResponseCache(reportId);
+
+        const photos = await getPhotos(reportId);
+        for (const photo of photos) {
+            await deletePhoto(photo.id);
+        }
+
+        console.log('[DATA] Cleared temporary data after submit');
+    }
+
+    // ========================================
     // UTILITIES
     // ========================================
 
@@ -240,9 +543,36 @@
         setActiveProjectId,
         getActiveProjectId,
 
+        // User Settings
+        loadUserSettings,
+
+        // Drafts (localStorage)
+        getCurrentDraft,
+        saveDraft,
+        deleteDraft,
+        getAllDrafts,
+
+        // Photos (IndexedDB)
+        savePhoto,
+        getPhotos,
+        deletePhoto,
+
+        // AI Response Cache
+        cacheAIResponse,
+        getCachedAIResponse,
+        clearAIResponseCache,
+
+        // Archives
+        loadArchivedReports,
+
+        // Submit
+        submitFinalReport,
+        clearAfterSubmit,
+
         // Normalizers (exposed for edge cases)
         normalizeProject,
         normalizeContractor,
+        normalizeUserSettings,
 
         // Utilities
         isOnline
