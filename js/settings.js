@@ -4,39 +4,167 @@
 // ============ STATE ============
 // Store the current profile ID for updates
 let currentProfileId = null;
+// Track if form has unsaved changes (dirty flag)
+let isDirty = false;
+// Store original values to compare for dirty detection
+let originalValues = {};
+
+// Storage key for scratch pad (localStorage)
+const SETTINGS_SCRATCH_KEY = 'fvp_settings_scratch';
 
 // ============ PROFILE MANAGEMENT ============
 async function loadSettings() {
-    // Load user settings via data-layer (handles localStorage + Supabase fallback)
-    const profile = await window.dataLayer.loadUserSettings();
+    // 1. First check for unsaved scratch data in localStorage
+    const scratch = getScratchData();
 
-    if (profile) {
-        currentProfileId = profile.id || null;
-        // Populate form fields
-        document.getElementById('inspectorName').value = profile.fullName || '';
-        document.getElementById('title').value = profile.title || '';
-        document.getElementById('company').value = profile.company || '';
-        document.getElementById('email').value = profile.email || '';
-        document.getElementById('phone').value = profile.phone || '';
+    if (scratch && scratch.hasUnsavedChanges) {
+        // Restore from scratch pad (user was typing but didn't save)
+        currentProfileId = scratch.id || null;
+        document.getElementById('inspectorName').value = scratch.fullName || '';
+        document.getElementById('title').value = scratch.title || '';
+        document.getElementById('company').value = scratch.company || '';
+        document.getElementById('email').value = scratch.email || '';
+        document.getElementById('phone').value = scratch.phone || '';
+
+        // Mark as dirty since we have unsaved changes
+        setDirty(true);
+        console.log('[SETTINGS] Restored unsaved changes from scratch pad');
+    } else {
+        // 2. Load from IndexedDB via data-layer (IndexedDB-first, Supabase-fallback)
+        const profile = await window.dataLayer.loadUserSettings();
+
+        if (profile) {
+            currentProfileId = profile.id || null;
+            // Populate form fields
+            document.getElementById('inspectorName').value = profile.fullName || '';
+            document.getElementById('title').value = profile.title || '';
+            document.getElementById('company').value = profile.company || '';
+            document.getElementById('email').value = profile.email || '';
+            document.getElementById('phone').value = profile.phone || '';
+        }
+
+        // Not dirty - data matches saved state
+        setDirty(false);
     }
 
+    // Store original values for dirty detection
+    storeOriginalValues();
     updateSignaturePreview();
+}
+
+/**
+ * Get scratch data from localStorage
+ */
+function getScratchData() {
+    try {
+        const data = localStorage.getItem(SETTINGS_SCRATCH_KEY);
+        return data ? JSON.parse(data) : null;
+    } catch (e) {
+        console.warn('[SETTINGS] Failed to parse scratch data:', e);
+        return null;
+    }
+}
+
+/**
+ * Save current form state to scratch pad (localStorage)
+ */
+function saveScratchData() {
+    const scratch = {
+        id: currentProfileId,
+        fullName: document.getElementById('inspectorName').value.trim(),
+        title: document.getElementById('title').value.trim(),
+        company: document.getElementById('company').value.trim(),
+        email: document.getElementById('email').value.trim(),
+        phone: document.getElementById('phone').value.trim(),
+        hasUnsavedChanges: isDirty,
+        updatedAt: new Date().toISOString()
+    };
+
+    try {
+        localStorage.setItem(SETTINGS_SCRATCH_KEY, JSON.stringify(scratch));
+    } catch (e) {
+        console.warn('[SETTINGS] Failed to save scratch data:', e);
+    }
+}
+
+/**
+ * Clear scratch data after successful save
+ */
+function clearScratchData() {
+    localStorage.removeItem(SETTINGS_SCRATCH_KEY);
+}
+
+/**
+ * Store original values for dirty detection
+ */
+function storeOriginalValues() {
+    originalValues = {
+        fullName: document.getElementById('inspectorName').value.trim(),
+        title: document.getElementById('title').value.trim(),
+        company: document.getElementById('company').value.trim(),
+        email: document.getElementById('email').value.trim(),
+        phone: document.getElementById('phone').value.trim()
+    };
+}
+
+/**
+ * Check if current values differ from original
+ */
+function checkIfDirty() {
+    const current = {
+        fullName: document.getElementById('inspectorName').value.trim(),
+        title: document.getElementById('title').value.trim(),
+        company: document.getElementById('company').value.trim(),
+        email: document.getElementById('email').value.trim(),
+        phone: document.getElementById('phone').value.trim()
+    };
+
+    const dirty = Object.keys(originalValues).some(key =>
+        current[key] !== originalValues[key]
+    );
+
+    setDirty(dirty);
+    return dirty;
+}
+
+/**
+ * Set dirty flag and update UI
+ */
+function setDirty(dirty) {
+    isDirty = dirty;
+    updateDirtyIndicator();
+}
+
+/**
+ * Update UI to show dirty state
+ */
+function updateDirtyIndicator() {
+    const saveBtn = document.getElementById('saveBtn');
+    const dirtyBadge = document.getElementById('dirtyBadge');
+
+    if (isDirty) {
+        if (saveBtn) {
+            saveBtn.classList.add('ring-2', 'ring-dot-orange', 'ring-offset-2');
+        }
+        if (dirtyBadge) {
+            dirtyBadge.classList.remove('hidden');
+        }
+    } else {
+        if (saveBtn) {
+            saveBtn.classList.remove('ring-2', 'ring-dot-orange', 'ring-offset-2');
+        }
+        if (dirtyBadge) {
+            dirtyBadge.classList.add('hidden');
+        }
+    }
 }
 
 async function saveSettings() {
     // Step 1: Get device_id (generates if not exists)
     const deviceId = getDeviceId();
 
-    // DEBUG: Log device and localStorage state before building profile
-    console.log('[saveSettings] This device ID:', deviceId);
-    console.log('[saveSettings] Current user_id in localStorage:', getStorageItem(STORAGE_KEYS.USER_ID));
-    console.log('[saveSettings] currentProfileId variable:', currentProfileId);
-
     // Step 2: Get user_id (only if we have one for THIS device)
-    // Do NOT fall back to currentProfileId — it might be from another device
-    // Do NOT generate a new UUID — let Supabase generate it
     let userId = getStorageItem(STORAGE_KEYS.USER_ID);
-    console.log('[saveSettings] userId from localStorage:', userId);
 
     // Step 3: Build profile object with all fields
     const profile = {
@@ -51,10 +179,14 @@ async function saveSettings() {
         updatedAt: new Date().toISOString()
     };
 
-    // Step 4: Save to localStorage first (local-first)
-    setStorageItem(STORAGE_KEYS.USER_PROFILE, profile);
+    // Step 4: Save to IndexedDB first (local-first, source of truth)
+    const savedToIDB = await window.dataLayer.saveUserSettings(profile);
+    if (!savedToIDB) {
+        showToast('Failed to save locally', 'error');
+        return;
+    }
 
-    // Step 5: Only store user_id if we have one (will be set after Supabase upsert for new devices)
+    // Step 5: Only store user_id if we have one
     if (userId) {
         setStorageItem(STORAGE_KEYS.USER_ID, userId);
         currentProfileId = userId;
@@ -62,16 +194,9 @@ async function saveSettings() {
 
     updateSignaturePreview();
 
-    // Step 6: Try to upsert to Supabase
+    // Step 6: Try to upsert to Supabase (cloud backup)
     try {
-        // DEBUG: Log the profile object being built
-        console.log('[saveSettings] Profile object:', JSON.stringify(profile, null, 2));
-
         const supabaseData = toSupabaseUserProfile(profile);
-
-        // DEBUG: Log the converted Supabase payload
-        console.log('[saveSettings] Supabase payload:', JSON.stringify(supabaseData, null, 2));
-        console.log('[saveSettings] Payload has id?', !!supabaseData?.id, 'id value:', supabaseData?.id);
 
         const result = await supabaseClient
             .from('user_profiles')
@@ -79,40 +204,104 @@ async function saveSettings() {
             .select()
             .single();
 
-        // DEBUG: Log the full Supabase response
-        console.log('[saveSettings] Supabase result:', JSON.stringify(result, null, 2));
-        console.log('[saveSettings] Supabase data:', result.data);
-        console.log('[saveSettings] Supabase error:', result.error);
-        console.log('[saveSettings] Supabase status:', result.status);
-
         if (result.error) {
-            console.error('[saveSettings] Failed to save settings to Supabase:', result.error);
-            console.error('[saveSettings] Error code:', result.error.code);
-            console.error('[saveSettings] Error message:', result.error.message);
-            console.error('[saveSettings] Error details:', result.error.details);
-            console.error('[saveSettings] Error hint:', result.error.hint);
-            showToast('Saved locally. Save again when online to backup.', 'warning');
+            console.error('[saveSettings] Supabase error:', result.error);
+            showToast('Saved locally. Sync to cloud when online.', 'warning');
+
+            // Still clear scratch and mark clean - local save succeeded
+            clearScratchData();
+            storeOriginalValues();
+            setDirty(false);
             return;
         }
 
-        // Step 7: Store the Supabase-returned id (especially important for new devices)
+        // Step 7: Store the Supabase-returned id (important for new devices)
         if (result.data && result.data.id) {
             const returnedId = result.data.id;
             setStorageItem(STORAGE_KEYS.USER_ID, returnedId);
             currentProfileId = returnedId;
-            console.log('[saveSettings] Stored user_id from Supabase:', returnedId);
+
+            // Update IndexedDB with the id from Supabase
+            profile.id = returnedId;
+            await window.dataLayer.saveUserSettings(profile);
         }
 
-        // Step 8: Success - show confirmation
-        console.log('[saveSettings] SUCCESS - Profile saved to Supabase');
+        // Step 8: Success - clear scratch and mark clean
+        clearScratchData();
+        storeOriginalValues();
+        setDirty(false);
+
+        console.log('[saveSettings] Profile saved to IndexedDB + Supabase');
         showToast('Profile saved');
     } catch (e) {
-        console.error('[saveSettings] EXCEPTION caught:', e);
-        console.error('[saveSettings] Exception name:', e.name);
-        console.error('[saveSettings] Exception message:', e.message);
-        console.error('[saveSettings] Exception stack:', e.stack);
-        // Step 8: Offline or error - inform user
-        showToast('Saved locally. Save again when online to backup.', 'warning');
+        console.error('[saveSettings] Exception:', e);
+        showToast('Saved locally. Sync to cloud when online.', 'warning');
+
+        // Still clear scratch and mark clean - local save succeeded
+        clearScratchData();
+        storeOriginalValues();
+        setDirty(false);
+    }
+}
+
+/**
+ * Refresh profile from Supabase (pull latest cloud data)
+ * Overwrites scratch pad but requires Save to commit to IndexedDB
+ */
+async function refreshFromCloud() {
+    if (!navigator.onLine) {
+        showToast('You are offline. Cannot refresh from cloud.', 'warning');
+        return;
+    }
+
+    const deviceId = getDeviceId();
+    if (!deviceId) {
+        showToast('No device ID set', 'error');
+        return;
+    }
+
+    try {
+        showToast('Refreshing from cloud...', 'info');
+
+        const { data, error } = await supabaseClient
+            .from('user_profiles')
+            .select('*')
+            .eq('device_id', deviceId)
+            .maybeSingle();
+
+        if (error) {
+            console.error('[refreshFromCloud] Supabase error:', error);
+            showToast('Failed to refresh from cloud', 'error');
+            return;
+        }
+
+        if (!data) {
+            showToast('No profile found in cloud for this device', 'warning');
+            return;
+        }
+
+        // Populate form with cloud data
+        currentProfileId = data.id || null;
+        document.getElementById('inspectorName').value = data.full_name || '';
+        document.getElementById('title').value = data.title || '';
+        document.getElementById('company').value = data.company || '';
+        document.getElementById('email').value = data.email || '';
+        document.getElementById('phone').value = data.phone || '';
+
+        // Store user_id
+        if (data.id) {
+            setStorageItem(STORAGE_KEYS.USER_ID, data.id);
+        }
+
+        // Mark as dirty - user needs to Save to commit to IndexedDB
+        setDirty(true);
+        saveScratchData();
+        updateSignaturePreview();
+
+        showToast('Refreshed from cloud. Press Save to keep changes.', 'success');
+    } catch (e) {
+        console.error('[refreshFromCloud] Exception:', e);
+        showToast('Failed to refresh from cloud', 'error');
     }
 }
 
@@ -286,17 +475,47 @@ async function resetAllData() {
 
 // ============ INIT ============
 document.addEventListener('DOMContentLoaded', () => {
-    // Update preview on input change
-    document.getElementById('inspectorName').addEventListener('input', updateSignaturePreview);
-    document.getElementById('title').addEventListener('input', updateSignaturePreview);
-    document.getElementById('company').addEventListener('input', updateSignaturePreview);
+    // Get all form input fields
+    const inputFields = [
+        document.getElementById('inspectorName'),
+        document.getElementById('title'),
+        document.getElementById('company'),
+        document.getElementById('email'),
+        document.getElementById('phone')
+    ];
 
-    // Load settings from Supabase
+    // Add listeners to all input fields
+    inputFields.forEach(input => {
+        if (!input) return;
+
+        // Update preview and check dirty on input
+        input.addEventListener('input', () => {
+            updateSignaturePreview();
+            checkIfDirty();
+
+            // Save to scratch pad on every keystroke
+            if (isDirty) {
+                saveScratchData();
+            }
+        });
+    });
+
+    // Warn user before leaving with unsaved changes
+    window.addEventListener('beforeunload', (e) => {
+        if (isDirty) {
+            e.preventDefault();
+            e.returnValue = 'You have unsaved changes. Are you sure you want to leave?';
+            return e.returnValue;
+        }
+    });
+
+    // Load settings from IndexedDB (or scratch pad if unsaved changes exist)
     loadSettings();
 });
 
 // ============ EXPOSE TO WINDOW FOR ONCLICK HANDLERS ============
 window.saveSettings = saveSettings;
+window.refreshFromCloud = refreshFromCloud;
 window.refreshApp = refreshApp;
 window.hideRefreshModal = hideRefreshModal;
 window.executeRefresh = executeRefresh;

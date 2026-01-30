@@ -223,17 +223,25 @@
     // ========================================
 
     /**
-     * Load user settings (localStorage-first, Supabase-fallback)
+     * Load user settings (IndexedDB-first, Supabase-fallback)
      * @returns {Promise<Object|null>} User settings object or null
      */
     async function loadUserSettings() {
         const deviceId = getStorageItem(STORAGE_KEYS.DEVICE_ID);
+        if (!deviceId) {
+            console.log('[DATA] No device ID set');
+            return null;
+        }
 
-        // 1. Try localStorage first
-        const localSettings = getStorageItem(STORAGE_KEYS.USER_PROFILE);
-        if (localSettings) {
-            console.log('[DATA] Loaded user settings from localStorage');
-            return normalizeUserSettings(localSettings);
+        // 1. Try IndexedDB first
+        try {
+            const localSettings = await window.idb.getUserProfile(deviceId);
+            if (localSettings) {
+                console.log('[DATA] Loaded user settings from IndexedDB');
+                return normalizeUserSettings(localSettings);
+            }
+        } catch (e) {
+            console.warn('[DATA] IndexedDB read failed:', e);
         }
 
         // 2. Check if offline
@@ -243,11 +251,6 @@
         }
 
         // 3. Fetch from Supabase
-        if (!deviceId) {
-            console.log('[DATA] No device ID, cannot fetch user settings');
-            return null;
-        }
-
         try {
             const { data, error } = await supabaseClient
                 .from('user_profiles')
@@ -265,15 +268,42 @@
                 return null;
             }
 
-            // 4. Cache to localStorage
+            // 4. Convert to JS format and cache to IndexedDB
             const settings = normalizeUserSettings(data);
-            setStorageItem(STORAGE_KEYS.USER_PROFILE, settings);
-            console.log('[DATA] Loaded user settings from Supabase');
+            try {
+                await window.idb.saveUserProfile(settings);
+                console.log('[DATA] Cached user settings to IndexedDB');
+            } catch (e) {
+                console.warn('[DATA] Failed to cache user settings:', e);
+            }
 
+            console.log('[DATA] Loaded user settings from Supabase');
             return settings;
         } catch (e) {
             console.error('[DATA] Failed to load user settings:', e);
             return null;
+        }
+    }
+
+    /**
+     * Save user settings to IndexedDB
+     * @param {Object} settings - User settings object
+     * @returns {Promise<boolean>} Success status
+     */
+    async function saveUserSettings(settings) {
+        const normalized = normalizeUserSettings(settings);
+        if (!normalized || !normalized.deviceId) {
+            console.error('[DATA] Cannot save user settings: missing deviceId');
+            return false;
+        }
+
+        try {
+            await window.idb.saveUserProfile(normalized);
+            console.log('[DATA] User settings saved to IndexedDB');
+            return true;
+        } catch (e) {
+            console.error('[DATA] Failed to save user settings:', e);
+            return false;
         }
     }
 
@@ -545,6 +575,7 @@
 
         // User Settings
         loadUserSettings,
+        saveUserSettings,
 
         // Drafts (localStorage)
         getCurrentDraft,
