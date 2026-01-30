@@ -1608,7 +1608,8 @@
         }
 
         /**
-         * Handle photo input in minimal mode
+         * Handle photo input in minimal mode (local-first)
+         * Saves to IndexedDB immediately, then syncs to Supabase in background
          */
         async function handleMinimalPhotoInput(e) {
             const files = e.target.files;
@@ -1634,37 +1635,119 @@
                     const compressedDataUrl = await compressImage(rawDataUrl, 1200, 0.7);
                     const compressedBlob = await dataURLtoBlob(compressedDataUrl);
 
-                    // Upload to Supabase Storage
-                    showToast('Uploading photo...', 'info');
-                    const { storagePath, publicUrl } = await uploadPhotoToSupabase(compressedBlob, photoId);
+                    // Build photo record for IndexedDB
+                    const reportId = currentReportId || getReportKey(activeProject?.id, new Date().toISOString().split('T')[0]);
+                    const photoRecord = {
+                        id: photoId,
+                        reportId: reportId,
+                        blob: compressedBlob,
+                        caption: '',
+                        timestamp: now.toISOString(),
+                        gps: gps,
+                        syncStatus: 'pending',
+                        retryCount: 0,
+                        lastSyncAttempt: null,
+                        supabaseId: null,
+                        storagePath: null,
+                        fileName: file.name
+                    };
 
+                    // 1. SAVE TO INDEXEDDB FIRST (instant, offline-safe)
+                    await idb.savePhoto(photoRecord);
+                    console.log('[PHOTO] Saved to IndexedDB:', photoId);
+
+                    // 2. ADD TO REPORT (for UI) - use blob URL for display
+                    const blobUrl = URL.createObjectURL(compressedBlob);
                     const photoObj = {
                         id: photoId,
-                        url: publicUrl,
-                        storagePath: storagePath,
+                        url: blobUrl,
+                        storagePath: null,
                         caption: '',
                         timestamp: now.toISOString(),
                         date: now.toLocaleDateString(),
                         time: now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
                         gps: gps,
-                        fileName: file.name
+                        fileName: file.name,
+                        syncStatus: 'pending'
                     };
-
                     report.photos.push(photoObj);
-
-                    // Save photo metadata to Supabase
-                    await savePhotoMetadata(photoObj);
-
                     renderMinimalPhotos();
-                    showToast('Photo uploaded', 'success');
+                    showToast('Photo saved', 'success');
+
+                    // 3. ATTEMPT BACKGROUND UPLOAD (non-blocking)
+                    syncPhotoToSupabase(photoId).catch(err => {
+                        console.warn('[PHOTO] Background sync failed, will retry later:', err);
+                    });
+
                 } catch (err) {
                     console.error('Error adding photo:', err);
-                    showToast('Failed to add photo', 'error');
+                    showToast('Failed to save photo', 'error');
                 }
             }
 
             // Reset input
             e.target.value = '';
+        }
+
+        /**
+         * Sync a photo from IndexedDB to Supabase (background upload)
+         * @param {string} photoId - The photo ID to sync
+         */
+        async function syncPhotoToSupabase(photoId) {
+            const photo = await idb.getPhotoById(photoId);
+            if (!photo || photo.syncStatus === 'synced') return;
+
+            try {
+                // Ensure report exists in Supabase first
+                if (!currentReportId) {
+                    await saveReportToSupabase();
+                }
+
+                // Upload blob to storage
+                const { storagePath, publicUrl } = await uploadPhotoToSupabase(photo.blob, photoId, photo.fileName);
+
+                // Update IndexedDB with success
+                photo.syncStatus = 'synced';
+                photo.storagePath = storagePath;
+                photo.lastSyncAttempt = new Date().toISOString();
+                await idb.savePhoto(photo);
+
+                // Save metadata to Supabase
+                await savePhotoMetadata({
+                    id: photo.id,
+                    storagePath: storagePath,
+                    fileName: photo.fileName,
+                    caption: photo.caption,
+                    gps: photo.gps,
+                    timestamp: photo.timestamp
+                });
+
+                // Update in-memory report.photos with real URL
+                const idx = report.photos.findIndex(p => p.id === photoId);
+                if (idx !== -1) {
+                    URL.revokeObjectURL(report.photos[idx].url); // Clean up blob URL
+                    report.photos[idx].url = publicUrl;
+                    report.photos[idx].storagePath = storagePath;
+                    report.photos[idx].syncStatus = 'synced';
+                    renderMinimalPhotos();
+                }
+
+                console.log('[PHOTO] Synced to Supabase:', photoId);
+            } catch (err) {
+                // Update IndexedDB with failure
+                photo.syncStatus = 'failed';
+                photo.retryCount = (photo.retryCount || 0) + 1;
+                photo.lastSyncAttempt = new Date().toISOString();
+                await idb.savePhoto(photo);
+                
+                // Update in-memory status
+                const idx = report.photos.findIndex(p => p.id === photoId);
+                if (idx !== -1) {
+                    report.photos[idx].syncStatus = 'failed';
+                }
+                
+                throw err;
+            }
         }
 
         // readFileAsDataURL() and dataURLtoBlob() moved to /js/media-utils.js
@@ -3194,19 +3277,22 @@
 
         /**
          * Upload photo to Supabase Storage
+         * @param {Blob|File} file - The file or blob to upload
+         * @param {string} photoId - The photo ID
+         * @param {string} [fileName] - Optional filename (required for Blobs)
          */
-        async function uploadPhotoToSupabase(file, photoId) {
+        async function uploadPhotoToSupabase(file, photoId, fileName) {
             if (!currentReportId) {
                 // Create report first if it doesn't exist
                 await saveReportToSupabase();
             }
 
-            const fileName = `${currentReportId}/${photoId}_${file.name}`;
+            const storagePath = `${currentReportId}/${photoId}_${fileName || file.name || 'photo.jpg'}`;
 
             try {
                 const { data, error } = await supabaseClient.storage
                     .from('report-photos')
-                    .upload(fileName, file, {
+                    .upload(storagePath, file, {
                         cacheControl: '3600',
                         upsert: false
                     });
@@ -3219,10 +3305,10 @@
                 // Get public URL
                 const { data: urlData } = supabaseClient.storage
                     .from('report-photos')
-                    .getPublicUrl(fileName);
+                    .getPublicUrl(storagePath);
 
                 return {
-                    storagePath: fileName,
+                    storagePath: storagePath,
                     publicUrl: urlData?.publicUrl || ''
                 };
             } catch (err) {
