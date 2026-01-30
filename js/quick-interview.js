@@ -7,6 +7,10 @@
         let projectContractors = [];
         let userSettings = null;
 
+        // Track auto-saved entries so "+" buttons don't create duplicates
+        // Structure: { 'work_<contractorId>': { entryId: 'xxx', saved: true }, ... }
+        const autoSaveState = {};
+
         const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
         const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
         const isIOSSafari = isIOS && isSafari;
@@ -296,6 +300,8 @@
                         }
                         
                         saveReport();
+                        // Track in shared state so "+" button knows entry exists
+                        autoSaveState[section] = { entryId: currentEntryId, saved: true };
                         console.log('[AUTOSAVE] Created contractor work entry:', contractorId, currentEntryId);
                     } else {
                         // Update existing entry
@@ -306,6 +312,8 @@
                                 queueEntryBackup(currentReportId, entry);
                             }
                             saveReport();
+                            // Keep shared state updated
+                            autoSaveState[section] = { entryId: currentEntryId, saved: true };
                             console.log('[AUTOSAVE] Updated contractor work entry:', contractorId, currentEntryId);
                         }
                     }
@@ -336,6 +344,8 @@
                     
                     saveReport();
                     currentEntryId = entry.id;  // Track for subsequent updates
+                    // Track in shared state so "+" button knows entry exists
+                    autoSaveState[section] = { entryId: currentEntryId, saved: true };
                     console.log('[AUTOSAVE] Contractor work entry saved on blur:', contractorId);
                 }
             });
@@ -1436,13 +1446,26 @@
             if (!input) return;
             
             const text = input.value.trim();
-            if (text) {
-                createEntry(`work_${contractorId}`, text);
+            if (!text) return;
+            
+            const stateKey = `work_${contractorId}`;
+            
+            // If auto-save already created an entry for this content, just clear and render
+            if (autoSaveState[stateKey]?.saved) {
                 input.value = '';
+                delete autoSaveState[stateKey];  // Clear state for next entry
                 renderContractorWorkCards();
                 updateAllPreviews();
                 updateProgress();
+                return;
             }
+            
+            // Otherwise create new entry (user clicked "+" before auto-save triggered)
+            createEntry(stateKey, text);
+            input.value = '';
+            renderContractorWorkCards();
+            updateAllPreviews();
+            updateProgress();
         }
 
         /**
