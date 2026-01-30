@@ -7,7 +7,7 @@
     'use strict';
 
     const DB_NAME = 'fieldvoice-pro';
-    const DB_VERSION = 1;
+    const DB_VERSION = 2; // Bumped for photos + archives stores
 
     let db = null;
 
@@ -48,6 +48,22 @@
                 if (!database.objectStoreNames.contains('userProfile')) {
                     database.createObjectStore('userProfile', { keyPath: 'deviceId' });
                     console.log('Created userProfile object store');
+                }
+
+                // Create photos store (v2)
+                if (!database.objectStoreNames.contains('photos')) {
+                    const photosStore = database.createObjectStore('photos', { keyPath: 'id' });
+                    photosStore.createIndex('reportId', 'reportId', { unique: false });
+                    photosStore.createIndex('syncStatus', 'syncStatus', { unique: false });
+                    console.log('Created photos object store');
+                }
+
+                // Create archives store (v2)
+                if (!database.objectStoreNames.contains('archives')) {
+                    const archivesStore = database.createObjectStore('archives', { keyPath: 'id' });
+                    archivesStore.createIndex('projectId', 'projectId', { unique: false });
+                    archivesStore.createIndex('reportDate', 'reportDate', { unique: false });
+                    console.log('Created archives object store');
                 }
             };
         });
@@ -216,6 +232,287 @@
     }
 
     // ============================================
+    // PHOTOS STORE
+    // ============================================
+
+    /**
+     * Saves a photo to IndexedDB
+     * @param {Object} photo - Photo object (must include id, reportId)
+     * @returns {Promise<void>}
+     */
+    function savePhoto(photo) {
+        return ensureDB().then((database) => {
+            return new Promise((resolve, reject) => {
+                const transaction = database.transaction(['photos'], 'readwrite');
+                const store = transaction.objectStore('photos');
+                const request = store.put(photo);
+
+                request.onsuccess = () => {
+                    resolve();
+                };
+
+                request.onerror = (event) => {
+                    console.error('Error saving photo:', event.target.error);
+                    reject(event.target.error);
+                };
+            });
+        });
+    }
+
+    /**
+     * Gets a photo by ID
+     * @param {string} id - The photo ID
+     * @returns {Promise<Object|undefined>}
+     */
+    function getPhoto(id) {
+        return ensureDB().then((database) => {
+            return new Promise((resolve, reject) => {
+                const transaction = database.transaction(['photos'], 'readonly');
+                const store = transaction.objectStore('photos');
+                const request = store.get(id);
+
+                request.onsuccess = (event) => {
+                    resolve(event.target.result);
+                };
+
+                request.onerror = (event) => {
+                    console.error('Error getting photo:', event.target.error);
+                    reject(event.target.error);
+                };
+            });
+        });
+    }
+
+    /**
+     * Gets all photos for a report
+     * @param {string} reportId - The report ID
+     * @returns {Promise<Array>}
+     */
+    function getPhotosByReportId(reportId) {
+        return ensureDB().then((database) => {
+            return new Promise((resolve, reject) => {
+                const transaction = database.transaction(['photos'], 'readonly');
+                const store = transaction.objectStore('photos');
+                const index = store.index('reportId');
+                const request = index.getAll(reportId);
+
+                request.onsuccess = (event) => {
+                    resolve(event.target.result || []);
+                };
+
+                request.onerror = (event) => {
+                    console.error('Error getting photos by reportId:', event.target.error);
+                    reject(event.target.error);
+                };
+            });
+        });
+    }
+
+    /**
+     * Gets all photos with a specific sync status
+     * @param {string} syncStatus - The sync status ('pending', 'synced', 'failed')
+     * @returns {Promise<Array>}
+     */
+    function getPhotosBySyncStatus(syncStatus) {
+        return ensureDB().then((database) => {
+            return new Promise((resolve, reject) => {
+                const transaction = database.transaction(['photos'], 'readonly');
+                const store = transaction.objectStore('photos');
+                const index = store.index('syncStatus');
+                const request = index.getAll(syncStatus);
+
+                request.onsuccess = (event) => {
+                    resolve(event.target.result || []);
+                };
+
+                request.onerror = (event) => {
+                    console.error('Error getting photos by syncStatus:', event.target.error);
+                    reject(event.target.error);
+                };
+            });
+        });
+    }
+
+    /**
+     * Deletes a photo by ID
+     * @param {string} id - The photo ID
+     * @returns {Promise<void>}
+     */
+    function deletePhoto(id) {
+        return ensureDB().then((database) => {
+            return new Promise((resolve, reject) => {
+                const transaction = database.transaction(['photos'], 'readwrite');
+                const store = transaction.objectStore('photos');
+                const request = store.delete(id);
+
+                request.onsuccess = () => {
+                    resolve();
+                };
+
+                request.onerror = (event) => {
+                    console.error('Error deleting photo:', event.target.error);
+                    reject(event.target.error);
+                };
+            });
+        });
+    }
+
+    /**
+     * Deletes all photos for a report
+     * @param {string} reportId - The report ID
+     * @returns {Promise<void>}
+     */
+    function deletePhotosByReportId(reportId) {
+        return ensureDB().then((database) => {
+            return new Promise((resolve, reject) => {
+                const transaction = database.transaction(['photos'], 'readwrite');
+                const store = transaction.objectStore('photos');
+                const index = store.index('reportId');
+                const request = index.openCursor(reportId);
+
+                request.onsuccess = (event) => {
+                    const cursor = event.target.result;
+                    if (cursor) {
+                        cursor.delete();
+                        cursor.continue();
+                    } else {
+                        resolve();
+                    }
+                };
+
+                request.onerror = (event) => {
+                    console.error('Error deleting photos by reportId:', event.target.error);
+                    reject(event.target.error);
+                };
+            });
+        });
+    }
+
+    // ============================================
+    // ARCHIVES STORE
+    // ============================================
+
+    /**
+     * Saves an archived report to IndexedDB
+     * @param {Object} archive - Archive object (must include id)
+     * @returns {Promise<void>}
+     */
+    function saveArchive(archive) {
+        return ensureDB().then((database) => {
+            return new Promise((resolve, reject) => {
+                const transaction = database.transaction(['archives'], 'readwrite');
+                const store = transaction.objectStore('archives');
+                const request = store.put(archive);
+
+                request.onsuccess = () => {
+                    resolve();
+                };
+
+                request.onerror = (event) => {
+                    console.error('Error saving archive:', event.target.error);
+                    reject(event.target.error);
+                };
+            });
+        });
+    }
+
+    /**
+     * Gets an archive by ID
+     * @param {string} id - The archive ID
+     * @returns {Promise<Object|undefined>}
+     */
+    function getArchive(id) {
+        return ensureDB().then((database) => {
+            return new Promise((resolve, reject) => {
+                const transaction = database.transaction(['archives'], 'readonly');
+                const store = transaction.objectStore('archives');
+                const request = store.get(id);
+
+                request.onsuccess = (event) => {
+                    resolve(event.target.result);
+                };
+
+                request.onerror = (event) => {
+                    console.error('Error getting archive:', event.target.error);
+                    reject(event.target.error);
+                };
+            });
+        });
+    }
+
+    /**
+     * Gets all archived reports
+     * @returns {Promise<Array>}
+     */
+    function getAllArchives() {
+        return ensureDB().then((database) => {
+            return new Promise((resolve, reject) => {
+                const transaction = database.transaction(['archives'], 'readonly');
+                const store = transaction.objectStore('archives');
+                const request = store.getAll();
+
+                request.onsuccess = (event) => {
+                    resolve(event.target.result || []);
+                };
+
+                request.onerror = (event) => {
+                    console.error('Error getting all archives:', event.target.error);
+                    reject(event.target.error);
+                };
+            });
+        });
+    }
+
+    /**
+     * Gets all archives for a project
+     * @param {string} projectId - The project ID
+     * @returns {Promise<Array>}
+     */
+    function getArchivesByProjectId(projectId) {
+        return ensureDB().then((database) => {
+            return new Promise((resolve, reject) => {
+                const transaction = database.transaction(['archives'], 'readonly');
+                const store = transaction.objectStore('archives');
+                const index = store.index('projectId');
+                const request = index.getAll(projectId);
+
+                request.onsuccess = (event) => {
+                    resolve(event.target.result || []);
+                };
+
+                request.onerror = (event) => {
+                    console.error('Error getting archives by projectId:', event.target.error);
+                    reject(event.target.error);
+                };
+            });
+        });
+    }
+
+    /**
+     * Deletes an archive by ID
+     * @param {string} id - The archive ID
+     * @returns {Promise<void>}
+     */
+    function deleteArchive(id) {
+        return ensureDB().then((database) => {
+            return new Promise((resolve, reject) => {
+                const transaction = database.transaction(['archives'], 'readwrite');
+                const store = transaction.objectStore('archives');
+                const request = store.delete(id);
+
+                request.onsuccess = () => {
+                    resolve();
+                };
+
+                request.onerror = (event) => {
+                    console.error('Error deleting archive:', event.target.error);
+                    reject(event.target.error);
+                };
+            });
+        });
+    }
+
+    // ============================================
     // GENERAL
     // ============================================
 
@@ -264,6 +561,21 @@
         // User profile store
         saveUserProfile,
         getUserProfile,
+
+        // Photos store
+        savePhoto,
+        getPhoto,
+        getPhotosByReportId,
+        getPhotosBySyncStatus,
+        deletePhoto,
+        deletePhotosByReportId,
+
+        // Archives store
+        saveArchive,
+        getArchive,
+        getAllArchives,
+        getArchivesByProjectId,
+        deleteArchive,
 
         // General
         clearStore

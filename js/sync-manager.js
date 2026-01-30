@@ -7,6 +7,11 @@
  * @module sync-manager
  */
 
+// ============ AUTO-SYNC DISABLED ============
+// Per spec: User controls when data goes to/from cloud via explicit buttons.
+// No automatic Supabase sync. Set to true to re-enable auto-backup (not recommended).
+const AUTO_SYNC_ENABLED = false;
+
 // ============ CONSTANTS ============
 const DEBOUNCE_MS = 2000;  // 2 second debounce for entry backup
 const RETRY_DELAY_MS = 5000;  // 5 seconds between retry attempts
@@ -26,6 +31,12 @@ let onlineListener = null;
  * @param {Object} entry - The entry object from localStorage
  */
 function queueEntryBackup(reportId, entry) {
+    // AUTO-SYNC DISABLED: User controls sync via explicit buttons only
+    if (!AUTO_SYNC_ENABLED) {
+        console.log('[SYNC] Auto-backup disabled - skipping queue for:', reportId);
+        return;
+    }
+
     // Clear existing timer for this report
     if (entryBackupTimers[reportId]) {
         clearTimeout(entryBackupTimers[reportId]);
@@ -346,6 +357,12 @@ async function processOfflineQueue() {
  * Sets up online/offline listeners
  */
 function initSyncManager() {
+    // AUTO-SYNC DISABLED: User controls sync via explicit buttons only
+    if (!AUTO_SYNC_ENABLED) {
+        console.log('[SYNC] Auto-sync disabled - sync manager not initialized');
+        return;
+    }
+
     // Process queue when coming online
     onlineListener = () => {
         console.log('[SYNC] Back online - processing queue');
