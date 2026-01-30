@@ -1609,6 +1609,7 @@
 
         /**
          * Handle photo input in minimal mode
+         * Saves to IndexedDB locally, uploads to Supabase on Submit
          */
         async function handleMinimalPhotoInput(e) {
             const files = e.target.files;
@@ -1629,18 +1630,31 @@
                     const photoId = `photo_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
                     const now = new Date();
 
-                    // Compress image before uploading
+                    // Compress image
                     const rawDataUrl = await readFileAsDataURL(file);
                     const compressedDataUrl = await compressImage(rawDataUrl, 1200, 0.7);
-                    const compressedBlob = await dataURLtoBlob(compressedDataUrl);
 
-                    // Upload to Supabase Storage
-                    showToast('Uploading photo...', 'info');
-                    const { storagePath, publicUrl } = await uploadPhotoToSupabase(compressedBlob, photoId);
+                    // Try to upload to Supabase if online, otherwise store base64 for later
+                    let storagePath = null;
+                    let publicUrl = compressedDataUrl; // Use base64 as fallback URL for display
+
+                    if (navigator.onLine) {
+                        try {
+                            showToast('Uploading photo...', 'info');
+                            const compressedBlob = await dataURLtoBlob(compressedDataUrl);
+                            const result = await uploadPhotoToSupabase(compressedBlob, photoId);
+                            storagePath = result.storagePath;
+                            publicUrl = result.publicUrl;
+                        } catch (uploadErr) {
+                            console.warn('[PHOTO] Upload failed, saving locally:', uploadErr);
+                            // Keep base64 for later upload
+                        }
+                    }
 
                     const photoObj = {
                         id: photoId,
                         url: publicUrl,
+                        base64: storagePath ? null : compressedDataUrl, // Only store base64 if not uploaded
                         storagePath: storagePath,
                         caption: '',
                         timestamp: now.toISOString(),
@@ -1652,11 +1666,12 @@
 
                     report.photos.push(photoObj);
 
-                    // Save photo metadata to Supabase
-                    await savePhotoMetadata(photoObj);
+                    // Save photo to IndexedDB (local-first)
+                    await savePhotoToIndexedDB(photoObj);
 
                     renderMinimalPhotos();
-                    showToast('Photo uploaded', 'success');
+                    saveReport();
+                    showToast(storagePath ? 'Photo saved' : 'Photo saved locally', 'success');
                 } catch (err) {
                     console.error('Error adding photo:', err);
                     showToast('Failed to add photo', 'error');
@@ -1677,7 +1692,18 @@
 
             const photo = report.photos[idx];
             if (photo) {
-                await deletePhotoFromSupabase(photo.id, photo.storagePath);
+                // Delete from IndexedDB first
+                try {
+                    await window.idb.deletePhoto(photo.id);
+                    console.log('[PHOTO] Deleted from IndexedDB:', photo.id);
+                } catch (err) {
+                    console.warn('[PHOTO] Failed to delete from IndexedDB:', err);
+                }
+
+                // Delete from Supabase if it was uploaded
+                if (photo.storagePath) {
+                    await deletePhotoFromSupabase(photo.id, photo.storagePath);
+                }
             }
 
             report.photos.splice(idx, 1);
@@ -3236,34 +3262,95 @@
         }
 
         /**
-         * Save photo metadata to Supabase
+         * Save photo to IndexedDB (local-first)
+         * Photos are uploaded to Supabase only on explicit Submit
          */
-        async function savePhotoMetadata(photo) {
-            if (!currentReportId) return;
-
+        async function savePhotoToIndexedDB(photo) {
             try {
-                const photoData = {
+                const photoRecord = {
                     id: photo.id,
-                    report_id: currentReportId,
-                    storage_path: photo.storagePath || '',
-                    filename: photo.fileName || photo.id,
+                    reportId: currentReportId || 'pending',
+                    base64: photo.base64 || null, // For offline storage
+                    url: photo.url || null,
+                    storagePath: photo.storagePath || null,
                     caption: photo.caption || '',
-                    gps_lat: photo.gps?.lat || null,
-                    gps_lng: photo.gps?.lng || null,
-                    taken_at: photo.timestamp || new Date().toISOString(),
-                    created_at: new Date().toISOString()
+                    gps: photo.gps || null,
+                    timestamp: photo.timestamp || new Date().toISOString(),
+                    fileName: photo.fileName || photo.id,
+                    syncStatus: photo.storagePath ? 'synced' : 'pending',
+                    createdAt: new Date().toISOString()
                 };
 
-                const { error } = await supabaseClient
-                    .from('photos')
-                    .upsert(photoData, { onConflict: 'id' });
-
-                if (error) {
-                    console.error('Error saving photo metadata:', error);
-                }
+                await window.idb.savePhoto(photoRecord);
+                console.log('[PHOTO] Saved to IndexedDB:', photo.id);
             } catch (err) {
-                console.error('Failed to save photo metadata:', err);
+                console.error('[PHOTO] Failed to save to IndexedDB:', err);
             }
+        }
+
+        /**
+         * Upload pending photos to Supabase (called on Submit)
+         */
+        async function uploadPendingPhotos() {
+            if (!currentReportId) return;
+
+            const pendingPhotos = await window.idb.getPhotosBySyncStatus('pending');
+            const reportPhotos = pendingPhotos.filter(p => p.reportId === currentReportId || p.reportId === 'pending');
+
+            for (const photo of reportPhotos) {
+                try {
+                    // If we have base64 but no storagePath, need to upload
+                    if (photo.base64 && !photo.storagePath) {
+                        showToast('Uploading photos...', 'info');
+                        const blob = await dataURLtoBlob(photo.base64);
+                        const { storagePath, publicUrl } = await uploadPhotoToSupabase(blob, photo.id);
+
+                        photo.storagePath = storagePath;
+                        photo.url = publicUrl;
+                    }
+
+                    // Save metadata to Supabase
+                    if (photo.storagePath) {
+                        const photoData = {
+                            id: photo.id,
+                            report_id: currentReportId,
+                            storage_path: photo.storagePath,
+                            filename: photo.fileName || photo.id,
+                            caption: photo.caption || '',
+                            gps_lat: photo.gps?.lat || null,
+                            gps_lng: photo.gps?.lng || null,
+                            taken_at: photo.timestamp || new Date().toISOString(),
+                            created_at: photo.createdAt || new Date().toISOString()
+                        };
+
+                        const { error } = await supabaseClient
+                            .from('photos')
+                            .upsert(photoData, { onConflict: 'id' });
+
+                        if (error) {
+                            console.error('[PHOTO] Supabase metadata error:', error);
+                            continue;
+                        }
+                    }
+
+                    // Update IndexedDB with synced status and reportId
+                    photo.reportId = currentReportId;
+                    photo.syncStatus = 'synced';
+                    await window.idb.savePhoto(photo);
+                    console.log('[PHOTO] Synced to Supabase:', photo.id);
+                } catch (err) {
+                    console.error('[PHOTO] Failed to sync photo:', photo.id, err);
+                }
+            }
+        }
+
+        /**
+         * Save photo metadata to Supabase (DEPRECATED - use savePhotoToIndexedDB)
+         * Kept for backwards compatibility but now just saves to IndexedDB
+         */
+        async function savePhotoMetadata(photo) {
+            // Redirect to IndexedDB save instead of immediate Supabase
+            await savePhotoToIndexedDB(photo);
         }
 
         /**
@@ -3531,6 +3618,10 @@
         }
 
         // ============ PHOTOS ============
+        /**
+         * Handle photo input (full mode)
+         * Saves to IndexedDB locally, uploads to Supabase on Submit
+         */
         async function handlePhotoInput(e) {
             console.log('[PHOTO] handlePhotoInput triggered');
 
@@ -3562,7 +3653,7 @@
                 }
 
                 // Show processing indicator
-                showToast('Uploading photo...', 'info');
+                showToast('Processing photo...', 'info');
 
                 // Get GPS coordinates (using multi-reading high accuracy)
                 let gps = null;
@@ -3586,25 +3677,39 @@
 
                     const photoId = `photo_${Date.now()}_${i}`;
 
-                    // Compress image before uploading
+                    // Compress image
                     showToast('Compressing photo...', 'info');
                     console.log('[PHOTO] Reading file for compression...');
                     const rawDataUrl = await readFileAsDataURL(file);
                     const compressedDataUrl = await compressImage(rawDataUrl, 1200, 0.7);
 
-                    // Convert compressed data URL to Blob for upload
-                    const compressedBlob = await dataURLtoBlob(compressedDataUrl);
-                    console.log(`[PHOTO] Compressed: ${Math.round(file.size/1024)}KB -> ${Math.round(compressedBlob.size/1024)}KB`);
+                    // Try to upload to Supabase if online, otherwise store base64 for later
+                    let storagePath = null;
+                    let publicUrl = compressedDataUrl; // Use base64 as fallback URL for display
 
-                    // Upload to Supabase Storage
-                    showToast('Uploading photo...', 'info');
-                    console.log('[PHOTO] Uploading to Supabase Storage...');
-                    const { storagePath, publicUrl } = await uploadPhotoToSupabase(compressedBlob, photoId);
+                    if (navigator.onLine) {
+                        try {
+                            const compressedBlob = await dataURLtoBlob(compressedDataUrl);
+                            console.log(`[PHOTO] Compressed: ${Math.round(file.size/1024)}KB -> ${Math.round(compressedBlob.size/1024)}KB`);
+
+                            showToast('Uploading photo...', 'info');
+                            console.log('[PHOTO] Uploading to Supabase Storage...');
+                            const result = await uploadPhotoToSupabase(compressedBlob, photoId);
+                            storagePath = result.storagePath;
+                            publicUrl = result.publicUrl;
+                        } catch (uploadErr) {
+                            console.warn('[PHOTO] Upload failed, saving locally:', uploadErr);
+                            // Keep base64 for later upload
+                        }
+                    } else {
+                        console.log('[PHOTO] Offline - saving locally for later upload');
+                    }
 
                     // Create photo object
                     const photoObj = {
                         id: photoId,
                         url: publicUrl,
+                        base64: storagePath ? null : compressedDataUrl, // Only store base64 if not uploaded
                         storagePath: storagePath,
                         caption: '',
                         timestamp: timestamp,
@@ -3620,23 +3725,25 @@
                         id: photoObj.id,
                         timestamp: photoObj.timestamp,
                         gps: photoObj.gps,
-                        storagePath: storagePath
+                        storagePath: storagePath,
+                        hasBase64: !!photoObj.base64
                     });
 
                     // Add to local report
                     report.photos.push(photoObj);
 
-                    // Save photo metadata to Supabase
-                    await savePhotoMetadata(photoObj);
+                    // Save photo to IndexedDB (local-first)
+                    await savePhotoToIndexedDB(photoObj);
 
                     // Update UI
                     renderSection('photos');
-                    showToast('Photo uploaded', 'success');
+                    saveReport();
+                    showToast(storagePath ? 'Photo saved' : 'Photo saved locally', 'success');
 
                     console.log(`[PHOTO] Success! Total photos: ${report.photos.length}`);
 
                 } catch (err) {
-                    console.error('[PHOTO] Failed to upload photo:', err);
+                    console.error('[PHOTO] Failed to process photo:', err);
                     showToast(`Photo error: ${err.message}`, 'error');
                 }
             }
@@ -3649,9 +3756,19 @@
             console.log(`[PHOTO] Removing photo at index ${index}`);
             const photo = report.photos[index];
 
-            // Delete from Supabase
             if (photo) {
-                await deletePhotoFromSupabase(photo.id, photo.storagePath);
+                // Delete from IndexedDB first
+                try {
+                    await window.idb.deletePhoto(photo.id);
+                    console.log('[PHOTO] Deleted from IndexedDB:', photo.id);
+                } catch (err) {
+                    console.warn('[PHOTO] Failed to delete from IndexedDB:', err);
+                }
+
+                // Delete from Supabase if it was uploaded
+                if (photo.storagePath) {
+                    await deletePhotoFromSupabase(photo.id, photo.storagePath);
+                }
             }
 
             report.photos.splice(index, 1);
@@ -3660,7 +3777,7 @@
             showToast('Photo removed', 'info');
         }
 
-        // Update photo caption and save to Supabase
+        // Update photo caption - save to localStorage and IndexedDB (Supabase on Submit)
         async function updatePhotoCaption(index, value) {
             const maxLength = 500;
             const caption = value.slice(0, maxLength);
@@ -3668,12 +3785,18 @@
                 report.photos[index].caption = caption;
                 saveReport();
 
-                // Also update in Supabase directly
-                if (report.photos[index].id && currentReportId) {
-                    await supabaseClient
-                        .from('photos')
-                        .update({ caption: caption })
-                        .eq('id', report.photos[index].id);
+                // Also update in IndexedDB
+                const photo = report.photos[index];
+                if (photo.id) {
+                    try {
+                        const idbPhoto = await window.idb.getPhoto(photo.id);
+                        if (idbPhoto) {
+                            idbPhoto.caption = caption;
+                            await window.idb.savePhoto(idbPhoto);
+                        }
+                    } catch (err) {
+                        console.warn('[PHOTO] Failed to update caption in IndexedDB:', err);
+                    }
                 }
 
                 // Update character counter
@@ -4425,6 +4548,11 @@
             // Store guided notes for AI processing
             report.guidedNotes.issues = report.generalIssues?.join('\n') || '';
             report.guidedNotes.safety = report.safety.noIncidents ? 'No incidents reported' : (report.safety.hasIncidents ? 'INCIDENT REPORTED: ' + report.safety.notes.join('; ') : '');
+
+            // Upload any pending photos from IndexedDB before saving report
+            if (navigator.onLine) {
+                await uploadPendingPhotos();
+            }
 
             // Ensure report is saved to Supabase first
             await saveReportToSupabase();
