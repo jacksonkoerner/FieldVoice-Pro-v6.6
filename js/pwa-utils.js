@@ -55,6 +55,7 @@ function registerServiceWorker() {
                         newWorker.addEventListener('statechange', () => {
                             if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
                                 console.log('[PWA] New version available');
+                                showUpdateBanner();
                             }
                         });
                     });
@@ -129,4 +130,26 @@ function injectOfflineBanner(message = 'You are offline - Some features may be u
         banner.innerHTML = `<i class="fas fa-wifi-slash mr-2"></i>${message}`;
         document.body.insertBefore(banner, document.body.firstChild);
     }
+}
+
+/**
+ * Show update available banner
+ * Creates a blue banner dynamically that reloads the page when clicked
+ */
+function showUpdateBanner() {
+    // Don't create duplicate banners
+    if (document.getElementById('update-banner')) {
+        return;
+    }
+
+    const banner = document.createElement('div');
+    banner.id = 'update-banner';
+    banner.className = 'fixed top-0 left-0 right-0 bg-blue-500 text-white text-center py-2 px-4 font-bold text-sm z-[9999] cursor-pointer';
+    banner.innerHTML = '<i class="fas fa-sync-alt mr-2"></i>Update available — tap to refresh';
+
+    banner.addEventListener('click', () => {
+        location.reload();
+    });
+
+    document.body.insertBefore(banner, document.body.firstChild);
 }
