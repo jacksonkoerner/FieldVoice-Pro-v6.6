@@ -14,6 +14,7 @@ let projectsCache = [];
 let activeProjectCache = null;
 
 // ============ PROJECT MANAGEMENT ============
+/* DEPRECATED — now using window.dataLayer.loadProjects()
 async function loadProjects() {
     const userId = getStorageItem(STORAGE_KEYS.USER_ID);
 
@@ -85,11 +86,13 @@ async function loadProjects() {
         return [];
     }
 }
+*/
 
 function getProjects() {
     return projectsCache;
 }
 
+/* DEPRECATED — now using window.dataLayer.loadActiveProject()
 async function loadActiveProject() {
     const activeId = getStorageItem(STORAGE_KEYS.ACTIVE_PROJECT_ID);
     if (!activeId) {
@@ -150,6 +153,7 @@ async function loadActiveProject() {
         return null;
     }
 }
+*/
 
 function getActiveProjectFromCache() {
     return activeProjectCache;
@@ -224,7 +228,7 @@ async function showProjectPickerModal() {
     modal.classList.remove('hidden');
 
     // Load fresh projects from Supabase
-    await loadProjects();
+    await window.dataLayer.loadProjects();
     const projects = getProjects();
     const activeId = getStorageItem(STORAGE_KEYS.ACTIVE_PROJECT_ID);
 
@@ -325,7 +329,7 @@ async function selectProjectAndProceed(projectId) {
     setStorageItem(STORAGE_KEYS.ACTIVE_PROJECT_ID, projectId);
 
     // Update cache
-    await loadActiveProject();
+    activeProjectCache = await window.dataLayer.loadActiveProject();
 
     // Update the active project card on dashboard (visible when they return)
     updateActiveProjectCard();
@@ -707,8 +711,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         initSyncManager();
 
         // Load projects from Supabase (projects still live there)
-        await loadProjects();
-        await loadActiveProject();
+        await window.dataLayer.loadProjects();
+        activeProjectCache = await window.dataLayer.loadActiveProject();
 
         // Update UI - reports come from localStorage now
         updateActiveProjectCard();
