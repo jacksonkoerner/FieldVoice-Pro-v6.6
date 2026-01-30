@@ -990,6 +990,90 @@
             showModeUI(newMode);
         }
 
+        // ============ LOCK WARNING MODAL ============
+
+        /**
+         * Show the lock warning modal when another device is editing
+         * @param {Object} lockInfo - Lock information from lockManager.checkLock
+         */
+        function showLockWarningModal(lockInfo) {
+            const modal = document.getElementById('lockWarningModal');
+            if (!modal) {
+                // Fallback: show alert and redirect
+                alert(window.lockManager.formatLockMessage(lockInfo));
+                window.location.href = 'index.html';
+                return;
+            }
+
+            // Update modal content
+            const messageEl = document.getElementById('lockWarningMessage');
+            if (messageEl) {
+                messageEl.textContent = window.lockManager.formatLockMessage(lockInfo);
+            }
+
+            const detailsEl = document.getElementById('lockWarningDetails');
+            if (detailsEl && lockInfo.inspectorName) {
+                detailsEl.textContent = `Editor: ${lockInfo.inspectorName}`;
+            }
+
+            modal.classList.remove('hidden');
+        }
+
+        /**
+         * Handle "Go Back" from lock warning modal
+         */
+        function handleLockWarningBack() {
+            window.location.href = 'index.html';
+        }
+
+        /**
+         * Handle "Force Edit" from lock warning modal (take over the lock)
+         */
+        async function handleLockWarningForceEdit() {
+            const btn = document.getElementById('lockForceEditBtn');
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Taking over...';
+            }
+
+            try {
+                const todayStr = getTodayDateString();
+                const inspectorName = userSettings?.full_name || '';
+
+                // Force acquire the lock
+                const { error } = await supabaseClient
+                    .from('active_reports')
+                    .upsert({
+                        project_id: activeProject.id,
+                        report_date: todayStr,
+                        device_id: getDeviceId(),
+                        inspector_name: inspectorName,
+                        locked_at: new Date().toISOString(),
+                        last_heartbeat: new Date().toISOString()
+                    }, { onConflict: 'project_id,report_date' });
+
+                if (error) {
+                    console.error('[LOCK] Force edit failed:', error);
+                    showToast('Failed to take over editing', 'error');
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.innerHTML = '<i class="fas fa-exclamation-triangle mr-2"></i>Force Edit Anyway';
+                    }
+                    return;
+                }
+
+                // Reload the page to continue with normal initialization
+                window.location.reload();
+            } catch (e) {
+                console.error('[LOCK] Force edit exception:', e);
+                showToast('Failed to take over editing', 'error');
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-exclamation-triangle mr-2"></i>Force Edit Anyway';
+                }
+            }
+        }
+
         // ============ CANCEL REPORT FUNCTIONS ============
 
         /**
@@ -1037,6 +1121,11 @@
                 // Reset local state
                 currentReportId = null;
                 report = {};
+
+                // Release the lock before navigating away
+                if (window.lockManager) {
+                    await window.lockManager.releaseCurrentLock();
+                }
 
                 // Navigate to home
                 window.location.href = 'index.html';
@@ -2001,6 +2090,11 @@
 
                 // Clear localStorage draft - report is now saved and refined
                 clearLocalStorageDraft();
+
+                // Release the lock before navigating away
+                if (window.lockManager) {
+                    await window.lockManager.releaseCurrentLock();
+                }
 
                 // Navigate to report with date and reportId parameters
                 const todayStr = new Date().toISOString().split('T')[0];
@@ -4603,6 +4697,11 @@
                 // Clear localStorage draft - report is now saved and refined
                 clearLocalStorageDraft();
 
+                // Release the lock before navigating away
+                if (window.lockManager) {
+                    await window.lockManager.releaseCurrentLock();
+                }
+
                 // Navigate to report with date and reportId parameters
                 const todayStr = new Date().toISOString().split('T')[0];
                 window.location.href = `report.html?date=${todayStr}&reportId=${currentReportId}`;
@@ -4688,6 +4787,18 @@
                     projectContractors = activeProject.contractors || [];
                 }
 
+                // Check for report lock before loading
+                if (activeProject && navigator.onLine) {
+                    updateLoadingStatus('Checking for active editors...');
+                    const todayStr = getTodayDateString();
+                    const lockInfo = await window.lockManager.checkLock(activeProject.id, todayStr);
+                    if (lockInfo) {
+                        hideLoadingOverlay();
+                        showLockWarningModal(lockInfo);
+                        return; // Stop initialization
+                    }
+                }
+
                 // Load report from Supabase (baseline)
                 updateLoadingStatus('Loading report data...');
                 report = await getReport();
@@ -4750,6 +4861,16 @@
 
                 checkAndShowWarningBanner();
                 checkDictationHintBanner();
+
+                // Acquire lock on this report (if online)
+                if (activeProject && navigator.onLine) {
+                    const todayStr = getTodayDateString();
+                    const inspectorName = userSettings?.full_name || '';
+                    const lockAcquired = await window.lockManager.acquireLock(activeProject.id, todayStr, inspectorName);
+                    if (!lockAcquired) {
+                        console.warn('[INIT] Failed to acquire lock - may have been taken by another device');
+                    }
+                }
             } catch (error) {
                 console.error('Initialization failed:', error);
                 hideLoadingOverlay();
