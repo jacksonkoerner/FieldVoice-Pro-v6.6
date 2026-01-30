@@ -29,10 +29,15 @@
     document.addEventListener('DOMContentLoaded', async () => {
         try {
             // Load project and user settings from Supabase
-            await Promise.all([
-                loadActiveProject(),
-                loadUserSettings()
+            const [projectResult, settingsResult] = await Promise.all([
+                window.dataLayer.loadActiveProject(),
+                window.dataLayer.loadUserSettings()
             ]);
+            activeProject = projectResult;
+            userSettings = settingsResult;
+            if (activeProject) {
+                projectContractors = activeProject.contractors || [];
+            }
 
             // Load report data from Supabase
             report = await loadReport();
@@ -235,6 +240,7 @@
     }
 
     // ============ PROJECT LOADING ============
+    /* DEPRECATED — now using window.dataLayer.loadActiveProject()
     async function loadActiveProject() {
         const activeId = getStorageItem(STORAGE_KEYS.ACTIVE_PROJECT_ID);
         if (!activeId) {
@@ -286,7 +292,9 @@
             return null;
         }
     }
+    */
 
+    /* DEPRECATED — now using window.dataLayer.loadUserSettings()
     async function loadUserSettings() {
         try {
             const { data, error } = await supabaseClient
@@ -317,6 +325,7 @@
             return null;
         }
     }
+    */
 
     // ============ REPORT LOADING ============
     function getReportDateStr() {
