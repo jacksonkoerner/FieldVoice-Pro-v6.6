@@ -578,14 +578,16 @@
                     <div class="px-4 pb-4 space-y-3 border-t border-slate-200 pt-4">
                         <!-- Toggle: Any communications with contractor? -->
                         <div id="communications-toggle-container"></div>
+                        <!-- N/A message (shown when toggle = No) -->
+                        <div id="communications-na-message" class="hidden bg-slate-100 border border-slate-200 p-3 text-center text-sm text-slate-500">
+                            <i class="fas fa-ban mr-2"></i>Marked as N/A - No communications
+                        </div>
                         <!-- Communications list -->
                         <div id="communications-list" class="space-y-2"></div>
-                        <!-- Add communication input (shown when toggle = Yes) -->
-                        <div id="communications-input-container" class="hidden">
-                            <div class="flex items-center gap-2">
-                                <textarea id="communications-input" class="flex-1 bg-white border-2 border-slate-300 px-4 py-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-violet-500 auto-expand" rows="3" placeholder="Describe communication with contractor..."></textarea>
-                                <button onclick="addCommunication()" class="px-4 py-3 bg-violet-600 hover:bg-violet-700 text-white font-bold transition-colors"><i class="fas fa-plus"></i></button>
-                            </div>
+                        <!-- Add communication input - ALWAYS IN DOM (iOS Safari fix) -->
+                        <div id="communications-input-area" class="flex items-center gap-2">
+                            <textarea id="communications-input" class="flex-1 bg-white border-2 border-slate-300 px-4 py-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-violet-500 auto-expand" rows="3" placeholder="Describe communication with contractor..."></textarea>
+                            <button id="communications-add-btn" onclick="addCommunication()" class="px-4 py-3 bg-violet-600 hover:bg-violet-700 text-white font-bold transition-colors"><i class="fas fa-plus"></i></button>
                         </div>
                     </div>
                 </div>
@@ -609,14 +611,16 @@
                     <div class="px-4 pb-4 space-y-3 border-t border-slate-200 pt-4">
                         <!-- Toggle: Any QA/QC testing today? -->
                         <div id="qaqc-toggle-container"></div>
+                        <!-- N/A message (shown when toggle = No) -->
+                        <div id="qaqc-na-message" class="hidden bg-slate-100 border border-slate-200 p-3 text-center text-sm text-slate-500">
+                            <i class="fas fa-ban mr-2"></i>Marked as N/A - No QA/QC testing
+                        </div>
                         <!-- QA/QC entries list -->
                         <div id="qaqc-list" class="space-y-2"></div>
-                        <!-- Add QA/QC input (shown when toggle = Yes) -->
-                        <div id="qaqc-input-container" class="hidden">
-                            <div class="flex items-center gap-2">
-                                <textarea id="qaqc-input" class="flex-1 bg-white border-2 border-slate-300 px-4 py-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-500 auto-expand" rows="3" placeholder="Describe testing or inspection..."></textarea>
-                                <button onclick="addQAQC()" class="px-4 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold transition-colors"><i class="fas fa-plus"></i></button>
-                            </div>
+                        <!-- Add QA/QC input - ALWAYS IN DOM (iOS Safari fix) -->
+                        <div id="qaqc-input-area" class="flex items-center gap-2">
+                            <textarea id="qaqc-input" class="flex-1 bg-white border-2 border-slate-300 px-4 py-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-500 auto-expand" rows="3" placeholder="Describe testing or inspection..."></textarea>
+                            <button id="qaqc-add-btn" onclick="addQAQC()" class="px-4 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold transition-colors"><i class="fas fa-plus"></i></button>
                         </div>
                     </div>
                 </div>
@@ -675,14 +679,16 @@
                     <div class="px-4 pb-4 space-y-3 border-t border-slate-200 pt-4">
                         <!-- Toggle: Any visitors/deliveries? -->
                         <div id="visitors-toggle-container"></div>
+                        <!-- N/A message (shown when toggle = No) -->
+                        <div id="visitors-na-message" class="hidden bg-slate-100 border border-slate-200 p-3 text-center text-sm text-slate-500">
+                            <i class="fas fa-ban mr-2"></i>Marked as N/A - No visitors or deliveries
+                        </div>
                         <!-- Visitors/Deliveries entries list -->
                         <div id="visitors-list" class="space-y-2"></div>
-                        <!-- Add visitor/delivery input (shown when toggle = Yes) -->
-                        <div id="visitors-input-container" class="hidden">
-                            <div class="flex items-center gap-2">
-                                <textarea id="visitors-input" class="flex-1 bg-white border-2 border-slate-300 px-4 py-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-teal-500 auto-expand" rows="3" placeholder="Describe visitors, deliveries, or other activity..."></textarea>
-                                <button onclick="addVisitor()" class="px-4 py-3 bg-teal-600 hover:bg-teal-700 text-white font-bold transition-colors"><i class="fas fa-plus"></i></button>
-                            </div>
+                        <!-- Add visitor/delivery input - ALWAYS IN DOM (iOS Safari fix) -->
+                        <div id="visitors-input-area" class="flex items-center gap-2">
+                            <textarea id="visitors-input" class="flex-1 bg-white border-2 border-slate-300 px-4 py-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-teal-500 auto-expand" rows="3" placeholder="Describe visitors, deliveries, or other activity..."></textarea>
+                            <button id="visitors-add-btn" onclick="addVisitor()" class="px-4 py-3 bg-teal-600 hover:bg-teal-700 text-white font-bold transition-colors"><i class="fas fa-plus"></i></button>
                         </div>
                     </div>
                 </div>

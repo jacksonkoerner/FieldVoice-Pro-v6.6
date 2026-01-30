@@ -3745,46 +3745,43 @@
                         commsToggleContainer.innerHTML = commsToggle;
                     }
 
-                    // Show/hide input based on toggle state
+                    // v6.6 iOS Safari fix: textarea always in DOM, toggle controls visibility
                     const commsToggleState = getToggleState('communications_made');
-                    const commsInputContainer = document.getElementById('communications-input-container');
+                    const commsNaMessage = document.getElementById('communications-na-message');
+                    const commsInputArea = document.getElementById('communications-input-area');
                     const commsList = document.getElementById('communications-list');
 
-                    if (commsToggleState === true) {
-                        if (commsInputContainer) commsInputContainer.classList.remove('hidden');
-                        // Render existing entries
-                        const commsEntries = getEntriesForSection('communications');
-                        if (commsList) {
-                            commsList.innerHTML = commsEntries.map(entry => `
-                                <div class="bg-violet-50 border border-violet-200 p-3 flex items-start gap-3 group" data-entry-id="${entry.id}">
-                                    <i class="fas fa-comment text-violet-500 mt-0.5"></i>
-                                    <div class="flex-1">
-                                        <p class="entry-content text-sm text-slate-700">${escapeHtml(entry.content)}</p>
-                                        <p class="text-[10px] text-slate-400 mt-1">${new Date(entry.timestamp).toLocaleTimeString()}</p>
-                                    </div>
-                                    <div class="flex items-center gap-1 opacity-50 group-hover:opacity-100 transition-opacity">
-                                        <button onclick="startEditEntry('${entry.id}', 'communications')" class="edit-btn text-slate-400 hover:text-dot-blue p-1">
-                                            <i class="fas fa-pencil-alt text-xs"></i>
-                                        </button>
-                                        <button onclick="deleteEntryById('${entry.id}'); renderSection('communications'); updateAllPreviews(); updateProgress();" class="text-red-400 hover:text-red-600 p-1">
-                                            <i class="fas fa-trash text-xs"></i>
-                                        </button>
-                                    </div>
+                    // Always render existing entries
+                    const commsEntries = getEntriesForSection('communications');
+                    if (commsList) {
+                        commsList.innerHTML = commsEntries.map(entry => `
+                            <div class="bg-violet-50 border border-violet-200 p-3 flex items-start gap-3 group" data-entry-id="${entry.id}">
+                                <i class="fas fa-comment text-violet-500 mt-0.5"></i>
+                                <div class="flex-1">
+                                    <p class="entry-content text-sm text-slate-700">${escapeHtml(entry.content)}</p>
+                                    <p class="text-[10px] text-slate-400 mt-1">${new Date(entry.timestamp).toLocaleTimeString()}</p>
                                 </div>
-                            `).join('');
-                        }
-                    } else if (commsToggleState === false) {
-                        if (commsInputContainer) commsInputContainer.classList.add('hidden');
-                        if (commsList) {
-                            commsList.innerHTML = `
-                                <div class="bg-slate-100 border border-slate-200 p-3 text-center text-sm text-slate-500">
-                                    <i class="fas fa-ban mr-2"></i>Marked as N/A - No communications
+                                <div class="flex items-center gap-1 opacity-50 group-hover:opacity-100 transition-opacity">
+                                    <button onclick="startEditEntry('${entry.id}', 'communications')" class="edit-btn text-slate-400 hover:text-dot-blue p-1">
+                                        <i class="fas fa-pencil-alt text-xs"></i>
+                                    </button>
+                                    <button onclick="deleteEntryById('${entry.id}'); renderSection('communications'); updateAllPreviews(); updateProgress();" class="text-red-400 hover:text-red-600 p-1">
+                                        <i class="fas fa-trash text-xs"></i>
+                                    </button>
                                 </div>
-                            `;
-                        }
+                            </div>
+                        `).join('');
+                    }
+
+                    // Toggle controls N/A message and input area visibility
+                    if (commsToggleState === false) {
+                        // N/A selected - show message, hide input
+                        if (commsNaMessage) commsNaMessage.classList.remove('hidden');
+                        if (commsInputArea) commsInputArea.classList.add('hidden');
                     } else {
-                        if (commsInputContainer) commsInputContainer.classList.add('hidden');
-                        if (commsList) commsList.innerHTML = '';
+                        // Yes selected or not yet answered - hide message, show input
+                        if (commsNaMessage) commsNaMessage.classList.add('hidden');
+                        if (commsInputArea) commsInputArea.classList.remove('hidden');
                     }
                     break;
                 case 'qaqc':
@@ -3795,46 +3792,43 @@
                         qaqcToggleContainer.innerHTML = qaqcToggle;
                     }
 
-                    // Show/hide input based on toggle state
+                    // v6.6 iOS Safari fix: textarea always in DOM, toggle controls visibility
                     const qaqcToggleState = getToggleState('qaqc_performed');
-                    const qaqcInputContainer = document.getElementById('qaqc-input-container');
+                    const qaqcNaMessage = document.getElementById('qaqc-na-message');
+                    const qaqcInputArea = document.getElementById('qaqc-input-area');
                     const qaqcList = document.getElementById('qaqc-list');
 
-                    if (qaqcToggleState === true) {
-                        if (qaqcInputContainer) qaqcInputContainer.classList.remove('hidden');
-                        // Render existing entries
-                        const qaqcEntries = getEntriesForSection('qaqc');
-                        if (qaqcList) {
-                            qaqcList.innerHTML = qaqcEntries.map(entry => `
-                                <div class="bg-indigo-50 border border-indigo-200 p-3 flex items-start gap-3 group" data-entry-id="${entry.id}">
-                                    <i class="fas fa-clipboard-check text-indigo-500 mt-0.5"></i>
-                                    <div class="flex-1">
-                                        <p class="entry-content text-sm text-slate-700">${escapeHtml(entry.content)}</p>
-                                        <p class="text-[10px] text-slate-400 mt-1">${new Date(entry.timestamp).toLocaleTimeString()}</p>
-                                    </div>
-                                    <div class="flex items-center gap-1 opacity-50 group-hover:opacity-100 transition-opacity">
-                                        <button onclick="startEditEntry('${entry.id}', 'qaqc')" class="edit-btn text-slate-400 hover:text-dot-blue p-1">
-                                            <i class="fas fa-pencil-alt text-xs"></i>
-                                        </button>
-                                        <button onclick="deleteEntryById('${entry.id}'); renderSection('qaqc'); updateAllPreviews(); updateProgress();" class="text-red-400 hover:text-red-600 p-1">
-                                            <i class="fas fa-trash text-xs"></i>
-                                        </button>
-                                    </div>
+                    // Always render existing entries
+                    const qaqcEntries = getEntriesForSection('qaqc');
+                    if (qaqcList) {
+                        qaqcList.innerHTML = qaqcEntries.map(entry => `
+                            <div class="bg-indigo-50 border border-indigo-200 p-3 flex items-start gap-3 group" data-entry-id="${entry.id}">
+                                <i class="fas fa-clipboard-check text-indigo-500 mt-0.5"></i>
+                                <div class="flex-1">
+                                    <p class="entry-content text-sm text-slate-700">${escapeHtml(entry.content)}</p>
+                                    <p class="text-[10px] text-slate-400 mt-1">${new Date(entry.timestamp).toLocaleTimeString()}</p>
                                 </div>
-                            `).join('');
-                        }
-                    } else if (qaqcToggleState === false) {
-                        if (qaqcInputContainer) qaqcInputContainer.classList.add('hidden');
-                        if (qaqcList) {
-                            qaqcList.innerHTML = `
-                                <div class="bg-slate-100 border border-slate-200 p-3 text-center text-sm text-slate-500">
-                                    <i class="fas fa-ban mr-2"></i>Marked as N/A - No QA/QC testing
+                                <div class="flex items-center gap-1 opacity-50 group-hover:opacity-100 transition-opacity">
+                                    <button onclick="startEditEntry('${entry.id}', 'qaqc')" class="edit-btn text-slate-400 hover:text-dot-blue p-1">
+                                        <i class="fas fa-pencil-alt text-xs"></i>
+                                    </button>
+                                    <button onclick="deleteEntryById('${entry.id}'); renderSection('qaqc'); updateAllPreviews(); updateProgress();" class="text-red-400 hover:text-red-600 p-1">
+                                        <i class="fas fa-trash text-xs"></i>
+                                    </button>
                                 </div>
-                            `;
-                        }
+                            </div>
+                        `).join('');
+                    }
+
+                    // Toggle controls N/A message and input area visibility
+                    if (qaqcToggleState === false) {
+                        // N/A selected - show message, hide input
+                        if (qaqcNaMessage) qaqcNaMessage.classList.remove('hidden');
+                        if (qaqcInputArea) qaqcInputArea.classList.add('hidden');
                     } else {
-                        if (qaqcInputContainer) qaqcInputContainer.classList.add('hidden');
-                        if (qaqcList) qaqcList.innerHTML = '';
+                        // Yes selected or not yet answered - hide message, show input
+                        if (qaqcNaMessage) qaqcNaMessage.classList.add('hidden');
+                        if (qaqcInputArea) qaqcInputArea.classList.remove('hidden');
                     }
                     break;
                 case 'visitors':
@@ -3845,46 +3839,43 @@
                         visitorsToggleContainer.innerHTML = visitorsToggle;
                     }
 
-                    // Show/hide input based on toggle state
+                    // v6.6 iOS Safari fix: textarea always in DOM, toggle controls visibility
                     const visitorsToggleState = getToggleState('visitors_present');
-                    const visitorsInputContainer = document.getElementById('visitors-input-container');
+                    const visitorsNaMessage = document.getElementById('visitors-na-message');
+                    const visitorsInputArea = document.getElementById('visitors-input-area');
                     const visitorsList = document.getElementById('visitors-list');
 
-                    if (visitorsToggleState === true) {
-                        if (visitorsInputContainer) visitorsInputContainer.classList.remove('hidden');
-                        // Render existing entries
-                        const visitorsEntries = getEntriesForSection('visitors');
-                        if (visitorsList) {
-                            visitorsList.innerHTML = visitorsEntries.map(entry => `
-                                <div class="bg-teal-50 border border-teal-200 p-3 flex items-start gap-3 group" data-entry-id="${entry.id}">
-                                    <i class="fas fa-truck-loading text-teal-500 mt-0.5"></i>
-                                    <div class="flex-1">
-                                        <p class="entry-content text-sm text-slate-700">${escapeHtml(entry.content)}</p>
-                                        <p class="text-[10px] text-slate-400 mt-1">${new Date(entry.timestamp).toLocaleTimeString()}</p>
-                                    </div>
-                                    <div class="flex items-center gap-1 opacity-50 group-hover:opacity-100 transition-opacity">
-                                        <button onclick="startEditEntry('${entry.id}', 'visitors')" class="edit-btn text-slate-400 hover:text-dot-blue p-1">
-                                            <i class="fas fa-pencil-alt text-xs"></i>
-                                        </button>
-                                        <button onclick="deleteEntryById('${entry.id}'); renderSection('visitors'); updateAllPreviews(); updateProgress();" class="text-red-400 hover:text-red-600 p-1">
-                                            <i class="fas fa-trash text-xs"></i>
-                                        </button>
-                                    </div>
+                    // Always render existing entries
+                    const visitorsEntries = getEntriesForSection('visitors');
+                    if (visitorsList) {
+                        visitorsList.innerHTML = visitorsEntries.map(entry => `
+                            <div class="bg-teal-50 border border-teal-200 p-3 flex items-start gap-3 group" data-entry-id="${entry.id}">
+                                <i class="fas fa-truck-loading text-teal-500 mt-0.5"></i>
+                                <div class="flex-1">
+                                    <p class="entry-content text-sm text-slate-700">${escapeHtml(entry.content)}</p>
+                                    <p class="text-[10px] text-slate-400 mt-1">${new Date(entry.timestamp).toLocaleTimeString()}</p>
                                 </div>
-                            `).join('');
-                        }
-                    } else if (visitorsToggleState === false) {
-                        if (visitorsInputContainer) visitorsInputContainer.classList.add('hidden');
-                        if (visitorsList) {
-                            visitorsList.innerHTML = `
-                                <div class="bg-slate-100 border border-slate-200 p-3 text-center text-sm text-slate-500">
-                                    <i class="fas fa-ban mr-2"></i>Marked as N/A - No visitors or deliveries
+                                <div class="flex items-center gap-1 opacity-50 group-hover:opacity-100 transition-opacity">
+                                    <button onclick="startEditEntry('${entry.id}', 'visitors')" class="edit-btn text-slate-400 hover:text-dot-blue p-1">
+                                        <i class="fas fa-pencil-alt text-xs"></i>
+                                    </button>
+                                    <button onclick="deleteEntryById('${entry.id}'); renderSection('visitors'); updateAllPreviews(); updateProgress();" class="text-red-400 hover:text-red-600 p-1">
+                                        <i class="fas fa-trash text-xs"></i>
+                                    </button>
                                 </div>
-                            `;
-                        }
+                            </div>
+                        `).join('');
+                    }
+
+                    // Toggle controls N/A message and input area visibility
+                    if (visitorsToggleState === false) {
+                        // N/A selected - show message, hide input
+                        if (visitorsNaMessage) visitorsNaMessage.classList.remove('hidden');
+                        if (visitorsInputArea) visitorsInputArea.classList.add('hidden');
                     } else {
-                        if (visitorsInputContainer) visitorsInputContainer.classList.add('hidden');
-                        if (visitorsList) visitorsList.innerHTML = '';
+                        // Yes selected or not yet answered - hide message, show input
+                        if (visitorsNaMessage) visitorsNaMessage.classList.add('hidden');
+                        if (visitorsInputArea) visitorsInputArea.classList.remove('hidden');
                     }
                     break;
                 case 'photos':
