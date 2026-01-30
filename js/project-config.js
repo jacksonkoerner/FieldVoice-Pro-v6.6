@@ -314,6 +314,11 @@ async function saveProject() {
 
     await renderSavedProjects();
     updateActiveProjectBadge();
+
+    // Navigate to projects.html after save
+    setTimeout(() => {
+        window.location.href = 'projects.html';
+    }, 800);
 }
 
 function deleteProject(projectId) {
