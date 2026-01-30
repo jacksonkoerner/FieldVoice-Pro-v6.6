@@ -160,7 +160,7 @@ function getActiveProjectFromCache() {
 }
 
 function openProjectConfig() {
-    window.location.href = 'project-config.html';
+    window.location.href = 'projects.html';
 }
 
 function updateActiveProjectCard() {

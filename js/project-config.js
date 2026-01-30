@@ -312,9 +312,6 @@ async function saveProject() {
         showToast('Project saved locally (offline)', 'warning');
     }
 
-    await renderSavedProjects();
-    updateActiveProjectBadge();
-
     // Navigate to projects.html after save
     setTimeout(() => {
         window.location.href = 'projects.html';
@@ -348,12 +345,13 @@ function deleteProject(projectId) {
             removeStorageItem(STORAGE_KEYS.ACTIVE_PROJECT_ID);
         }
 
-        // If we're currently editing this project, close the form
+        // If we're currently editing this project, navigate back to projects list
         if (currentProject && currentProject.id === projectId) {
-            hideProjectForm();
+            currentProject = null;
+            setTimeout(() => {
+                window.location.href = 'projects.html';
+            }, 500);
         }
-
-        await renderSavedProjects();
     });
 }
 
@@ -365,74 +363,15 @@ async function setActiveProject() {
 
     setActiveProjectId(currentProject.id);
     showToast('Set as active project');
-    await renderSavedProjects();
     updateActiveProjectBadge();
 }
 
 function cancelEdit() {
     currentProject = null;
-    hideProjectForm();
+    window.location.href = 'projects.html';
 }
 
 // ============ UI RENDERING ============
-async function renderSavedProjects() {
-    const container = document.getElementById('savedProjectsList');
-
-    // Show loading state
-    container.innerHTML = `
-        <div class="p-6 text-center">
-            <i class="fas fa-spinner fa-spin text-slate-400 text-2xl mb-3"></i>
-            <p class="text-sm text-slate-500">Loading projects...</p>
-        </div>
-    `;
-
-    const projects = await window.dataLayer.loadProjects();
-    const activeId = getActiveProjectId();
-
-    if (projects.length === 0) {
-        container.innerHTML = `
-            <div class="p-6 text-center">
-                <i class="fas fa-folder-open text-slate-300 text-3xl mb-3"></i>
-                <p class="text-sm text-slate-500">No saved projects</p>
-                <p class="text-xs text-slate-400 mt-1">Create a new project to get started</p>
-            </div>
-        `;
-        return;
-    }
-
-    container.innerHTML = projects.map(project => {
-        const isActive = project.id === activeId;
-        const isEditing = currentProject && currentProject.id === project.id;
-        return `
-            <div class="p-4 ${isEditing ? 'bg-dot-blue/5' : ''} ${isActive ? 'border-l-4 border-safety-green' : ''}">
-                <div class="flex items-start gap-3">
-                    <div class="flex-1 min-w-0">
-                        <div class="flex items-center gap-2">
-                            <p class="font-bold text-slate-800 truncate">${escapeHtml(project.name)}</p>
-                            ${isActive ? '<span class="shrink-0 text-[10px] bg-safety-green text-white px-2 py-0.5 font-bold uppercase">Active</span>' : ''}
-                        </div>
-                        <p class="text-xs text-slate-500 mt-1">
-                            ${project.noabProjectNo ? `#${escapeHtml(project.noabProjectNo)}` : 'No project number'}
-                            ${project.location ? ` • ${escapeHtml(project.location)}` : ''}
-                        </p>
-                        <p class="text-xs text-slate-400 mt-1">
-                            ${project.contractors?.length || 0} contractors
-                        </p>
-                    </div>
-                    <div class="flex items-center gap-2 shrink-0">
-                        <button onclick="loadProject('${project.id}')" class="w-9 h-9 bg-dot-blue text-white flex items-center justify-center hover:bg-blue-800 transition-colors" title="Edit">
-                            <i class="fas fa-edit text-sm"></i>
-                        </button>
-                        <button onclick="deleteProject('${project.id}')" class="w-9 h-9 bg-red-600 text-white flex items-center justify-center hover:bg-red-700 transition-colors" title="Delete">
-                            <i class="fas fa-trash text-sm"></i>
-                        </button>
-                    </div>
-                </div>
-            </div>
-        `;
-    }).join('');
-}
-
 function populateForm() {
     if (!currentProject) return;
 
@@ -473,14 +412,8 @@ function populateForm() {
 }
 
 function showProjectForm() {
-    document.getElementById('projectFormContainer').classList.remove('hidden');
-    // Scroll to form
+    // Scroll to top of form
     document.getElementById('projectFormContainer').scrollIntoView({ behavior: 'smooth' });
-}
-
-function hideProjectForm() {
-    document.getElementById('projectFormContainer').classList.add('hidden');
-    currentProject = null;
 }
 
 function updateActiveProjectBadge() {
@@ -1133,7 +1066,7 @@ function handleMissingFieldInput(e) {
     }
 }
 
-// Initialize drop zones when DOM is ready
+// Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', async () => {
     // Initialize IndexedDB first for local-first storage
     try {
@@ -1143,7 +1076,18 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.error('[project-config] Failed to initialize IndexedDB:', error);
     }
 
-    await renderSavedProjects();
     setupDropZone();
     setupLogoDropZone();
+
+    // Check URL for project ID to edit, otherwise create new project
+    const urlParams = new URLSearchParams(window.location.search);
+    const projectId = urlParams.get('id');
+
+    if (projectId) {
+        // Edit existing project
+        await loadProject(projectId);
+    } else {
+        // Create new project
+        createNewProject();
+    }
 });
