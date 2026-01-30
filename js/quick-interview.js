@@ -296,17 +296,7 @@
                         }
                         
                         saveReport();
-                        renderContractorWorkCards();  // Re-render to show new entry
-                        
-                        // Re-focus and restore cursor position
-                        const newTextarea = document.getElementById(textareaId);
-                        if (newTextarea) {
-                            newTextarea.focus();
-                            newTextarea.value = '';  // Clear since entry is now in list
-                        }
-                        
                         console.log('[AUTOSAVE] Created contractor work entry:', contractorId, currentEntryId);
-                        currentEntryId = null;  // Reset for next entry
                     } else {
                         // Update existing entry
                         const entry = report.entries?.find(e => e.id === currentEntryId);
@@ -345,7 +335,7 @@
                     }
                     
                     saveReport();
-                    renderContractorWorkCards();
+                    currentEntryId = entry.id;  // Track for subsequent updates
                     console.log('[AUTOSAVE] Contractor work entry saved on blur:', contractorId);
                 }
             });
