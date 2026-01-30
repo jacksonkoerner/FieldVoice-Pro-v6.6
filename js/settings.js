@@ -7,79 +7,20 @@ let currentProfileId = null;
 
 // ============ PROFILE MANAGEMENT ============
 async function loadSettings() {
-    // DEBUG: Log device ID at start
-    const deviceId = getDeviceId();
-    console.log('[loadSettings] This device ID:', deviceId);
+    // Load user settings via data-layer (handles localStorage + Supabase fallback)
+    const profile = await window.dataLayer.loadUserSettings();
 
-    // Step 1: Load from localStorage first (local-first)
-    const localProfile = getStorageItem(STORAGE_KEYS.USER_PROFILE);
-
-    // DEBUG: Log localStorage state
-    console.log('[loadSettings] localStorage profile:', localProfile);
-    console.log('[loadSettings] localStorage user_id:', getStorageItem(STORAGE_KEYS.USER_ID));
-
-    if (localProfile) {
-        currentProfileId = localProfile.id || null;
-        document.getElementById('inspectorName').value = localProfile.fullName || '';
-        document.getElementById('title').value = localProfile.title || '';
-        document.getElementById('company').value = localProfile.company || '';
-        document.getElementById('email').value = localProfile.email || '';
-        document.getElementById('phone').value = localProfile.phone || '';
+    if (profile) {
+        currentProfileId = profile.id || null;
+        // Populate form fields
+        document.getElementById('inspectorName').value = profile.fullName || '';
+        document.getElementById('title').value = profile.title || '';
+        document.getElementById('company').value = profile.company || '';
+        document.getElementById('email').value = profile.email || '';
+        document.getElementById('phone').value = profile.phone || '';
     }
 
     updateSignaturePreview();
-
-    // Step 2: Try to fetch from Supabase to sync any cloud changes
-    try {
-        const { data, error } = await supabaseClient
-            .from('user_profiles')
-            .select('*')
-            .eq('device_id', deviceId)
-            .maybeSingle();  // Returns null if not found, doesn't throw error
-
-        // DEBUG: Log Supabase query result
-        console.log('[loadSettings] Supabase result for this device:', data);
-        console.log('[loadSettings] Error:', error);
-
-        if (error && error.code !== 'PGRST116') {
-            // PGRST116 = no rows returned, which is fine for new users
-            console.error('Failed to load settings from Supabase:', error);
-            // Don't show error toast - we already have local data
-            return;
-        }
-
-        if (data) {
-            // Convert to JS format
-            const cloudProfile = fromSupabaseUserProfile(data);
-
-            // Check if cloud data is newer than local data
-            const cloudUpdatedAt = cloudProfile.updatedAt ? new Date(cloudProfile.updatedAt).getTime() : 0;
-            const localUpdatedAt = localProfile?.updatedAt ? new Date(localProfile.updatedAt).getTime() : 0;
-
-            if (cloudUpdatedAt > localUpdatedAt) {
-                // Cloud data is newer - update form and localStorage
-                currentProfileId = cloudProfile.id;
-                document.getElementById('inspectorName').value = cloudProfile.fullName || '';
-                document.getElementById('title').value = cloudProfile.title || '';
-                document.getElementById('company').value = cloudProfile.company || '';
-                document.getElementById('email').value = cloudProfile.email || '';
-                document.getElementById('phone').value = cloudProfile.phone || '';
-
-                // Update localStorage with cloud data
-                setStorageItem(STORAGE_KEYS.USER_PROFILE, cloudProfile);
-
-                // Also store the user_id for use by other pages
-                if (cloudProfile.id) {
-                    setStorageItem(STORAGE_KEYS.USER_ID, cloudProfile.id);
-                }
-
-                updateSignaturePreview();
-            }
-        }
-    } catch (e) {
-        console.error('Failed to sync settings from Supabase:', e);
-        // Don't show error - we already have local data
-    }
 }
 
 async function saveSettings() {
