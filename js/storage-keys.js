@@ -168,18 +168,18 @@ function getDeviceId() {
  * Gets an item from localStorage and parses it as JSON
  *
  * @param {string} key - The localStorage key
- * @returns {*} The parsed value, or null if not found or parse fails
+ * @returns {*} The parsed value, or the raw string if not valid JSON, or null if not found
  */
 function getStorageItem(key) {
-  try {
-    const item = localStorage.getItem(key);
-    if (item === null) {
-      return null;
-    }
-    return JSON.parse(item);
-  } catch (error) {
-    console.error(`Error parsing localStorage item "${key}":`, error);
+  const item = localStorage.getItem(key);
+  if (item === null) {
     return null;
+  }
+  try {
+    return JSON.parse(item);
+  } catch (e) {
+    // Value is a plain string, not JSON - return as-is
+    return item;
   }
 }
 
