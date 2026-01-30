@@ -196,27 +196,8 @@
         <!-- MAIN CONTENT -->
         <main class="flex-1 p-4 space-y-4">
 
-            <!-- SAVED PROJECTS LIST -->
-            <section class="bg-white border-2 border-slate-200">
-                <div class="bg-dot-green text-white p-4">
-                    <h2 class="text-sm font-bold uppercase tracking-wider flex items-center gap-2">
-                        <i class="fas fa-folder-open"></i>
-                        Saved Projects
-                    </h2>
-                </div>
-                <div id="savedProjectsList" class="divide-y divide-slate-200">
-                    <!-- Projects will be rendered here -->
-                </div>
-                <div class="p-4 border-t border-slate-200">
-                    <button onclick="createNewProject()" class="w-full p-3 bg-dot-green hover:bg-green-700 text-white font-bold uppercase transition-colors flex items-center justify-center gap-2 text-sm">
-                        <i class="fas fa-plus"></i>
-                        New Project
-                    </button>
-                </div>
-            </section>
-
-            <!-- PROJECT DETAILS FORM (hidden by default until project is loaded/created) -->
-            <div id="projectFormContainer" class="hidden space-y-4">
+            <!-- PROJECT DETAILS FORM -->
+            <div id="projectFormContainer" class="space-y-4">
 
                 <!-- Active Project Indicator -->
                 <div id="activeProjectBadge" class="hidden bg-safety-green text-white p-3 flex items-center gap-2">
