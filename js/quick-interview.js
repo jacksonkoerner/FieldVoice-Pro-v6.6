@@ -131,6 +131,26 @@
                 textarea.value = entry.content;
                 textarea.rows = 2;
                 
+                // Debounced auto-save on typing
+                let editSaveTimeout = null;
+                textarea.addEventListener('input', () => {
+                    autoExpand(textarea);
+                    if (editSaveTimeout) clearTimeout(editSaveTimeout);
+                    editSaveTimeout = setTimeout(() => {
+                        const text = textarea.value.trim();
+                        if (text) {
+                            updateEntry(entryId, text);
+                            saveReport();
+                            // Queue backup to Supabase
+                            if (currentReportId && entry) {
+                                entry.content = text;
+                                queueEntryBackup(currentReportId, entry);
+                            }
+                            console.log('[EDIT AUTOSAVE] Entry saved:', entryId);
+                        }
+                    }, 500);
+                });
+                
                 // Replace p with textarea
                 contentP.replaceWith(textarea);
                 
