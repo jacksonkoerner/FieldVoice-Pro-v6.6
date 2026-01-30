@@ -220,6 +220,8 @@
                         }
                         
                         saveReport();
+                        // Track in shared state so "+" button knows entry exists
+                        autoSaveState[section] = { entryId: currentEntryId, saved: true };
                         console.log('[AUTOSAVE] Created guided entry:', section, currentEntryId);
                     } else {
                         // Update existing entry
@@ -230,6 +232,8 @@
                                 queueEntryBackup(currentReportId, entry);
                             }
                             saveReport();
+                            // Keep shared state updated
+                            autoSaveState[section] = { entryId: currentEntryId, saved: true };
                             console.log('[AUTOSAVE] Updated guided entry:', section, currentEntryId);
                         }
                     }
@@ -246,6 +250,8 @@
                         entry.content = text;
                         if (currentReportId) queueEntryBackup(currentReportId, entry);
                         saveReport();
+                        // Track in shared state so "+" button knows entry exists
+                        autoSaveState[section] = { entryId: currentEntryId, saved: true };
                         console.log('[AUTOSAVE] Guided entry saved on blur:', section, currentEntryId);
                     }
                 }
@@ -3356,14 +3362,24 @@
         function addIssue() {
             const input = document.getElementById('issue-input');
             const text = input.value.trim();
-            if (text) {
-                // v6: Use entry-based notes
-                createEntry('issues', text);
-                renderSection('issues');
+            if (!text) return;
+            
+            // If auto-save already created an entry for this content, just clear and render
+            if (autoSaveState['issues']?.saved) {
                 input.value = '';
+                delete autoSaveState['issues'];  // Clear state for next entry
+                renderSection('issues');
                 updateAllPreviews();
                 updateProgress();
+                return;
             }
+            
+            // Otherwise create new entry (user clicked "+" before auto-save triggered)
+            createEntry('issues', text);
+            renderSection('issues');
+            input.value = '';
+            updateAllPreviews();
+            updateProgress();
         }
 
         function removeIssue(index) {
@@ -3388,14 +3404,24 @@
         function addSafetyNote() {
             const input = document.getElementById('safety-input');
             const text = input.value.trim();
-            if (text) {
-                // v6: Use entry-based notes
-                createEntry('safety', text);
-                renderSection('safety');
+            if (!text) return;
+            
+            // If auto-save already created an entry for this content, just clear and render
+            if (autoSaveState['safety']?.saved) {
                 input.value = '';
+                delete autoSaveState['safety'];  // Clear state for next entry
+                renderSection('safety');
                 updateAllPreviews();
                 updateProgress();
+                return;
             }
+            
+            // Otherwise create new entry (user clicked "+" before auto-save triggered)
+            createEntry('safety', text);
+            renderSection('safety');
+            input.value = '';
+            updateAllPreviews();
+            updateProgress();
         }
 
         function removeSafetyNote(index) {
@@ -3413,37 +3439,70 @@
         function addCommunication() {
             const input = document.getElementById('communications-input');
             const text = input.value.trim();
-            if (text) {
-                createEntry('communications', text);
-                renderSection('communications');
+            if (!text) return;
+            
+            // If auto-save already created an entry for this content, just clear and render
+            if (autoSaveState['communications']?.saved) {
                 input.value = '';
+                delete autoSaveState['communications'];  // Clear state for next entry
+                renderSection('communications');
                 updateAllPreviews();
                 updateProgress();
+                return;
             }
+            
+            // Otherwise create new entry (user clicked "+" before auto-save triggered)
+            createEntry('communications', text);
+            renderSection('communications');
+            input.value = '';
+            updateAllPreviews();
+            updateProgress();
         }
 
         function addQAQC() {
             const input = document.getElementById('qaqc-input');
             const text = input.value.trim();
-            if (text) {
-                createEntry('qaqc', text);
-                renderSection('qaqc');
+            if (!text) return;
+            
+            // If auto-save already created an entry for this content, just clear and render
+            if (autoSaveState['qaqc']?.saved) {
                 input.value = '';
+                delete autoSaveState['qaqc'];  // Clear state for next entry
+                renderSection('qaqc');
                 updateAllPreviews();
                 updateProgress();
+                return;
             }
+            
+            // Otherwise create new entry (user clicked "+" before auto-save triggered)
+            createEntry('qaqc', text);
+            renderSection('qaqc');
+            input.value = '';
+            updateAllPreviews();
+            updateProgress();
         }
 
         function addVisitor() {
             const input = document.getElementById('visitors-input');
             const text = input.value.trim();
-            if (text) {
-                createEntry('visitors', text);
-                renderSection('visitors');
+            if (!text) return;
+            
+            // If auto-save already created an entry for this content, just clear and render
+            if (autoSaveState['visitors']?.saved) {
                 input.value = '';
+                delete autoSaveState['visitors'];  // Clear state for next entry
+                renderSection('visitors');
                 updateAllPreviews();
                 updateProgress();
+                return;
             }
+            
+            // Otherwise create new entry (user clicked "+" before auto-save triggered)
+            createEntry('visitors', text);
+            renderSection('visitors');
+            input.value = '';
+            updateAllPreviews();
+            updateProgress();
         }
 
         // ============ PHOTOS ============
