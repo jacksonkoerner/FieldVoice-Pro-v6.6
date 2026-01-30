@@ -1608,8 +1608,7 @@
         }
 
         /**
-         * Handle photo input in minimal mode (local-first)
-         * Saves to IndexedDB immediately, then syncs to Supabase in background
+         * Handle photo input in minimal mode
          */
         async function handleMinimalPhotoInput(e) {
             const files = e.target.files;
@@ -1635,53 +1634,32 @@
                     const compressedDataUrl = await compressImage(rawDataUrl, 1200, 0.7);
                     const compressedBlob = await dataURLtoBlob(compressedDataUrl);
 
-                    // Build photo record for IndexedDB
-                    const reportId = currentReportId || getReportKey(activeProject?.id, new Date().toISOString().split('T')[0]);
-                    const photoRecord = {
-                        id: photoId,
-                        reportId: reportId,
-                        blob: compressedBlob,
-                        caption: '',
-                        timestamp: now.toISOString(),
-                        gps: gps,
-                        syncStatus: 'pending',
-                        retryCount: 0,
-                        lastSyncAttempt: null,
-                        supabaseId: null,
-                        storagePath: null,
-                        fileName: file.name
-                    };
+                    // Upload to Supabase Storage
+                    showToast('Uploading photo...', 'info');
+                    const { storagePath, publicUrl } = await uploadPhotoToSupabase(compressedBlob, photoId);
 
-                    // 1. SAVE TO INDEXEDDB FIRST (instant, offline-safe)
-                    await idb.savePhoto(photoRecord);
-                    console.log('[PHOTO] Saved to IndexedDB:', photoId);
-
-                    // 2. ADD TO REPORT (for UI) - use blob URL for display
-                    const blobUrl = URL.createObjectURL(compressedBlob);
                     const photoObj = {
                         id: photoId,
-                        url: blobUrl,
-                        storagePath: null,
+                        url: publicUrl,
+                        storagePath: storagePath,
                         caption: '',
                         timestamp: now.toISOString(),
                         date: now.toLocaleDateString(),
                         time: now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
                         gps: gps,
-                        fileName: file.name,
-                        syncStatus: 'pending'
+                        fileName: file.name
                     };
+
                     report.photos.push(photoObj);
+
+                    // Save photo metadata to Supabase
+                    await savePhotoMetadata(photoObj);
+
                     renderMinimalPhotos();
-                    showToast('Photo saved', 'success');
-
-                    // 3. ATTEMPT BACKGROUND UPLOAD (non-blocking)
-                    syncPhotoToSupabase(photoId).catch(err => {
-                        console.warn('[PHOTO] Background sync failed, will retry later:', err);
-                    });
-
+                    showToast('Photo uploaded', 'success');
                 } catch (err) {
                     console.error('Error adding photo:', err);
-                    showToast('Failed to save photo', 'error');
+                    showToast('Failed to add photo', 'error');
                 }
             }
 
@@ -1689,190 +1667,22 @@
             e.target.value = '';
         }
 
-        /**
-         * Sync a photo from IndexedDB to Supabase (background upload)
-         * @param {string} photoId - The photo ID to sync
-         */
-        async function syncPhotoToSupabase(photoId) {
-            const photo = await idb.getPhotoById(photoId);
-            if (!photo || photo.syncStatus === 'synced') return;
-
-            try {
-                // Ensure report exists in Supabase first
-                if (!currentReportId) {
-                    await saveReportToSupabase();
-                }
-
-                // Upload blob to storage
-                const { storagePath, publicUrl } = await uploadPhotoToSupabase(photo.blob, photoId, photo.fileName);
-
-                // Update IndexedDB with success
-                photo.syncStatus = 'synced';
-                photo.storagePath = storagePath;
-                photo.lastSyncAttempt = new Date().toISOString();
-                await idb.savePhoto(photo);
-
-                // Save metadata to Supabase
-                await savePhotoMetadata({
-                    id: photo.id,
-                    storagePath: storagePath,
-                    fileName: photo.fileName,
-                    caption: photo.caption,
-                    gps: photo.gps,
-                    timestamp: photo.timestamp
-                });
-
-                // Update in-memory report.photos with real URL
-                const idx = report.photos.findIndex(p => p.id === photoId);
-                if (idx !== -1) {
-                    URL.revokeObjectURL(report.photos[idx].url); // Clean up blob URL
-                    report.photos[idx].url = publicUrl;
-                    report.photos[idx].storagePath = storagePath;
-                    report.photos[idx].syncStatus = 'synced';
-                    renderMinimalPhotos();
-                }
-
-                console.log('[PHOTO] Synced to Supabase:', photoId);
-            } catch (err) {
-                // Update IndexedDB with failure
-                photo.syncStatus = 'failed';
-                photo.retryCount = (photo.retryCount || 0) + 1;
-                photo.lastSyncAttempt = new Date().toISOString();
-                await idb.savePhoto(photo);
-                
-                // Update in-memory status
-                const idx = report.photos.findIndex(p => p.id === photoId);
-                if (idx !== -1) {
-                    report.photos[idx].syncStatus = 'failed';
-                }
-                
-                throw err;
-            }
-        }
-
-        /**
-         * Sync all pending/failed photos to Supabase
-         * Called on page load and when coming back online
-         */
-        async function syncPendingPhotos() {
-            // 1. Get all photos that need syncing
-            const pending = await idb.getPhotosBySyncStatus('pending');
-            const failed = await idb.getPhotosBySyncStatus('failed');
-            const pendingDelete = await idb.getPhotosBySyncStatus('pending-delete');
-
-            console.log(`[PHOTO SYNC] Found: ${pending.length} pending, ${failed.length} failed, ${pendingDelete.length} pending-delete`);
-
-            // 2. Handle pending uploads
-            for (const photo of pending) {
-                try {
-                    await syncPhotoToSupabase(photo.id);
-                } catch (err) {
-                    console.warn('[PHOTO SYNC] Failed to sync pending photo:', photo.id, err);
-                }
-            }
-
-            // 3. Handle failed uploads (with backoff)
-            for (const photo of failed) {
-                // Exponential backoff: wait 2^retryCount minutes before retry
-                // Max 5 retries (32 min max wait)
-                if (photo.retryCount >= 5) {
-                    console.warn('[PHOTO SYNC] Max retries reached for:', photo.id);
-                    continue;
-                }
-
-                const lastAttempt = photo.lastSyncAttempt ? new Date(photo.lastSyncAttempt) : null;
-                const backoffMs = Math.pow(2, photo.retryCount) * 60 * 1000; // 2^n minutes
-                const now = Date.now();
-
-                if (lastAttempt && (now - lastAttempt.getTime()) < backoffMs) {
-                    console.log('[PHOTO SYNC] Backoff not elapsed for:', photo.id);
-                    continue;
-                }
-
-                try {
-                    await syncPhotoToSupabase(photo.id);
-                } catch (err) {
-                    console.warn('[PHOTO SYNC] Retry failed for:', photo.id, err);
-                }
-            }
-
-            // 4. Handle pending deletes
-            for (const photo of pendingDelete) {
-                try {
-                    await deletePhotoFromSupabaseAndLocal(photo);
-                } catch (err) {
-                    console.warn('[PHOTO SYNC] Failed to delete:', photo.id, err);
-                }
-            }
-        }
-
-        /**
-         * Delete photo from Supabase (if synced) and IndexedDB
-         * @param {Object} photo - The photo object from IndexedDB
-         */
-        async function deletePhotoFromSupabaseAndLocal(photo) {
-            // If it was synced, delete from Supabase
-            if (photo.storagePath) {
-                await supabaseClient.storage
-                    .from('report-photos')
-                    .remove([photo.storagePath]);
-
-                await supabaseClient
-                    .from('photos')
-                    .delete()
-                    .eq('id', photo.id);
-            }
-
-            // Delete from IndexedDB
-            await idb.deletePhoto(photo.id);
-            console.log('[PHOTO SYNC] Deleted photo:', photo.id);
-        }
-
         // readFileAsDataURL() and dataURLtoBlob() moved to /js/media-utils.js
 
         /**
          * Delete a photo in minimal mode
-         * If online and synced → delete immediately from Supabase
-         * If offline or not synced → mark as 'pending-delete' for later
          */
         async function deleteMinimalPhoto(idx) {
             if (!confirm('Delete this photo?')) return;
 
             const photo = report.photos[idx];
-            if (!photo) return;
+            if (photo) {
+                await deletePhotoFromSupabase(photo.id, photo.storagePath);
+            }
 
-            // Remove from in-memory report immediately (UI feedback)
             report.photos.splice(idx, 1);
             saveReport();
             renderMinimalPhotos();
-
-            // Clean up blob URL if it exists
-            if (photo.url && photo.url.startsWith('blob:')) {
-                URL.revokeObjectURL(photo.url);
-            }
-
-            // Get the IndexedDB record
-            const idbPhoto = await idb.getPhotoById(photo.id);
-
-            if (navigator.onLine && idbPhoto?.syncStatus === 'synced') {
-                // Online and synced → delete from Supabase immediately
-                try {
-                    await deletePhotoFromSupabaseAndLocal(idbPhoto);
-                    showToast('Photo deleted', 'success');
-                } catch (err) {
-                    console.error('[PHOTO] Failed to delete from Supabase:', err);
-                    showToast('Photo removed locally', 'warning');
-                }
-            } else if (idbPhoto) {
-                // Offline or not synced → mark as pending-delete
-                idbPhoto.syncStatus = 'pending-delete';
-                await idb.savePhoto(idbPhoto);
-                console.log('[PHOTO] Marked for pending delete:', photo.id);
-                showToast('Photo will be deleted when online', 'info');
-            } else {
-                // No IndexedDB record (shouldn't happen, but handle gracefully)
-                showToast('Photo deleted', 'success');
-            }
         }
 
         // ============ AI PROCESSING WEBHOOK ============
@@ -3384,22 +3194,19 @@
 
         /**
          * Upload photo to Supabase Storage
-         * @param {Blob|File} file - The file or blob to upload
-         * @param {string} photoId - The photo ID
-         * @param {string} [fileName] - Optional filename (required for Blobs)
          */
-        async function uploadPhotoToSupabase(file, photoId, fileName) {
+        async function uploadPhotoToSupabase(file, photoId) {
             if (!currentReportId) {
                 // Create report first if it doesn't exist
                 await saveReportToSupabase();
             }
 
-            const storagePath = `${currentReportId}/${photoId}_${fileName || file.name || 'photo.jpg'}`;
+            const fileName = `${currentReportId}/${photoId}_${file.name}`;
 
             try {
                 const { data, error } = await supabaseClient.storage
                     .from('report-photos')
-                    .upload(storagePath, file, {
+                    .upload(fileName, file, {
                         cacheControl: '3600',
                         upsert: false
                     });
@@ -3412,10 +3219,10 @@
                 // Get public URL
                 const { data: urlData } = supabaseClient.storage
                     .from('report-photos')
-                    .getPublicUrl(storagePath);
+                    .getPublicUrl(fileName);
 
                 return {
-                    storagePath: storagePath,
+                    storagePath: fileName,
                     publicUrl: urlData?.publicUrl || ''
                 };
             } catch (err) {
@@ -4808,18 +4615,9 @@
 
                 checkAndShowWarningBanner();
                 checkDictationHintBanner();
-
-                // Sync any pending photos from IndexedDB
-                syncPendingPhotos();
             } catch (error) {
                 console.error('Initialization failed:', error);
                 hideLoadingOverlay();
                 showToast('Failed to load data. Please refresh.', 'error');
             }
-        });
-
-        // Sync photos when coming back online
-        window.addEventListener('online', () => {
-            console.log('[SYNC] Back online, syncing photos...');
-            syncPendingPhotos();
         });
