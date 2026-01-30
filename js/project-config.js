@@ -11,6 +11,7 @@ let isLoading = false;
 // Note: Initialization moved to end of script with setupDropZone()
 
 // ============ PROJECT MANAGEMENT ============
+/* DEPRECATED — now using window.dataLayer.loadProjects()
 async function getProjects() {
     try {
         // Get current user's ID
@@ -101,6 +102,7 @@ async function getProjects() {
         return [];
     }
 }
+*/
 
 async function saveProjectToSupabase(project) {
     try {
@@ -234,7 +236,7 @@ async function loadProject(projectId) {
         // Fall back to getProjects() if not found in IndexedDB
         if (!project) {
             console.log('[loadProject] Not in IndexedDB, falling back to getProjects()');
-            const projects = await getProjects();
+            const projects = await window.dataLayer.loadProjects();
             project = projects.find(p => p.id === projectId);
         }
 
@@ -379,7 +381,7 @@ async function renderSavedProjects() {
         </div>
     `;
 
-    const projects = await getProjects();
+    const projects = await window.dataLayer.loadProjects();
     const activeId = getActiveProjectId();
 
     if (projects.length === 0) {
