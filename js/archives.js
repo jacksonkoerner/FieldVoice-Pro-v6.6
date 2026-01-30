@@ -1,13 +1,36 @@
 // FieldVoice Pro - Archives Page Logic
-// Report listing, deletion, and project lookup
+// Report listing with IndexedDB caching, Supabase fallback
 
 // ============ STATE ============
 let pendingDeleteId = null;
 let pendingDeleteDate = null;
 let projectsCache = [];
+let isRefreshing = false;
 
 // ============ PROJECT LOADING ============
 async function loadProjects() {
+    // Try IndexedDB first
+    try {
+        const localProjects = await window.idb.getAllProjects();
+        if (localProjects && localProjects.length > 0) {
+            projectsCache = localProjects.map(p => ({
+                id: p.id,
+                name: p.project_name || p.name || '',
+                status: p.status || 'active'
+            }));
+            console.log('[IDB] Loaded projects:', projectsCache.length);
+            return projectsCache;
+        }
+    } catch (e) {
+        console.warn('[IDB] Failed to load projects:', e);
+    }
+
+    // Fallback to Supabase if online
+    if (!navigator.onLine) {
+        console.log('[OFFLINE] No cached projects');
+        return [];
+    }
+
     try {
         const { data, error } = await supabaseClient
             .from('projects')
@@ -37,8 +60,21 @@ function getProjectById(projectId) {
     return projectsCache.find(p => p.id === projectId) || null;
 }
 
-// ============ REPORT LOADING ============
-async function getAllReports() {
+// ============ ARCHIVE LOADING (IndexedDB-first) ============
+async function loadArchivesFromIndexedDB() {
+    try {
+        const archives = await window.idb.getAllArchives();
+        if (archives && archives.length > 0) {
+            console.log('[IDB] Loaded archives:', archives.length);
+            return archives.sort((a, b) => new Date(b.date) - new Date(a.date));
+        }
+    } catch (e) {
+        console.warn('[IDB] Failed to load archives:', e);
+    }
+    return [];
+}
+
+async function fetchArchivesFromSupabase() {
     try {
         // Query reports table with photo count
         const { data: reportRows, error: reportError } = await supabaseClient
@@ -82,8 +118,8 @@ async function getAllReports() {
             });
         }
 
-        // Map to the format expected by the UI
-        const reports = reportRows.map(row => {
+        // Map to archive format
+        const archives = reportRows.map(row => {
             const project = getProjectById(row.project_id);
             return {
                 id: row.id,
@@ -91,80 +127,178 @@ async function getAllReports() {
                 projectId: row.project_id,
                 projectName: project?.name || row.projects?.project_name || 'Unknown Project',
                 submitted: row.status === 'submitted',
+                status: row.status,
                 photoCount: photoCountMap[row.id] || 0,
                 createdAt: row.created_at,
-                submittedAt: row.submitted_at
+                submittedAt: row.submitted_at,
+                updatedAt: row.updated_at
             };
         });
 
-        console.log('[SUPABASE] Loaded reports:', reports.length);
-        return reports;
+        console.log('[SUPABASE] Fetched archives:', archives.length);
+        return archives;
     } catch (e) {
         console.error('[SUPABASE] Failed to load reports:', e);
         throw e;
     }
 }
 
-async function deleteReport(reportId) {
-    try {
-        // Delete the report - related tables will cascade automatically
-        const { error } = await supabaseClient
-            .from('reports')
-            .delete()
-            .eq('id', reportId);
-
-        if (error) {
-            console.error('[SUPABASE] Error deleting report:', error);
-            throw error;
+async function saveArchivesToIndexedDB(archives) {
+    for (const archive of archives) {
+        try {
+            await window.idb.saveArchive(archive);
+        } catch (e) {
+            console.warn('[IDB] Failed to save archive:', archive.id, e);
         }
-
-        console.log('[SUPABASE] Report deleted:', reportId);
-        return true;
-    } catch (e) {
-        console.error('[SUPABASE] Failed to delete report:', e);
-        return false;
     }
+    console.log('[IDB] Saved archives to IndexedDB:', archives.length);
 }
 
-// ============ RENDER ============
-async function renderReportList() {
-    const section = document.getElementById('reportListSection');
+// ============ MAIN LOAD FUNCTION ============
+async function getAllReports() {
+    // 1. Try IndexedDB first
+    const localArchives = await loadArchivesFromIndexedDB();
+    if (localArchives.length > 0) {
+        return localArchives;
+    }
 
-    // Show loading state
-    section.innerHTML = `
-        <div class="flex flex-col items-center justify-center py-16 px-4">
-            <i class="fas fa-spinner fa-spin text-slate-400 text-3xl mb-4"></i>
-            <p class="text-sm text-slate-500">Loading reports...</p>
-        </div>
-    `;
+    // 2. If offline and no local data, return empty
+    if (!navigator.onLine) {
+        console.log('[OFFLINE] No cached archives');
+        return [];
+    }
 
-    let reports;
-    try {
-        reports = await getAllReports();
-    } catch (err) {
-        console.error('[ARCHIVES] Error loading reports:', err);
-        section.innerHTML = `
-            <div class="flex flex-col items-center justify-center py-16 px-4">
-                <div class="w-20 h-20 bg-red-100 border-2 border-red-300 flex items-center justify-center mb-6">
-                    <i class="fas fa-exclamation-triangle text-red-500 text-3xl"></i>
-                </div>
-                <p class="text-lg font-bold text-slate-500 mb-2 text-center">Error loading reports</p>
-                <p class="text-sm text-red-500 text-center mb-6">${err.message || 'Unknown error'}</p>
-                <button onclick="location.reload()" class="px-6 py-3 bg-dot-navy text-white font-bold uppercase tracking-wide hover:bg-dot-blue transition-colors">
-                    <i class="fas fa-redo mr-2"></i>Retry
-                </button>
-            </div>
-        `;
+    // 3. Fetch from Supabase and cache
+    const supabaseArchives = await fetchArchivesFromSupabase();
+    if (supabaseArchives.length > 0) {
+        await saveArchivesToIndexedDB(supabaseArchives);
+    }
+    return supabaseArchives;
+}
+
+// ============ REFRESH FROM CLOUD ============
+async function refreshFromCloud() {
+    if (isRefreshing) return;
+
+    if (!navigator.onLine) {
+        showToast('You are offline', 'warning');
         return;
     }
 
+    isRefreshing = true;
+    const refreshBtn = document.getElementById('refreshBtn');
+    if (refreshBtn) {
+        refreshBtn.disabled = true;
+        refreshBtn.innerHTML = '<i class="fas fa-sync-alt fa-spin"></i>';
+    }
+
+    try {
+        showToast('Refreshing from cloud...', 'info');
+
+        // Fetch fresh data from Supabase
+        const archives = await fetchArchivesFromSupabase();
+
+        // Clear old archives and save new ones
+        try {
+            await window.idb.clearStore('archives');
+        } catch (e) {
+            console.warn('[IDB] Could not clear archives store:', e);
+        }
+
+        if (archives.length > 0) {
+            await saveArchivesToIndexedDB(archives);
+        }
+
+        // Re-render the list
+        await renderReportList(archives);
+
+        showToast('Archives refreshed', 'success');
+    } catch (err) {
+        console.error('[REFRESH] Failed:', err);
+        showToast('Failed to refresh', 'error');
+    } finally {
+        isRefreshing = false;
+        if (refreshBtn) {
+            refreshBtn.disabled = false;
+            refreshBtn.innerHTML = '<i class="fas fa-sync-alt"></i>';
+        }
+    }
+}
+
+// ============ DELETE ============
+async function deleteReport(reportId) {
+    // Delete from IndexedDB first
+    try {
+        await window.idb.deleteArchive(reportId);
+        console.log('[IDB] Archive deleted:', reportId);
+    } catch (e) {
+        console.warn('[IDB] Failed to delete archive from IndexedDB:', e);
+    }
+
+    // Delete from Supabase if online
+    if (navigator.onLine) {
+        try {
+            const { error } = await supabaseClient
+                .from('reports')
+                .delete()
+                .eq('id', reportId);
+
+            if (error) {
+                console.error('[SUPABASE] Error deleting report:', error);
+                // Don't throw - local delete succeeded
+            } else {
+                console.log('[SUPABASE] Report deleted:', reportId);
+            }
+        } catch (e) {
+            console.error('[SUPABASE] Failed to delete report:', e);
+        }
+    }
+
+    return true;
+}
+
+// ============ RENDER ============
+async function renderReportList(reports = null) {
+    const section = document.getElementById('reportListSection');
+
+    // Show loading state if no reports provided
+    if (reports === null) {
+        section.innerHTML = `
+            <div class="flex flex-col items-center justify-center py-16 px-4">
+                <i class="fas fa-spinner fa-spin text-slate-400 text-3xl mb-4"></i>
+                <p class="text-sm text-slate-500">Loading reports...</p>
+            </div>
+        `;
+
+        try {
+            reports = await getAllReports();
+        } catch (err) {
+            console.error('[ARCHIVES] Error loading reports:', err);
+            section.innerHTML = `
+                <div class="flex flex-col items-center justify-center py-16 px-4">
+                    <div class="w-20 h-20 bg-red-100 border-2 border-red-300 flex items-center justify-center mb-6">
+                        <i class="fas fa-exclamation-triangle text-red-500 text-3xl"></i>
+                    </div>
+                    <p class="text-lg font-bold text-slate-500 mb-2 text-center">Error loading reports</p>
+                    <p class="text-sm text-red-500 text-center mb-6">${escapeHtml(err.message || 'Unknown error')}</p>
+                    <button onclick="location.reload()" class="px-6 py-3 bg-dot-navy text-white font-bold uppercase tracking-wide hover:bg-dot-blue transition-colors">
+                        <i class="fas fa-redo mr-2"></i>Retry
+                    </button>
+                </div>
+            `;
+            return;
+        }
+    }
+
     if (reports.length === 0) {
+        const offlineMsg = !navigator.onLine ? '<p class="text-xs text-yellow-600 mb-4"><i class="fas fa-wifi-slash mr-1"></i>You are offline</p>' : '';
         section.innerHTML = `
             <div class="flex flex-col items-center justify-center py-16 px-4">
                 <div class="w-20 h-20 bg-slate-200 border-2 border-dashed border-slate-300 flex items-center justify-center mb-6">
                     <i class="fas fa-folder-open text-slate-400 text-3xl"></i>
                 </div>
                 <p class="text-lg font-bold text-slate-500 mb-2 text-center">No reports yet</p>
+                ${offlineMsg}
                 <p class="text-sm text-slate-400 text-center mb-6">Complete your first daily report to see it here.</p>
                 <a href="index.html" class="px-6 py-3 bg-dot-navy text-white font-bold uppercase tracking-wide hover:bg-dot-blue transition-colors">
                     <i class="fas fa-plus mr-2"></i>Start a Report
@@ -287,3 +421,4 @@ document.addEventListener('DOMContentLoaded', async () => {
 window.showDeleteModal = showDeleteModal;
 window.closeDeleteModal = closeDeleteModal;
 window.confirmDelete = confirmDelete;
+window.refreshFromCloud = refreshFromCloud;

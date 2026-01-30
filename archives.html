@@ -23,6 +23,7 @@
     <script src="./js/pwa-utils.js"></script>
     <script src="./js/ui-utils.js"></script>
     <script src="./js/storage-keys.js"></script>
+    <script src="./js/indexeddb-utils.js"></script>
     <script src="./js/supabase-utils.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -101,9 +102,14 @@
                         Report Archives
                     </h1>
                 </div>
-                <a href="index.html" class="w-10 h-10 border border-slate-600 flex items-center justify-center text-slate-400 hover:bg-slate-800 hover:text-white transition-colors" title="Home">
-                    <i class="fas fa-home"></i>
-                </a>
+                <div class="flex items-center gap-2">
+                    <button id="refreshBtn" onclick="refreshFromCloud()" class="w-10 h-10 border border-slate-600 flex items-center justify-center text-slate-400 hover:bg-slate-800 hover:text-white transition-colors" title="Refresh from Cloud">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                    <a href="index.html" class="w-10 h-10 border border-slate-600 flex items-center justify-center text-slate-400 hover:bg-slate-800 hover:text-white transition-colors" title="Home">
+                        <i class="fas fa-home"></i>
+                    </a>
+                </div>
             </div>
         </header>
 

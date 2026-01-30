@@ -1,45 +1,58 @@
-// FieldVoice Pro - Drafts & Pending Reports Page Logic
-// Offline queue management, sync retry, and draft editing
+// FieldVoice Pro - Drafts Page Logic
+// Local draft management (localStorage only, no Supabase)
 
 // ============ STATE ============
-let pendingDeleteIndex = null;
+let pendingDeleteKey = null;
 
-// ============ OFFLINE QUEUE MANAGEMENT ============
-function getOfflineQueue() {
+// ============ DRAFT LOADING (localStorage CURRENT_REPORTS) ============
+function getAllDrafts() {
     try {
-        const stored = localStorage.getItem(STORAGE_KEYS.OFFLINE_QUEUE);
-        if (!stored) return { drafts: [] };
-        const parsed = JSON.parse(stored);
-        return parsed.drafts ? parsed : { drafts: [] };
+        const stored = localStorage.getItem(STORAGE_KEYS.CURRENT_REPORTS);
+        if (!stored) return [];
+
+        const reportsObj = JSON.parse(stored);
+        // CURRENT_REPORTS is an object keyed by report key (projectId_date)
+        const drafts = [];
+
+        for (const [key, report] of Object.entries(reportsObj)) {
+            if (report && typeof report === 'object') {
+                drafts.push({
+                    key: key,
+                    projectId: report.project?.id || report.projectId || null,
+                    projectName: report.project?.name || report.projectName || 'Unknown Project',
+                    reportDate: report.overview?.date || report.reportDate || key.split('_').pop(),
+                    captureMode: report.meta?.captureMode || 'guided',
+                    lastSaved: report.meta?.lastSaved || report.lastSaved || new Date().toISOString(),
+                    status: report.meta?.status || 'draft',
+                    data: report
+                });
+            }
+        }
+
+        // Sort by lastSaved descending
+        drafts.sort((a, b) => new Date(b.lastSaved) - new Date(a.lastSaved));
+
+        console.log('[DRAFTS] Loaded drafts:', drafts.length);
+        return drafts;
     } catch (e) {
-        console.error('[DRAFTS] Failed to parse offline queue:', e);
-        return { drafts: [] };
+        console.error('[DRAFTS] Failed to parse drafts:', e);
+        return [];
     }
 }
 
-function saveOfflineQueue(queue) {
+function deleteDraftByKey(key) {
     try {
-        localStorage.setItem(STORAGE_KEYS.OFFLINE_QUEUE, JSON.stringify(queue));
+        const stored = localStorage.getItem(STORAGE_KEYS.CURRENT_REPORTS);
+        if (!stored) return;
+
+        const reportsObj = JSON.parse(stored);
+        if (reportsObj[key]) {
+            delete reportsObj[key];
+            localStorage.setItem(STORAGE_KEYS.CURRENT_REPORTS, JSON.stringify(reportsObj));
+            console.log('[DRAFTS] Deleted draft:', key);
+        }
     } catch (e) {
-        console.error('[DRAFTS] Failed to save offline queue:', e);
-    }
-}
-
-function removeDraft(index) {
-    const queue = getOfflineQueue();
-    if (index >= 0 && index < queue.drafts.length) {
-        queue.drafts.splice(index, 1);
-        saveOfflineQueue(queue);
-    }
-}
-
-function updateDraftError(index, errorMessage) {
-    const queue = getOfflineQueue();
-    if (index >= 0 && index < queue.drafts.length) {
-        queue.drafts[index].status = 'sync_failed';
-        queue.drafts[index].errorMessage = errorMessage;
-        queue.drafts[index].lastSaved = new Date().toISOString();
-        saveOfflineQueue(queue);
+        console.error('[DRAFTS] Failed to delete draft:', e);
     }
 }
 
@@ -52,50 +65,59 @@ function getStatusBadge(status) {
                 bgColor: 'bg-dot-slate',
                 borderColor: 'border-dot-slate'
             };
-        case 'pending_sync':
+        case 'in_progress':
             return {
-                text: 'Pending Sync',
+                text: 'In Progress',
+                bgColor: 'bg-dot-blue',
+                borderColor: 'border-dot-blue'
+            };
+        case 'pending':
+            return {
+                text: 'Pending',
                 bgColor: 'bg-dot-orange',
                 borderColor: 'border-dot-orange'
             };
-        case 'sync_failed':
-            return {
-                text: 'Sync Failed',
-                bgColor: 'bg-red-600',
-                borderColor: 'border-red-600'
-            };
         default:
             return {
-                text: status || 'Unknown',
+                text: status || 'Draft',
                 bgColor: 'bg-slate-400',
                 borderColor: 'border-slate-400'
             };
     }
 }
 
+function formatRelativeTime(dateStr) {
+    try {
+        const date = new Date(dateStr);
+        const now = new Date();
+        const diffMs = now - date;
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMs / 3600000);
+        const diffDays = Math.floor(diffMs / 86400000);
+
+        if (diffMins < 1) return 'Just now';
+        if (diffMins < 60) return `${diffMins}m ago`;
+        if (diffHours < 24) return `${diffHours}h ago`;
+        if (diffDays < 7) return `${diffDays}d ago`;
+        return date.toLocaleDateString();
+    } catch (e) {
+        return dateStr;
+    }
+}
+
 // ============ RENDER FUNCTIONS ============
 function renderDrafts() {
-    const queue = getOfflineQueue();
-    const drafts = queue.drafts || [];
+    const drafts = getAllDrafts();
     const container = document.getElementById('draftsList');
     const countEl = document.getElementById('queueCount');
 
     // Update count
     if (drafts.length === 0) {
-        countEl.textContent = 'No pending items';
+        countEl.textContent = 'No drafts';
     } else if (drafts.length === 1) {
-        countEl.textContent = '1 pending item';
+        countEl.textContent = '1 draft';
     } else {
-        countEl.textContent = `${drafts.length} pending items`;
-    }
-
-    // Show sync banner if online and has pending items
-    const syncBanner = document.getElementById('syncBanner');
-    const hasSyncable = drafts.some(d => d.status === 'pending_sync' || d.status === 'sync_failed');
-    if (navigator.onLine && hasSyncable) {
-        syncBanner.classList.remove('hidden');
-    } else {
-        syncBanner.classList.add('hidden');
+        countEl.textContent = `${drafts.length} drafts`;
     }
 
     // Render empty state or drafts
@@ -105,8 +127,8 @@ function renderDrafts() {
                 <div class="w-20 h-20 bg-slate-100 border-2 border-slate-300 flex items-center justify-center mx-auto mb-4">
                     <i class="fas fa-inbox text-slate-400 text-3xl"></i>
                 </div>
-                <p class="text-lg font-bold text-slate-700 mb-2">No Drafts or Pending Reports</p>
-                <p class="text-sm text-slate-500 mb-6">All your reports are synced and up to date.</p>
+                <p class="text-lg font-bold text-slate-700 mb-2">No Drafts</p>
+                <p class="text-sm text-slate-500 mb-6">Start a new report to create a draft.</p>
                 <a href="index.html" class="inline-block bg-dot-navy hover:bg-dot-blue text-white px-6 py-3 font-bold uppercase tracking-wide transition-colors">
                     <i class="fas fa-arrow-left mr-2"></i>Back to Dashboard
                 </a>
@@ -116,9 +138,8 @@ function renderDrafts() {
     }
 
     // Render draft cards
-    container.innerHTML = drafts.map((draft, index) => {
+    container.innerHTML = drafts.map((draft) => {
         const status = getStatusBadge(draft.status);
-        const showRetry = draft.status === 'pending_sync' || draft.status === 'sync_failed';
 
         return `
             <div class="bg-white border-l-4 ${status.borderColor} p-4 mb-4">
@@ -126,36 +147,22 @@ function renderDrafts() {
                     <div class="flex-1 min-w-0">
                         <div class="flex items-center gap-2 mb-1">
                             <span class="text-[10px] font-bold ${status.bgColor} text-white px-2 py-0.5 uppercase">${status.text}</span>
-                            <span class="text-[10px] font-bold text-slate-400 uppercase">${draft.captureMode || 'guided'} mode</span>
+                            <span class="text-[10px] font-bold text-slate-400 uppercase">${escapeHtml(draft.captureMode)} mode</span>
                         </div>
-                        <p class="font-bold text-slate-800 truncate">${escapeHtml(draft.projectName || 'Unknown Project')}</p>
+                        <p class="font-bold text-slate-800 truncate">${escapeHtml(draft.projectName)}</p>
                         <p class="text-sm text-slate-600">${formatDate(draft.reportDate)}</p>
                     </div>
                     <div class="text-right shrink-0 ml-4">
                         <p class="text-xs text-slate-400">Last saved</p>
-                        <p class="text-sm text-slate-600">${formatTime(draft.lastSaved)}</p>
+                        <p class="text-sm text-slate-600">${formatRelativeTime(draft.lastSaved)}</p>
                     </div>
                 </div>
-
-                ${draft.errorMessage ? `
-                <div class="bg-red-50 border border-red-200 p-3 mb-3">
-                    <div class="flex items-start gap-2">
-                        <i class="fas fa-exclamation-circle text-red-600 mt-0.5"></i>
-                        <p class="text-sm text-red-700">${escapeHtml(draft.errorMessage)}</p>
-                    </div>
-                </div>
-                ` : ''}
 
                 <div class="flex gap-2">
-                    <button onclick="continueEditing(${index})" class="flex-1 p-3 bg-dot-navy hover:bg-dot-blue text-white text-sm font-bold uppercase transition-colors">
+                    <button onclick="continueEditing('${escapeHtml(draft.key)}')" class="flex-1 p-3 bg-dot-navy hover:bg-dot-blue text-white text-sm font-bold uppercase transition-colors">
                         <i class="fas fa-edit mr-1"></i>Continue
                     </button>
-                    ${showRetry ? `
-                    <button onclick="retrySync(${index})" class="flex-1 p-3 bg-safety-green hover:bg-green-700 text-white text-sm font-bold uppercase transition-colors">
-                        <i class="fas fa-sync-alt mr-1"></i>Retry
-                    </button>
-                    ` : ''}
-                    <button onclick="confirmDelete(${index})" class="p-3 border-2 border-red-300 text-red-600 hover:bg-red-50 transition-colors">
+                    <button onclick="confirmDelete('${escapeHtml(draft.key)}')" class="p-3 border-2 border-red-300 text-red-600 hover:bg-red-50 transition-colors">
                         <i class="fas fa-trash"></i>
                     </button>
                 </div>
@@ -165,9 +172,9 @@ function renderDrafts() {
 }
 
 // ============ ACTIONS ============
-function continueEditing(index) {
-    const queue = getOfflineQueue();
-    const draft = queue.drafts[index];
+function continueEditing(key) {
+    const drafts = getAllDrafts();
+    const draft = drafts.find(d => d.key === key);
 
     if (!draft) {
         showToast('Draft not found', 'error');
@@ -179,275 +186,35 @@ function continueEditing(index) {
         setStorageItem(STORAGE_KEYS.ACTIVE_PROJECT_ID, draft.projectId);
     }
 
-    // Store the draft data for quick-interview to load
-    // We'll use the existing QUICK_INTERVIEW_STORAGE_KEY format
-    const quickInterviewData = {
-        projectId: draft.projectId,
-        reportDate: draft.reportDate,
-        captureMode: draft.captureMode,
-        lastSaved: draft.lastSaved,
-        ...draft.data
-    };
-
-    localStorage.setItem(STORAGE_KEYS.QUICK_INTERVIEW_DRAFT, JSON.stringify(quickInterviewData));
-
-    // Navigate to quick-interview
+    // Navigate to quick-interview - it will load from CURRENT_REPORTS automatically
     window.location.href = 'quick-interview.html';
 }
 
-async function retrySync(index) {
-    const queue = getOfflineQueue();
-    const draft = queue.drafts[index];
-
-    if (!draft) {
-        showToast('Draft not found', 'error');
-        return;
-    }
-
-    if (!navigator.onLine) {
-        showToast("You're offline. Connect to sync.", 'warning');
-        return;
-    }
-
-    // Show loading state
-    showToast('Syncing report...', 'info');
-
-    try {
-        // Attempt to sync via the same flow as FINISH
-        const result = await syncDraft(draft, index);
-
-        if (result.success) {
-            // Remove from queue
-            removeDraft(index);
-            showToast('Report synced successfully!', 'success');
-
-            // Redirect to report.html to view the synced report
-            setTimeout(() => {
-                window.location.href = 'report.html';
-            }, 1000);
-        } else {
-            // Update error message
-            updateDraftError(index, result.error || 'Sync failed. Please try again.');
-            renderDrafts();
-            showToast('Sync failed', 'error');
-        }
-    } catch (error) {
-        console.error('[DRAFTS] Sync error:', error);
-        updateDraftError(index, error.message || 'An unexpected error occurred');
-        renderDrafts();
-        showToast('Sync failed', 'error');
-    }
-}
-
-async function syncDraft(draft, index) {
-    try {
-        // The draft contains all the data needed to complete the FINISH flow
-        // This includes the payload for AI processing
-
-        // First, ensure the report exists in Supabase
-        const reportData = draft.data;
-        if (!reportData) {
-            return { success: false, error: 'No report data found in draft' };
-        }
-
-        // Set active project for the sync
-        if (draft.projectId) {
-            setStorageItem(STORAGE_KEYS.ACTIVE_PROJECT_ID, draft.projectId);
-        }
-
-        // Check if report already exists in Supabase
-        const { data: existingReport, error: fetchError } = await supabaseClient
-            .from('reports')
-            .select('id, status')
-            .eq('project_id', draft.projectId)
-            .eq('report_date', draft.reportDate)
-            .single();
-
-        let reportId;
-        if (existingReport) {
-            reportId = existingReport.id;
-        } else {
-            // Create the report in Supabase
-            const { data: newReport, error: createError } = await supabaseClient
-                .from('reports')
-                .insert({
-                    project_id: draft.projectId,
-                    report_date: draft.reportDate,
-                    status: 'pending_refine',
-                    raw_capture: reportData
-                })
-                .select('id')
-                .single();
-
-            if (createError) {
-                return { success: false, error: 'Failed to create report: ' + createError.message };
-            }
-            reportId = newReport.id;
-        }
-
-        // Build payload for AI processing
-        const payload = draft.payload || buildPayloadFromDraft(draft);
-
-        // Call the AI processing webhook
-        const webhookUrl = 'https://advidere.app.n8n.cloud/webhook/fieldvoice-refine-v6.6';
-        const response = await fetch(webhookUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
-
-        if (!response.ok) {
-            const errorText = await response.text();
-            return { success: false, error: `Webhook error: ${response.status} - ${errorText}` };
-        }
-
-        const result = await response.json();
-
-        // Save AI response to report
-        if (result.aiGenerated) {
-            const { error: updateError } = await supabaseClient
-                .from('reports')
-                .update({
-                    status: 'refined',
-                    ai_generated: result.aiGenerated,
-                    updated_at: new Date().toISOString()
-                })
-                .eq('id', reportId);
-
-            if (updateError) {
-                return { success: false, error: 'Failed to save AI response: ' + updateError.message };
-            }
-        }
-
-        return { success: true, reportId };
-    } catch (error) {
-        console.error('[DRAFTS] Sync error:', error);
-        return { success: false, error: error.message || 'Network error during sync' };
-    }
-}
-
-function buildPayloadFromDraft(draft) {
-    // Build payload matching quick-interview.html's buildProcessPayload() structure
-    const data = draft.data || {};
-    const reportKey = `${draft.projectId}_${draft.reportDate}`;
-
-    return {
-        reportId: reportKey,
-        captureMode: draft.captureMode || 'guided',
-
-        projectContext: {
-            projectId: draft.projectId || null,
-            projectName: draft.projectName || '',
-            noabProjectNo: data.project?.noabProjectNo || '',
-            location: data.project?.location || '',
-            engineer: data.project?.engineer || '',
-            primeContractor: data.project?.primeContractor || '',
-            contractors: data.project?.contractors || [],
-            equipment: data.project?.equipment || []
-        },
-
-        fieldNotes: draft.captureMode === 'minimal'
-            ? { freeformNotes: data.fieldNotes?.freeformNotes || '' }
-            : {
-                workSummary: data.guidedNotes?.workSummary || '',
-                issues: data.guidedNotes?.issues || '',
-                safety: data.guidedNotes?.safety || ''
-              },
-
-        weather: data.overview?.weather || data.weather || {},
-
-        photos: (data.photos || []).map(p => ({
-            id: p.id,
-            caption: p.caption || '',
-            timestamp: p.timestamp,
-            date: p.date,
-            time: p.time,
-            gps: p.gps
-        })),
-
-        reportDate: draft.reportDate || data.overview?.date || new Date().toLocaleDateString(),
-        inspectorName: data.overview?.completedBy || ''
-    };
-}
-
-async function syncAllPending() {
-    const queue = getOfflineQueue();
-    const syncable = queue.drafts.filter(d => d.status === 'pending_sync' || d.status === 'sync_failed');
-
-    if (syncable.length === 0) {
-        showToast('No items to sync', 'info');
-        return;
-    }
-
-    if (!navigator.onLine) {
-        showToast("You're offline. Connect to sync.", 'warning');
-        return;
-    }
-
-    showToast(`Syncing ${syncable.length} report(s)...`, 'info');
-
-    let successCount = 0;
-    let failCount = 0;
-
-    // Sync each item (process in reverse order to handle index shifts)
-    for (let i = queue.drafts.length - 1; i >= 0; i--) {
-        const draft = queue.drafts[i];
-        if (draft.status !== 'pending_sync' && draft.status !== 'sync_failed') continue;
-
-        try {
-            const result = await syncDraft(draft, i);
-            if (result.success) {
-                removeDraft(i);
-                successCount++;
-            } else {
-                updateDraftError(i, result.error);
-                failCount++;
-            }
-        } catch (error) {
-            updateDraftError(i, error.message);
-            failCount++;
-        }
-    }
-
-    renderDrafts();
-
-    if (failCount === 0) {
-        showToast(`${successCount} report(s) synced!`, 'success');
-        if (successCount > 0) {
-            setTimeout(() => {
-                window.location.href = 'index.html';
-            }, 1500);
-        }
-    } else {
-        showToast(`${successCount} synced, ${failCount} failed`, failCount > 0 ? 'warning' : 'success');
-    }
-}
-
 // ============ DELETE MODAL ============
-function confirmDelete(index) {
-    const queue = getOfflineQueue();
-    const draft = queue.drafts[index];
+function confirmDelete(key) {
+    const drafts = getAllDrafts();
+    const draft = drafts.find(d => d.key === key);
 
     if (!draft) return;
 
-    pendingDeleteIndex = index;
+    pendingDeleteKey = key;
     document.getElementById('deleteModalProject').textContent = draft.projectName || 'Unknown Project';
     document.getElementById('deleteModal').classList.remove('hidden');
 
     // Set up confirm button
     document.getElementById('confirmDeleteBtn').onclick = () => {
-        deleteDraft(pendingDeleteIndex);
+        deleteDraft(pendingDeleteKey);
         closeDeleteModal();
     };
 }
 
 function closeDeleteModal() {
     document.getElementById('deleteModal').classList.add('hidden');
-    pendingDeleteIndex = null;
+    pendingDeleteKey = null;
 }
 
-function deleteDraft(index) {
-    removeDraft(index);
+function deleteDraft(key) {
+    deleteDraftByKey(key);
     renderDrafts();
     showToast('Draft deleted', 'success');
 }
@@ -459,8 +226,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // ============ EXPOSE TO WINDOW FOR ONCLICK HANDLERS ============
 window.continueEditing = continueEditing;
-window.retrySync = retrySync;
 window.confirmDelete = confirmDelete;
 window.closeDeleteModal = closeDeleteModal;
-window.syncAllPending = syncAllPending;
 window.renderDrafts = renderDrafts;

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Drafts & Pending Reports - FieldVoice Pro</title>
+    <title>Drafts - FieldVoice Pro</title>
 
     <!-- PWA Meta Tags -->
     <link rel="manifest" href="./manifest.json">
@@ -67,15 +67,6 @@
     <!-- Safety Stripe Header -->
     <div class="header-stripe"></div>
 
-    <!-- Online Sync Banner -->
-    <div id="syncBanner" class="hidden bg-safety-green text-white cursor-pointer" onclick="syncAllPending()">
-        <div class="max-w-lg mx-auto px-4 py-3 flex items-center gap-3">
-            <i class="fas fa-cloud-upload-alt"></i>
-            <p class="flex-1 text-sm font-medium">You have pending reports. Tap to sync.</p>
-            <i class="fas fa-chevron-right"></i>
-        </div>
-    </div>
-
     <div id="app" class="max-w-lg mx-auto min-h-screen flex flex-col">
 
         <!-- HEADER -->
@@ -83,11 +74,11 @@
             <div class="flex justify-between items-start">
                 <div>
                     <div class="flex items-center gap-2 mb-1">
-                        <i class="fas fa-clock text-dot-yellow"></i>
-                        <span class="text-[10px] font-bold tracking-widest text-dot-yellow">OFFLINE QUEUE</span>
+                        <i class="fas fa-edit text-dot-yellow"></i>
+                        <span class="text-[10px] font-bold tracking-widest text-dot-yellow">LOCAL DRAFTS</span>
                     </div>
                     <h1 class="text-xl font-bold tracking-tight">
-                        Drafts & Pending Reports
+                        Report Drafts
                     </h1>
                     <p id="queueCount" class="text-xs text-slate-400 mt-1">Loading...</p>
                 </div>
@@ -144,15 +135,7 @@
         <i class="fas fa-wifi-slash mr-2"></i>You are offline
     </div>
 
-    <!-- Initialize PWA features with page-specific handlers -->
-    <script>
-        initPWA({
-            onOnline: () => renderDrafts(),
-            onOffline: () => {
-                document.getElementById('syncBanner').classList.add('hidden');
-                showToast("You're offline", 'warning');
-            }
-        });
-    </script>
+    <!-- Initialize PWA features -->
+    <script>initPWA();</script>
 </body>
 </html>
