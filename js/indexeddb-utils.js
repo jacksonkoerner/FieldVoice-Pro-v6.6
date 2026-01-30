@@ -308,6 +308,22 @@
         });
     }
 
+    /**
+     * Get a single photo by ID
+     * @param {string} photoId - The photo ID
+     * @returns {Promise<Object|null>} The photo object or null if not found
+     */
+    async function getPhotoById(photoId) {
+        const database = await ensureDB();
+        return new Promise((resolve, reject) => {
+            const transaction = database.transaction(['photos'], 'readonly');
+            const store = transaction.objectStore('photos');
+            const request = store.get(photoId);
+            request.onsuccess = () => resolve(request.result || null);
+            request.onerror = (e) => reject(e.target.error);
+        });
+    }
+
     // ============================================
     // GENERAL
     // ============================================
@@ -360,6 +376,7 @@
 
         // Photos store
         savePhoto,
+        getPhotoById,
         getPhotosByReportId,
         getPhotosBySyncStatus,
         deletePhoto,
