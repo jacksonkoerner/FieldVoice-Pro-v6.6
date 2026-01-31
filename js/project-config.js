@@ -6,9 +6,52 @@ let currentProject = null;
 let deleteCallback = null;
 let selectedFiles = [];
 let isLoading = false;
+let isDirty = false;
 
 // ============ INITIALIZATION ============
 // Note: Initialization moved to end of script with setupDropZone()
+
+// ============ DIRTY STATE MANAGEMENT ============
+function markDirty() {
+    if (!isDirty) {
+        isDirty = true;
+        updateDirtyBanner();
+    }
+}
+
+function clearDirty() {
+    isDirty = false;
+    updateDirtyBanner();
+}
+
+function updateDirtyBanner() {
+    const banner = document.getElementById('dirtyBanner');
+    if (banner) {
+        if (isDirty) {
+            banner.classList.remove('hidden');
+        } else {
+            banner.classList.add('hidden');
+        }
+    }
+}
+
+function setupDirtyTracking() {
+    // Track all form inputs
+    const formInputs = document.querySelectorAll('#projectFormContainer input, #projectFormContainer select');
+    formInputs.forEach(input => {
+        input.addEventListener('input', markDirty);
+        input.addEventListener('change', markDirty);
+    });
+
+    // Add beforeunload warning
+    window.addEventListener('beforeunload', (e) => {
+        if (isDirty) {
+            e.preventDefault();
+            e.returnValue = 'You have unsaved changes. Are you sure you want to leave?';
+            return e.returnValue;
+        }
+    });
+}
 
 // ============ PROJECT MANAGEMENT ============
 /* DEPRECATED — now using window.dataLayer.loadProjects()
@@ -305,10 +348,12 @@ async function saveProject() {
     try {
         await saveProjectToSupabase(currentProject);
         console.log('[saveProject] Synced to Supabase:', currentProject.id);
+        clearDirty();
         showToast('Project saved successfully');
     } catch (supabaseError) {
         // Offline or Supabase error - local save succeeded, warn user
         console.warn('[saveProject] Supabase sync failed (offline?):', supabaseError);
+        clearDirty();
         showToast('Project saved locally (offline)', 'warning');
     }
 
@@ -547,6 +592,7 @@ function saveContractor() {
 
     hideAddContractorForm();
     renderContractors();
+    markDirty();
     showToast(editId ? 'Contractor updated' : 'Contractor added');
 }
 
@@ -554,6 +600,7 @@ function deleteContractor(contractorId) {
     showDeleteModal('Delete this contractor?', () => {
         currentProject.contractors = currentProject.contractors.filter(c => c.id !== contractorId);
         renderContractors();
+        markDirty();
         showToast('Contractor deleted');
     });
 }
@@ -610,6 +657,7 @@ function handleContractorDrop(e) {
             const [removed] = currentProject.contractors.splice(draggedIndex, 1);
             currentProject.contractors.splice(targetIndex, 0, removed);
             renderContractors();
+            markDirty();
         }
     }
 }
@@ -787,6 +835,8 @@ async function handleLogoSelect(event) {
 
         // Clear old logo field if it exists
         delete currentProject.logo;
+
+        markDirty();
     } catch (err) {
         console.error('[LOGO] Error processing logo:', err);
         showToast('Error processing logo', 'error');
@@ -818,6 +868,7 @@ async function removeLogo() {
     // Clear the file input
     document.getElementById('logoInput').value = '';
 
+    markDirty();
     showToast('Logo removed');
 }
 
@@ -1015,6 +1066,9 @@ function populateFormWithExtractedData(data) {
 
     // Setup input listeners to clear missing indicators when user types
     setupMissingFieldListeners();
+
+    // Mark form as dirty after extraction
+    markDirty();
 }
 
 function generateAbbreviation(name) {
@@ -1090,4 +1144,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Create new project
         createNewProject();
     }
+
+    // Setup dirty tracking after form is populated
+    setupDirtyTracking();
 });

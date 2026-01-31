@@ -181,7 +181,7 @@ function updateActiveProjectCard() {
                             ${project.noabProjectNo ? `<p class="text-xs text-slate-500">#${escapeHtml(project.noabProjectNo)}</p>` : ''}
                         </div>
                     </div>
-                    <a href="project-config.html" class="text-dot-blue hover:text-dot-navy transition-colors shrink-0 ml-2" title="Change Project">
+                    <a href="projects.html" class="text-dot-blue hover:text-dot-navy transition-colors shrink-0 ml-2" title="Change Project">
                         <i class="fas fa-exchange-alt"></i>
                     </a>
                 </div>
@@ -189,7 +189,7 @@ function updateActiveProjectCard() {
         `;
     } else {
         section.innerHTML = `
-            <a href="project-config.html" class="block bg-white border-2 border-dashed border-dot-orange p-4 hover:bg-orange-50 transition-colors">
+            <a href="projects.html" class="block bg-white border-2 border-dashed border-dot-orange p-4 hover:bg-orange-50 transition-colors">
                 <div class="flex items-center gap-3">
                     <div class="w-10 h-10 bg-dot-orange/10 border-2 border-dot-orange flex items-center justify-center shrink-0">
                         <i class="fas fa-exclamation text-dot-orange"></i>
