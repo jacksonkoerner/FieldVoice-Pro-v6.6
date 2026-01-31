@@ -20,13 +20,14 @@
     // ========================================
 
     /**
-     * Load all projects (IndexedDB-first, Supabase-fallback)
+     * Load all projects from IndexedDB only (no Supabase fallback)
+     * Use refreshProjectsFromCloud() to explicitly sync from Supabase
      * @returns {Promise<Array>} Array of project objects (JS format, camelCase)
      */
     async function loadProjects() {
         const userId = getStorageItem(STORAGE_KEYS.USER_ID);
 
-        // 1. Try IndexedDB first
+        // Load from IndexedDB only - NO Supabase fallback
         try {
             const allLocalProjects = await window.idb.getAllProjects();
             const localProjects = userId
@@ -36,23 +37,45 @@
             if (localProjects && localProjects.length > 0) {
                 console.log('[DATA] Loaded projects from IndexedDB:', localProjects.length);
                 // Convert to JS format in case raw Supabase data was cached
-                return localProjects.map(p => normalizeProject(p));
+                const normalized = localProjects.map(p => normalizeProject(p));
+
+                // Also cache to localStorage for report-rules.js
+                const projectsMap = {};
+                normalized.forEach(p => { projectsMap[p.id] = p; });
+                setStorageItem(STORAGE_KEYS.PROJECTS, projectsMap);
+
+                return normalized;
             }
         } catch (e) {
             console.warn('[DATA] IndexedDB read failed:', e);
         }
 
-        // 2. Check if offline
+        // Return empty array if IndexedDB is empty - caller should use refreshProjectsFromCloud()
+        console.log('[DATA] No projects in IndexedDB');
+        return [];
+    }
+
+    /**
+     * Refresh projects from Supabase (explicit cloud sync with contractors)
+     * Call this when user taps Refresh or on initial load when IndexedDB is empty
+     * @returns {Promise<Array>} Array of project objects with contractors
+     */
+    async function refreshProjectsFromCloud() {
         if (!navigator.onLine) {
-            console.log('[DATA] Offline, no cached projects');
+            console.log('[DATA] Offline, cannot refresh from cloud');
             return [];
         }
 
-        // 3. Fetch from Supabase
+        const userId = getStorageItem(STORAGE_KEYS.USER_ID);
+
         try {
+            // Fetch projects WITH contractors using Supabase join
             let query = supabaseClient
                 .from('projects')
-                .select('*')
+                .select(`
+                    *,
+                    contractors (*)
+                `)
                 .order('project_name');
 
             if (userId) {
@@ -63,10 +86,15 @@
 
             if (error) throw error;
 
-            // 4. Convert to JS format
-            const projects = (data || []).map(row => fromSupabaseProject(row));
+            // Convert to JS format with contractors
+            const projects = (data || []).map(row => {
+                const project = fromSupabaseProject(row);
+                // Include contractors from the join
+                project.contractors = (row.contractors || []).map(c => fromSupabaseContractor(c));
+                return project;
+            });
 
-            // 5. Cache to IndexedDB (store converted format)
+            // Cache to IndexedDB (with contractors)
             for (const project of projects) {
                 try {
                     await window.idb.saveProject(project);
@@ -75,21 +103,22 @@
                 }
             }
 
-            // 6. Also cache to localStorage for report-rules.js
+            // Also cache to localStorage for report-rules.js
             const projectsMap = {};
             projects.forEach(p => { projectsMap[p.id] = p; });
             setStorageItem(STORAGE_KEYS.PROJECTS, projectsMap);
 
-            console.log('[DATA] Loaded projects from Supabase:', projects.length);
+            console.log('[DATA] Refreshed projects from Supabase:', projects.length);
             return projects;
         } catch (e) {
             console.error('[DATA] Supabase fetch failed:', e);
-            return [];
+            throw e;
         }
     }
 
     /**
-     * Load active project with contractors (IndexedDB-first, Supabase-fallback)
+     * Load active project with contractors from IndexedDB only (no Supabase fallback)
+     * Use refreshProjectsFromCloud() to sync from Supabase first if IndexedDB is empty
      * @returns {Promise<Object|null>} Project object with contractors, or null
      */
     async function loadActiveProject() {
@@ -101,7 +130,7 @@
 
         const userId = getStorageItem(STORAGE_KEYS.USER_ID);
 
-        // 1. Try IndexedDB first
+        // Load from IndexedDB only - NO Supabase fallback
         try {
             const localProject = await window.idb.getProject(activeId);
             if (localProject && (!userId || (localProject.userId || localProject.user_id) === userId)) {
@@ -115,49 +144,9 @@
             console.warn('[DATA] IndexedDB read failed:', e);
         }
 
-        // 2. Check if offline
-        if (!navigator.onLine) {
-            console.log('[DATA] Offline, no cached active project');
-            return null;
-        }
-
-        // 3. Fetch from Supabase
-        try {
-            const { data: projectRow, error: projectError } = await supabaseClient
-                .from('projects')
-                .select('*')
-                .eq('id', activeId)
-                .single();
-
-            if (projectError || !projectRow) {
-                console.warn('[DATA] Project not found in Supabase:', activeId);
-                return null;
-            }
-
-            // 4. Fetch contractors
-            const { data: contractorRows } = await supabaseClient
-                .from('contractors')
-                .select('*')
-                .eq('project_id', activeId);
-
-            // 5. Convert to JS format
-            const project = fromSupabaseProject(projectRow);
-            project.contractors = (contractorRows || []).map(c => fromSupabaseContractor(c));
-
-            // 6. Cache to IndexedDB (with contractors)
-            try {
-                const projectToCache = { ...project, contractors: project.contractors };
-                await window.idb.saveProject(projectToCache);
-                console.log('[DATA] Cached active project to IndexedDB:', activeId);
-            } catch (e) {
-                console.warn('[DATA] Failed to cache project:', e);
-            }
-
-            return project;
-        } catch (e) {
-            console.error('[DATA] Failed to load active project:', e);
-            return null;
-        }
+        // Return null if not in IndexedDB - caller should use refreshProjectsFromCloud()
+        console.log('[DATA] Active project not found in IndexedDB:', activeId);
+        return null;
     }
 
     /**
@@ -570,6 +559,7 @@
         // Projects
         loadProjects,
         loadActiveProject,
+        refreshProjectsFromCloud,
         setActiveProjectId,
         getActiveProjectId,
 

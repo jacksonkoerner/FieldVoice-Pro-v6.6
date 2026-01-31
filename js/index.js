@@ -227,9 +227,12 @@ async function showProjectPickerModal() {
     `;
     modal.classList.remove('hidden');
 
-    // Load fresh projects from Supabase
-    await window.dataLayer.loadProjects();
-    const projects = getProjects();
+    // Load projects from IndexedDB first, then refresh from cloud if empty
+    let projects = await window.dataLayer.loadProjects();
+    if (projects.length === 0 && navigator.onLine) {
+        projects = await window.dataLayer.refreshProjectsFromCloud();
+    }
+    projectsCache = projects;
     const activeId = getStorageItem(STORAGE_KEYS.ACTIVE_PROJECT_ID);
 
     if (projects.length === 0) {
@@ -710,8 +713,19 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Initialize sync manager
         initSyncManager();
 
-        // Load projects from Supabase (projects still live there)
-        await window.dataLayer.loadProjects();
+        // Load projects from IndexedDB first
+        let projects = await window.dataLayer.loadProjects();
+
+        // If IndexedDB is empty and online, refresh from cloud
+        if (projects.length === 0 && navigator.onLine) {
+            console.log('[INDEX] No local projects, refreshing from cloud...');
+            projects = await window.dataLayer.refreshProjectsFromCloud();
+        }
+
+        // Cache projects for this page
+        projectsCache = projects;
+
+        // Load active project
         activeProjectCache = await window.dataLayer.loadActiveProject();
 
         // Update UI - reports come from localStorage now

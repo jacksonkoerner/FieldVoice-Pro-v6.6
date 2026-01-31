@@ -26,9 +26,13 @@ async function loadProjectsFromIndexedDB() {
 
 async function fetchProjectsFromSupabase() {
     try {
+        // Fetch projects WITH contractors using Supabase join
         const { data, error } = await supabaseClient
             .from('projects')
-            .select('*')
+            .select(`
+                *,
+                contractors (*)
+            `)
             .order('project_name', { ascending: true });
 
         if (error) {
@@ -36,7 +40,7 @@ async function fetchProjectsFromSupabase() {
             throw new Error(error.message || 'Failed to load projects');
         }
 
-        console.log('[SUPABASE] Fetched projects:', data?.length || 0);
+        console.log('[SUPABASE] Fetched projects with contractors:', data?.length || 0);
         return data || [];
     } catch (e) {
         console.error('[SUPABASE] Failed to load projects:', e);
@@ -111,18 +115,26 @@ async function refreshFromCloud() {
     try {
         showToast('Refreshing from cloud...', 'info');
 
-        // Fetch fresh data from Supabase
+        // Fetch fresh data from Supabase (includes contractors via join)
         const projects = await fetchProjectsFromSupabase();
 
-        // Clear old projects and save new ones
-        try {
-            await window.idb.clearStore('projects');
-        } catch (e) {
-            console.warn('[IDB] Could not clear projects store:', e);
-        }
-
+        // Only clear IndexedDB AFTER successful fetch to prevent data loss
+        // This prevents race condition where clearing happens but fetch fails
         if (projects.length > 0) {
+            try {
+                await window.idb.clearStore('projects');
+            } catch (e) {
+                console.warn('[IDB] Could not clear projects store:', e);
+            }
             await saveProjectsToIndexedDB(projects);
+        } else {
+            // If Supabase returns empty, only clear if we explicitly have no projects
+            // Don't clear on network errors (which would throw before reaching here)
+            try {
+                await window.idb.clearStore('projects');
+            } catch (e) {
+                console.warn('[IDB] Could not clear projects store:', e);
+            }
         }
 
         // Re-render the list
@@ -132,6 +144,9 @@ async function refreshFromCloud() {
     } catch (err) {
         console.error('[REFRESH] Failed:', err);
         showToast('Failed to refresh', 'error');
+        // On error, re-render from IndexedDB (don't lose local data)
+        const localProjects = await loadProjectsFromIndexedDB();
+        await renderProjectList(localProjects);
     } finally {
         isRefreshing = false;
         if (refreshBtn) {
