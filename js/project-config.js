@@ -400,17 +400,6 @@ function deleteProject(projectId) {
     });
 }
 
-async function setActiveProject() {
-    if (!currentProject) return;
-
-    // Save first to ensure project exists
-    await saveProject();
-
-    setActiveProjectId(currentProject.id);
-    showToast('Set as active project');
-    updateActiveProjectBadge();
-}
-
 function cancelEdit() {
     currentProject = null;
     window.location.href = 'projects.html';
