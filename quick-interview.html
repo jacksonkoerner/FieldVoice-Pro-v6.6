@@ -840,6 +840,25 @@
         <i class="fas fa-wifi-slash mr-2"></i>You are offline - Some features may be unavailable
     </div>
 
+    <!-- Network Error Modal -->
+    <div id="network-error-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-xl max-w-sm w-full p-6">
+            <div class="text-center">
+                <i class="fas fa-wifi-slash text-4xl text-yellow-500 mb-4"></i>
+                <h3 id="network-modal-title" class="text-lg font-semibold text-gray-900 mb-2">Connection Issue</h3>
+                <p id="network-modal-message" class="text-gray-600 mb-6">Unable to submit report. Your data is safe.</p>
+            </div>
+            <div class="flex flex-col gap-3">
+                <button id="network-modal-retry" class="w-full py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700">
+                    Try Again
+                </button>
+                <button id="network-modal-drafts" class="w-full py-3 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300">
+                    Save to Drafts
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Page-specific JavaScript -->
     <script src="./js/quick-interview.js"></script>
     <script>initPWA();</script>
