@@ -363,41 +363,144 @@ async function saveProject() {
     }, 800);
 }
 
-function deleteProject(projectId) {
-    showDeleteModal('Are you sure you want to delete this project? This cannot be undone.', async () => {
-        // LOCAL-FIRST: Delete from IndexedDB first
+// ============ PROJECT DELETION ============
+
+/**
+ * Show the delete project confirmation modal
+ */
+function showDeleteProjectModal() {
+    if (!currentProject) return;
+
+    // Set project name in modal
+    const projectName = currentProject.projectName || 'Unnamed Project';
+    document.getElementById('deleteProjectName').textContent = `"${projectName}"`;
+
+    // Show modal
+    document.getElementById('deleteProjectModal').classList.remove('hidden');
+}
+
+/**
+ * Close the delete project modal
+ */
+function closeDeleteProjectModal() {
+    document.getElementById('deleteProjectModal').classList.add('hidden');
+    // Reset button state
+    const btn = document.getElementById('confirmDeleteProjectBtn');
+    const icon = document.getElementById('deleteProjectBtnIcon');
+    const text = document.getElementById('deleteProjectBtnText');
+    btn.disabled = false;
+    icon.className = 'fas fa-trash-alt';
+    text.textContent = 'Delete';
+}
+
+/**
+ * Confirm and execute project deletion
+ * Order: Check offline → Delete from Supabase → Delete from IndexedDB
+ */
+async function confirmDeleteProject() {
+    if (!currentProject) {
+        closeDeleteProjectModal();
+        return;
+    }
+
+    const projectId = currentProject.id;
+
+    // 1. Check if offline - block deletion
+    if (!navigator.onLine) {
+        closeDeleteProjectModal();
+        showToast('Cannot delete project while offline. Please connect to the internet and try again.', 'error');
+        return;
+    }
+
+    // Show loading state
+    const btn = document.getElementById('confirmDeleteProjectBtn');
+    const icon = document.getElementById('deleteProjectBtnIcon');
+    const text = document.getElementById('deleteProjectBtnText');
+    btn.disabled = true;
+    icon.className = 'fas fa-spinner spin-animation';
+    text.textContent = 'Deleting...';
+
+    try {
+        // 2. Delete from Supabase FIRST (contractors, then project)
+        // Delete contractors first
+        const { error: contractorError } = await supabaseClient
+            .from('contractors')
+            .delete()
+            .eq('project_id', projectId);
+
+        if (contractorError) {
+            console.error('[deleteProject] Failed to delete contractors from Supabase:', contractorError);
+            throw new Error('Failed to delete project contractors');
+        }
+        console.log('[deleteProject] Deleted contractors from Supabase for project:', projectId);
+
+        // Then delete the project
+        const { error: projectError } = await supabaseClient
+            .from('projects')
+            .delete()
+            .eq('id', projectId);
+
+        if (projectError) {
+            console.error('[deleteProject] Failed to delete project from Supabase:', projectError);
+            throw new Error('Failed to delete project');
+        }
+        console.log('[deleteProject] Deleted project from Supabase:', projectId);
+
+        // 3. Supabase succeeded - now delete from IndexedDB
         try {
             await window.idb.deleteProject(projectId);
             console.log('[deleteProject] Deleted from IndexedDB:', projectId);
         } catch (idbError) {
-            console.error('[deleteProject] IndexedDB delete failed:', idbError);
-            // Continue to try Supabase anyway
+            // Log but don't fail - Supabase deletion was successful
+            console.warn('[deleteProject] IndexedDB delete failed (non-critical):', idbError);
         }
 
-        // Then delete from Supabase (backup)
+        // 4. Clear from localStorage if cached there
         try {
-            await deleteProjectFromSupabase(projectId);
-            console.log('[deleteProject] Deleted from Supabase:', projectId);
-            showToast('Project deleted');
-        } catch (supabaseError) {
-            // Offline or Supabase error - local delete succeeded, warn user
-            console.warn('[deleteProject] Supabase delete failed (offline?):', supabaseError);
-            showToast('Project deleted locally (offline)', 'warning');
+            const cachedProjects = getStorageItem(STORAGE_KEYS.PROJECTS);
+            if (cachedProjects && cachedProjects[projectId]) {
+                delete cachedProjects[projectId];
+                setStorageItem(STORAGE_KEYS.PROJECTS, cachedProjects);
+                console.log('[deleteProject] Cleared from localStorage cache');
+            }
+        } catch (lsError) {
+            console.warn('[deleteProject] localStorage cleanup failed (non-critical):', lsError);
         }
 
-        // Clear active project if it was deleted
+        // 5. Clear active project if it was deleted
         if (getActiveProjectId() === projectId) {
             removeStorageItem(STORAGE_KEYS.ACTIVE_PROJECT_ID);
+            console.log('[deleteProject] Cleared active project ID');
         }
 
-        // If we're currently editing this project, navigate back to projects list
-        if (currentProject && currentProject.id === projectId) {
-            currentProject = null;
-            setTimeout(() => {
-                window.location.href = 'projects.html';
-            }, 500);
-        }
-    });
+        // 6. Success - close modal and redirect
+        closeDeleteProjectModal();
+        showToast('Project deleted successfully');
+        currentProject = null;
+
+        // Navigate to projects list
+        setTimeout(() => {
+            window.location.href = 'projects.html';
+        }, 800);
+
+    } catch (error) {
+        console.error('[deleteProject] Deletion failed:', error);
+        closeDeleteProjectModal();
+        showToast(error.message || 'Failed to delete project. Please try again.', 'error');
+    }
+}
+
+/**
+ * Legacy deleteProject function (for backwards compatibility)
+ * @deprecated Use showDeleteProjectModal() instead
+ */
+function deleteProject(projectId) {
+    // Set currentProject if not already set (for calls from other pages)
+    if (!currentProject || currentProject.id !== projectId) {
+        // This function is primarily for internal use
+        console.warn('[deleteProject] Called with projectId directly - use showDeleteProjectModal() instead');
+    }
+    showDeleteProjectModal();
 }
 
 function cancelEdit() {
@@ -1129,6 +1232,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (projectId) {
         // Edit existing project
         await loadProject(projectId);
+        // Show delete button for existing projects
+        const deleteBtn = document.getElementById('deleteProjectBtn');
+        if (deleteBtn) {
+            deleteBtn.classList.remove('hidden');
+        }
     } else {
         // Create new project
         createNewProject();

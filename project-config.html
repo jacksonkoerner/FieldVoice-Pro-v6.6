@@ -463,6 +463,11 @@
                         <i class="fas fa-times"></i>
                         Cancel
                     </button>
+                    <!-- Delete Project Button (only shown when editing existing project) -->
+                    <button id="deleteProjectBtn" onclick="showDeleteProjectModal()" class="hidden w-full p-3 bg-red-600 hover:bg-red-700 text-white font-bold uppercase transition-colors flex items-center justify-center gap-2 text-sm">
+                        <i class="fas fa-trash-alt"></i>
+                        Delete Project
+                    </button>
                 </div>
 
             </div>
@@ -478,7 +483,7 @@
         </footer>
     </div>
 
-    <!-- Delete Confirmation Modal -->
+    <!-- Delete Confirmation Modal (for contractors) -->
     <div id="deleteModal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
         <div class="bg-white max-w-sm w-full p-6 shadow-xl">
             <div class="text-center">
@@ -492,6 +497,30 @@
                         Delete
                     </button>
                     <button onclick="closeDeleteModal()" class="flex-1 p-3 bg-slate-300 hover:bg-slate-400 text-slate-700 font-bold uppercase transition-colors text-sm">
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Project Confirmation Modal -->
+    <div id="deleteProjectModal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white max-w-sm w-full p-6 shadow-xl">
+            <div class="text-center">
+                <div class="w-16 h-16 bg-red-100 flex items-center justify-center mx-auto mb-4">
+                    <i class="fas fa-trash-alt text-red-600 text-2xl"></i>
+                </div>
+                <h3 class="text-lg font-bold text-slate-800 mb-2">Delete Project</h3>
+                <p class="text-sm text-slate-600 mb-2">Are you sure you want to delete</p>
+                <p id="deleteProjectName" class="text-base font-bold text-red-600 mb-2">"Project Name"</p>
+                <p class="text-sm text-slate-600 mb-6">This will permanently delete the project and all its contractors. This cannot be undone.</p>
+                <div class="flex gap-3">
+                    <button id="confirmDeleteProjectBtn" onclick="confirmDeleteProject()" class="flex-1 p-3 bg-red-600 hover:bg-red-700 text-white font-bold uppercase transition-colors text-sm flex items-center justify-center gap-2">
+                        <i id="deleteProjectBtnIcon" class="fas fa-trash-alt"></i>
+                        <span id="deleteProjectBtnText">Delete</span>
+                    </button>
+                    <button onclick="closeDeleteProjectModal()" class="flex-1 p-3 bg-slate-300 hover:bg-slate-400 text-slate-700 font-bold uppercase transition-colors text-sm">
                         Cancel
                     </button>
                 </div>
