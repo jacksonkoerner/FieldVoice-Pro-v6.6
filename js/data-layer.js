@@ -25,23 +25,15 @@
      * @returns {Promise<Array>} Array of project objects (JS format, camelCase)
      */
     async function loadProjects() {
-        const userId = getStorageItem(STORAGE_KEYS.USER_ID);
-
         // Load from IndexedDB only - NO Supabase fallback
+        // All users see all projects (no user_id filtering)
         try {
             const allLocalProjects = await window.idb.getAllProjects();
-            // Filter to show user's projects AND shared projects (null/empty user_id)
-            const localProjects = userId
-                ? allLocalProjects.filter(p => {
-                    const projectUserId = p.userId || p.user_id;
-                    return projectUserId === userId || !projectUserId;
-                })
-                : allLocalProjects;
 
-            if (localProjects && localProjects.length > 0) {
-                console.log('[DATA] Loaded projects from IndexedDB:', localProjects.length);
+            if (allLocalProjects && allLocalProjects.length > 0) {
+                console.log('[DATA] Loaded projects from IndexedDB:', allLocalProjects.length);
                 // Convert to JS format in case raw Supabase data was cached
-                const normalized = localProjects.map(p => normalizeProject(p));
+                const normalized = allLocalProjects.map(p => normalizeProject(p));
 
                 // Also cache to localStorage for report-rules.js
                 const projectsMap = {};
@@ -70,25 +62,16 @@
             return [];
         }
 
-        const userId = getStorageItem(STORAGE_KEYS.USER_ID);
-
         try {
-            // Fetch projects WITH contractors using Supabase join
-            let query = supabaseClient
+            // Fetch ALL projects WITH contractors using Supabase join
+            // All users see all projects (no user_id filtering)
+            const { data, error } = await supabaseClient
                 .from('projects')
                 .select(`
                     *,
                     contractors (*)
                 `)
                 .order('project_name');
-
-            if (userId) {
-                // Show user's projects AND shared projects (null user_id)
-                query = query.or(`user_id.eq.${userId},user_id.is.null`);
-            }
-            // If no userId, show all projects (existing behavior)
-
-            const { data, error } = await query;
 
             if (error) throw error;
 
@@ -488,22 +471,14 @@
         }
 
         try {
-            const userId = getStorageItem(STORAGE_KEYS.USER_ID);
-
-            let query = supabaseClient
+            // Fetch ALL archived reports (no user_id filtering)
+            // All users see all reports
+            const { data, error } = await supabaseClient
                 .from('reports')
                 .select('*, projects(id, project_name)')
                 .eq('status', 'submitted')
                 .order('created_at', { ascending: false })
                 .limit(limit);
-
-            if (userId) {
-                // Show user's reports AND reports from shared projects (null user_id)
-                query = query.or(`user_id.eq.${userId},user_id.is.null`);
-            }
-            // If no userId, show all reports (existing behavior)
-
-            const { data, error } = await query;
 
             if (error) throw error;
 
