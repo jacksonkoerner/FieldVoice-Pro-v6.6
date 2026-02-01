@@ -345,7 +345,7 @@
      */
     function getCurrentDraft(projectId, date) {
         const reports = getStorageItem(STORAGE_KEYS.CURRENT_REPORTS) || {};
-        const key = `${projectId}_${date}`;
+        const key = `draft_${projectId}_${date}`;
         return reports[key] || null;
     }
 
@@ -354,7 +354,7 @@
      */
     function saveDraft(projectId, date, data) {
         const reports = getStorageItem(STORAGE_KEYS.CURRENT_REPORTS) || {};
-        const key = `${projectId}_${date}`;
+        const key = `draft_${projectId}_${date}`;
         reports[key] = {
             ...data,
             updatedAt: new Date().toISOString()
@@ -368,7 +368,7 @@
      */
     function deleteDraft(projectId, date) {
         const reports = getStorageItem(STORAGE_KEYS.CURRENT_REPORTS) || {};
-        const key = `${projectId}_${date}`;
+        const key = `draft_${projectId}_${date}`;
         delete reports[key];
         setStorageItem(STORAGE_KEYS.CURRENT_REPORTS, reports);
         console.log('[DATA] Draft deleted:', key);
