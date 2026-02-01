@@ -2025,6 +2025,12 @@
          * Finish the minimal mode report with AI processing
          */
         async function finishMinimalReport() {
+            // Early offline check - block submission when offline
+            if (!navigator.onLine) {
+                showToast('No internet connection. Your report is saved — submit when online.', 'warning');
+                return;
+            }
+
             // Validate - check for at least one entry with content
             const entries = report.freeform_entries || [];
             const hasContent = entries.some(e => e.content && e.content.trim());
@@ -4580,6 +4586,12 @@
         }
 
         async function finishReport() {
+            // Early offline check - block submission when offline
+            if (!navigator.onLine) {
+                showToast('No internet connection. Your report is saved — submit when online.', 'warning');
+                return;
+            }
+
             // v6.6: Validate required fields - check contractor work entries
             let hasWorkSummary = false;
             if (projectContractors && projectContractors.length > 0) {
