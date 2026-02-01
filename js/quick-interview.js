@@ -1965,6 +1965,52 @@
             }
         }
 
+        // ============ NETWORK ERROR MODAL HELPERS ============
+        /**
+         * Show network error modal with retry and drafts options
+         * @param {string} title - Modal title
+         * @param {string} message - Modal message
+         * @param {Function} onRetry - Callback when retry is clicked
+         * @param {Function} onDrafts - Callback when save to drafts is clicked
+         */
+        function showNetworkErrorModal(title, message, onRetry, onDrafts) {
+            const modal = document.getElementById('network-error-modal');
+            const titleEl = document.getElementById('network-modal-title');
+            const messageEl = document.getElementById('network-modal-message');
+            const retryBtn = document.getElementById('network-modal-retry');
+            const draftsBtn = document.getElementById('network-modal-drafts');
+
+            titleEl.textContent = title || 'Connection Issue';
+            messageEl.textContent = message || 'Unable to submit report. Your data is safe.';
+
+            // Remove old listeners by cloning buttons
+            const newRetryBtn = retryBtn.cloneNode(true);
+            const newDraftsBtn = draftsBtn.cloneNode(true);
+            retryBtn.parentNode.replaceChild(newRetryBtn, retryBtn);
+            draftsBtn.parentNode.replaceChild(newDraftsBtn, draftsBtn);
+
+            // Add new listeners
+            newRetryBtn.addEventListener('click', () => {
+                hideNetworkErrorModal();
+                if (onRetry) onRetry();
+            });
+
+            newDraftsBtn.addEventListener('click', () => {
+                hideNetworkErrorModal();
+                if (onDrafts) onDrafts();
+            });
+
+            modal.classList.remove('hidden');
+        }
+
+        /**
+         * Hide network error modal
+         */
+        function hideNetworkErrorModal() {
+            const modal = document.getElementById('network-error-modal');
+            modal.classList.add('hidden');
+        }
+
         /**
          * Handle offline/error scenario for AI processing
          * v6: Uses addToSyncQueue() from storage-keys.js for offline queue
@@ -2025,9 +2071,17 @@
          * Finish the minimal mode report with AI processing
          */
         async function finishMinimalReport() {
-            // Early offline check - block submission when offline
+            // Early offline check - show modal when offline
             if (!navigator.onLine) {
-                showToast('No internet connection. Your report is saved — submit when online.', 'warning');
+                showNetworkErrorModal(
+                    'No Internet Connection',
+                    'You appear to be offline. Your report data is saved locally.',
+                    () => finishMinimalReport(),  // Retry
+                    () => {
+                        showToast('Report saved to drafts', 'info');
+                        window.location.href = 'drafts.html';
+                    }
+                );
                 return;
             }
 
@@ -2120,8 +2174,15 @@
                     finishBtn.innerHTML = originalBtnHtml;
                 }
 
-                // Handle as offline - save to drafts queue and redirect
-                handleOfflineProcessing(payload, true);
+                // Show modal with retry/drafts options
+                showNetworkErrorModal(
+                    'Submission Failed',
+                    'Could not reach the server. Your report data is safe.',
+                    () => finishMinimalReport(),  // Retry
+                    () => {
+                        handleOfflineProcessing(payload, true);
+                    }
+                );
             }
         }
 
@@ -4586,9 +4647,17 @@
         }
 
         async function finishReport() {
-            // Early offline check - block submission when offline
+            // Early offline check - show modal when offline
             if (!navigator.onLine) {
-                showToast('No internet connection. Your report is saved — submit when online.', 'warning');
+                showNetworkErrorModal(
+                    'No Internet Connection',
+                    'You appear to be offline. Your report data is saved locally.',
+                    () => finishReport(),  // Retry
+                    () => {
+                        showToast('Report saved to drafts', 'info');
+                        window.location.href = 'drafts.html';
+                    }
+                );
                 return;
             }
 
@@ -4732,8 +4801,15 @@
                     finishBtn.innerHTML = originalBtnHtml;
                 }
 
-                // Handle as offline - save to drafts queue and redirect
-                handleOfflineProcessing(payload, true);
+                // Show modal with retry/drafts options
+                showNetworkErrorModal(
+                    'Submission Failed',
+                    'Could not reach the server. Your report data is safe.',
+                    () => finishReport(),  // Retry
+                    () => {
+                        handleOfflineProcessing(payload, true);
+                    }
+                );
             }
         }
 
