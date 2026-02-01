@@ -1856,6 +1856,12 @@
                 reportDate: report.overview?.date || new Date().toLocaleDateString(),
                 inspectorName: report.overview?.completedBy || '',
 
+                // v6.6: Structured data for AI processing
+                operations: report.operations || [],
+                equipmentRows: report.equipmentRows || [],
+                activities: report.activities || [],
+                safety: report.safety || { hasIncidents: false, noIncidents: true, notes: [] },
+
                 // v6: Entry-based notes and toggle states
                 entries: report.entries || [],
                 toggleStates: report.toggleStates || {}
