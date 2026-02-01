@@ -227,10 +227,17 @@ async function showProjectPickerModal() {
     `;
     modal.classList.remove('hidden');
 
-    // Load projects from IndexedDB first, then refresh from cloud if empty
+    // Load local projects first
     let projects = await window.dataLayer.loadProjects();
-    if (projects.length === 0 && navigator.onLine) {
-        projects = await window.dataLayer.refreshProjectsFromCloud();
+
+    // Always refresh from Supabase when online to get all projects
+    if (navigator.onLine) {
+        try {
+            projects = await window.dataLayer.refreshProjectsFromCloud();
+        } catch (e) {
+            console.warn('[INDEX] Cloud refresh failed, using local projects:', e);
+            // Keep using local projects on error
+        }
     }
     projectsCache = projects;
     const activeId = getStorageItem(STORAGE_KEYS.ACTIVE_PROJECT_ID);
@@ -713,13 +720,18 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Initialize sync manager
         initSyncManager();
 
-        // Load projects from IndexedDB first
+        // Load local projects first
         let projects = await window.dataLayer.loadProjects();
 
-        // If IndexedDB is empty and online, refresh from cloud
-        if (projects.length === 0 && navigator.onLine) {
-            console.log('[INDEX] No local projects, refreshing from cloud...');
-            projects = await window.dataLayer.refreshProjectsFromCloud();
+        // Always refresh from Supabase when online to get all projects
+        if (navigator.onLine) {
+            try {
+                console.log('[INDEX] Refreshing projects from cloud...');
+                projects = await window.dataLayer.refreshProjectsFromCloud();
+            } catch (e) {
+                console.warn('[INDEX] Cloud refresh failed, using local projects:', e);
+                // Keep using local projects on error
+            }
         }
 
         // Cache projects for this page
