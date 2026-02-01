@@ -30,8 +30,12 @@
         // Load from IndexedDB only - NO Supabase fallback
         try {
             const allLocalProjects = await window.idb.getAllProjects();
+            // Filter to show user's projects AND shared projects (null/empty user_id)
             const localProjects = userId
-                ? allLocalProjects.filter(p => (p.userId || p.user_id) === userId)
+                ? allLocalProjects.filter(p => {
+                    const projectUserId = p.userId || p.user_id;
+                    return projectUserId === userId || !projectUserId;
+                })
                 : allLocalProjects;
 
             if (localProjects && localProjects.length > 0) {
@@ -79,8 +83,10 @@
                 .order('project_name');
 
             if (userId) {
-                query = query.eq('user_id', userId);
+                // Show user's projects AND shared projects (null user_id)
+                query = query.or(`user_id.eq.${userId},user_id.is.null`);
             }
+            // If no userId, show all projects (existing behavior)
 
             const { data, error } = await query;
 
@@ -492,8 +498,10 @@
                 .limit(limit);
 
             if (userId) {
-                query = query.eq('user_id', userId);
+                // Show user's reports AND reports from shared projects (null user_id)
+                query = query.or(`user_id.eq.${userId},user_id.is.null`);
             }
+            // If no userId, show all reports (existing behavior)
 
             const { data, error } = await query;
 
