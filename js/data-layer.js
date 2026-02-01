@@ -178,8 +178,7 @@
         if (!p) return null;
         return {
             id: p.id,
-            name: p.name || p.projectName || p.project_name || '',
-            projectName: p.name || p.projectName || p.project_name || '',
+            projectName: p.projectName || p.name || p.project_name || '',
             noabProjectNo: p.noabProjectNo || p.noab_project_no || '',
             cnoSolicitationNo: p.cnoSolicitationNo || p.cno_solicitation_no || '',
             location: p.location || '',

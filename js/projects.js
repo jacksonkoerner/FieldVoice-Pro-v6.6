@@ -11,10 +11,10 @@ async function loadProjectsFromIndexedDB() {
         const projects = await window.idb.getAllProjects();
         if (projects && projects.length > 0) {
             console.log('[IDB] Loaded projects:', projects.length);
-            // Sort by name
+            // Sort by projectName
             return projects.sort((a, b) => {
-                const nameA = (a.project_name || a.name || '').toLowerCase();
-                const nameB = (b.project_name || b.name || '').toLowerCase();
+                const nameA = (a.projectName || a.project_name || '').toLowerCase();
+                const nameB = (b.projectName || b.project_name || '').toLowerCase();
                 return nameA.localeCompare(nameB);
             });
         }
@@ -54,8 +54,7 @@ async function saveProjectsToIndexedDB(projects) {
             // Normalize project structure
             const normalized = {
                 id: project.id,
-                project_name: project.project_name || project.name,
-                name: project.project_name || project.name,
+                projectName: project.projectName || project.project_name || '',
                 noab_project_no: project.noab_project_no || '',
                 location: project.location || '',
                 engineer: project.engineer || '',
@@ -165,7 +164,7 @@ async function selectProject(projectId) {
     // Get project details for toast
     const projects = await loadProjectsFromIndexedDB();
     const project = projects.find(p => p.id === projectId);
-    const projectName = project?.project_name || project?.name || 'Project';
+    const projectName = project?.projectName || project?.project_name || 'Project';
 
     showToast(`${projectName} selected`, 'success');
 
@@ -243,7 +242,7 @@ async function renderProjectList(projects = null) {
 
 function renderProjectRow(project) {
     const isActive = project.id === activeProjectId;
-    const projectName = project.project_name || project.name || 'Unnamed Project';
+    const projectName = project.projectName || project.project_name || 'Unnamed Project';
     const projectNo = project.noab_project_no || '';
     const location = project.location || '';
     const status = project.status || 'active';
@@ -297,7 +296,7 @@ function updateActiveProjectBanner(projects) {
 
     const activeProject = projects.find(p => p.id === activeProjectId);
     if (activeProject) {
-        const projectName = activeProject.project_name || activeProject.name || 'Unknown Project';
+        const projectName = activeProject.projectName || activeProject.project_name || 'Unknown Project';
         nameEl.textContent = projectName;
         banner.classList.remove('hidden');
     } else {

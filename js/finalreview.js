@@ -85,7 +85,7 @@ async function loadActiveProject() {
             projectContractors = [];
         }
 
-        console.log('[SUPABASE] Loaded project:', activeProject.name);
+        console.log('[SUPABASE] Loaded project:', activeProject.projectName);
         return activeProject;
     } catch (e) {
         console.error('[SUPABASE] Failed to load project:', e);
@@ -195,7 +195,7 @@ async function loadReport() {
         // Build the report object
         const loadedReport = {
             overview: {
-                projectName: reportRow.project_name || activeProject?.name || '',
+                projectName: reportRow.project_name || activeProject?.projectName || '',
                 noabProjectNo: reportRow.project_no || activeProject?.noabProjectNo || '',
                 date: reportRow.report_date,
                 startTime: rawCaptureResult.data?.start_time || activeProject?.defaultStartTime || '',
@@ -411,7 +411,7 @@ function populateReport() {
     document.getElementById('headerDate').textContent = formatDisplayDate(o.date);
 
     // Project Overview
-    document.getElementById('projectName').textContent = getValue('overview.projectName', activeProject?.name || '');
+    document.getElementById('projectName').textContent = getValue('overview.projectName', activeProject?.projectName || '');
     document.getElementById('reportDate').textContent = formatDisplayDate(o.date);
     document.getElementById('noabProjectNo').textContent = getValue('overview.noabProjectNo', activeProject?.noabProjectNo || '');
     document.getElementById('location').textContent = getValue('overview.location', activeProject?.location || '');
@@ -898,7 +898,7 @@ function renderSafetySection() {
 function renderPhotos() {
     const photos = report.photos || [];
     const grid = document.getElementById('photosGrid');
-    const projectName = report.overview?.projectName || activeProject?.name || '';
+    const projectName = report.overview?.projectName || activeProject?.projectName || '';
     const projectNo = report.overview?.noabProjectNo || activeProject?.noabProjectNo || '';
 
     document.getElementById('photoProjectName').textContent = projectName;

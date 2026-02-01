@@ -240,7 +240,7 @@ function setActiveProjectId(projectId) {
 function createNewProject() {
     currentProject = {
         id: generateId(),
-        name: '',
+        projectName: '',
         logoThumbnail: null,
         logoUrl: null,
         noabProjectNo: '',
@@ -306,7 +306,7 @@ async function saveProject() {
     }
 
     // Update current project from form
-    currentProject.name = name;
+    currentProject.projectName = name;
     // Logo fields are set by handleLogoSelect/removeLogo, preserve them
     currentProject.logoThumbnail = currentProject.logoThumbnail || null;
     currentProject.logoUrl = currentProject.logoUrl || null;
@@ -409,7 +409,7 @@ function cancelEdit() {
 function populateForm() {
     if (!currentProject) return;
 
-    document.getElementById('projectName').value = currentProject.name || '';
+    document.getElementById('projectName').value = currentProject.projectName || '';
     document.getElementById('noabProjectNo').value = currentProject.noabProjectNo || '';
     document.getElementById('cnoSolicitationNo').value = currentProject.cnoSolicitationNo || 'N/A';
     document.getElementById('location').value = currentProject.location || '';

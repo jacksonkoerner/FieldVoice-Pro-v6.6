@@ -539,7 +539,7 @@
                 version: 4
             },
             overview: {
-                projectName: activeProject?.name || '',
+                projectName: activeProject?.projectName || '',
                 noabProjectNo: activeProject?.noabProjectNo || '',
                 cnoSolicitationNo: activeProject?.cnoSolicitationNo || 'N/A',
                 location: activeProject?.location || '',
@@ -709,7 +709,7 @@
         }
 
         // Project Overview - Left Column
-        document.getElementById('projectName').value = getValue('overview.projectName', activeProject?.name || '');
+        document.getElementById('projectName').value = getValue('overview.projectName', activeProject?.projectName || '');
         document.getElementById('noabProjectNo').value = getValue('overview.noabProjectNo', activeProject?.noabProjectNo || '');
         document.getElementById('cnoSolicitationNo').value = getValue('overview.cnoSolicitationNo', activeProject?.cnoSolicitationNo || 'N/A');
 
@@ -2152,7 +2152,7 @@
         const debugData = {
             exportedAt: new Date().toISOString(),
             reportDate: report.overview?.date || '',
-            projectName: activeProject?.name || '',
+            projectName: activeProject?.projectName || '',
             aiGenerated: report.aiGenerated || null,
             fieldNotes: report.fieldNotes || {},
             guidedNotes: report.guidedNotes || {},
@@ -2184,7 +2184,7 @@
     function downloadDebugMarkdown() {
         const timestamp = new Date().toISOString();
         const reportDate = report.overview?.date || 'Unknown';
-        const projectName = activeProject?.name || 'Unknown';
+        const projectName = activeProject?.projectName || 'Unknown';
 
         let md = `# FieldVoice Debug Export\n\n`;
         md += `**Exported:** ${timestamp}\n`;

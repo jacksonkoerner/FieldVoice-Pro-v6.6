@@ -27,7 +27,7 @@ async function loadProjects() {
 
         if (localProjects.length > 0) {
             projectsCache = localProjects.sort((a, b) =>
-                (a.name || a.project_name || '').localeCompare(b.name || b.project_name || '')
+                (a.projectName || a.project_name || '').localeCompare(b.projectName || b.project_name || '')
             );
 
             // Also cache in localStorage for report-rules.js
@@ -107,7 +107,7 @@ async function loadActiveProject() {
         const localProject = await window.idb.getProject(activeId);
         if (localProject && (!userId || localProject.user_id === userId)) {
             activeProjectCache = localProject;
-            console.log('[IDB] Loaded active project from IndexedDB:', activeProjectCache.name || activeProjectCache.project_name);
+            console.log('[IDB] Loaded active project from IndexedDB:', activeProjectCache.projectName || activeProjectCache.project_name);
             return activeProjectCache;
         }
     } catch (e) {
@@ -145,7 +145,7 @@ async function loadActiveProject() {
         // Cache to IndexedDB
         await window.idb.saveProject(data);
 
-        console.log('[SUPABASE] Loaded active project:', activeProjectCache.name);
+        console.log('[SUPABASE] Loaded active project:', activeProjectCache.projectName);
         return activeProjectCache;
     } catch (e) {
         console.error('[SUPABASE] Failed to load active project:', e);
@@ -177,7 +177,7 @@ function updateActiveProjectCard() {
                         </div>
                         <div class="min-w-0">
                             <p class="text-[10px] font-bold text-safety-green uppercase tracking-wider">Active Project</p>
-                            <p class="font-bold text-slate-800 truncate">${escapeHtml(project.name)}</p>
+                            <p class="font-bold text-slate-800 truncate">${escapeHtml(project.projectName)}</p>
                             ${project.noabProjectNo ? `<p class="text-xs text-slate-500">#${escapeHtml(project.noabProjectNo)}</p>` : ''}
                         </div>
                     </div>
@@ -281,7 +281,7 @@ async function showProjectPickerModal() {
                             </div>
                             <div class="flex-1 min-w-0">
                                 <div class="flex items-center gap-2">
-                                    <p class="font-bold text-slate-600 truncate">${escapeHtml(project.name)}</p>
+                                    <p class="font-bold text-slate-600 truncate">${escapeHtml(project.projectName)}</p>
                                     <span class="shrink-0 text-[10px] bg-slate-400 text-white px-2 py-0.5 font-bold uppercase">${reasonText}</span>
                                 </div>
                                 <p class="text-xs text-slate-500 truncate mt-0.5">
@@ -304,7 +304,7 @@ async function showProjectPickerModal() {
                         </div>
                         <div class="flex-1 min-w-0">
                             <div class="flex items-center gap-2">
-                                <p class="font-bold text-slate-800 truncate">${escapeHtml(project.name)}</p>
+                                <p class="font-bold text-slate-800 truncate">${escapeHtml(project.projectName)}</p>
                                 ${isActive ? '<span class="shrink-0 text-[10px] bg-safety-green text-white px-2 py-0.5 font-bold uppercase">Active</span>' : ''}
                                 ${reason === 'CONTINUE_EXISTING' ? '<span class="shrink-0 text-[10px] bg-dot-orange text-white px-2 py-0.5 font-bold uppercase">In Progress</span>' : ''}
                             </div>

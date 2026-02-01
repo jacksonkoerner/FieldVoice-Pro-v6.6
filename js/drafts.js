@@ -19,7 +19,7 @@ function getAllDrafts() {
                 drafts.push({
                     key: key,
                     projectId: report.project?.id || report.projectId || null,
-                    projectName: report.project?.name || report.projectName || 'Unknown Project',
+                    projectName: report.project?.projectName || report.projectName || 'Unknown Project',
                     reportDate: report.overview?.date || report.reportDate || key.split('_').pop(),
                     captureMode: report.meta?.captureMode || 'guided',
                     lastSaved: report.meta?.lastSaved || report.lastSaved || new Date().toISOString(),

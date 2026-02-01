@@ -15,7 +15,7 @@ async function loadProjects() {
         if (localProjects && localProjects.length > 0) {
             projectsCache = localProjects.map(p => ({
                 id: p.id,
-                name: p.project_name || p.name || '',
+                projectName: p.projectName || p.project_name || '',
                 status: p.status || 'active'
             }));
             console.log('[IDB] Loaded projects:', projectsCache.length);
@@ -44,7 +44,7 @@ async function loadProjects() {
 
         projectsCache = data.map(row => ({
             id: row.id,
-            name: row.project_name || '',
+            projectName: row.project_name || '',
             status: row.status || 'active'
         }));
 
@@ -125,7 +125,7 @@ async function fetchArchivesFromSupabase() {
                 id: row.id,
                 date: row.report_date,
                 projectId: row.project_id,
-                projectName: project?.name || row.projects?.project_name || 'Unknown Project',
+                projectName: project?.projectName || row.projects?.project_name || 'Unknown Project',
                 submitted: row.status === 'submitted',
                 status: row.status,
                 photoCount: photoCountMap[row.id] || 0,

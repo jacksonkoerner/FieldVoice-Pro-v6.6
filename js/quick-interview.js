@@ -667,7 +667,7 @@
                 const reportData = {
                     id: currentReportId || `draft_${activeProjectId}_${todayStr}`,
                     project_id: activeProjectId,
-                    project_name: activeProject?.projectName || activeProject?.name || activeProject?.project_name || '',
+                    project_name: activeProject?.projectName || activeProject?.project_name || '',
                     date: todayStr,
                     status: 'draft',
                     capture_mode: data.captureMode,
@@ -915,7 +915,7 @@
             document.getElementById('modeSelectionDate').textContent = dateStr;
 
             if (activeProject) {
-                document.getElementById('modeSelectionProjectName').textContent = activeProject.name;
+                document.getElementById('modeSelectionProjectName').textContent = activeProject.projectName;
             }
         }
 
@@ -1816,7 +1816,7 @@
 
                 projectContext: {
                     projectId: activeProject?.id || null,
-                    projectName: activeProject?.name || report.project?.name || '',
+                    projectName: activeProject?.projectName || report.project?.projectName || '',
                     noabProjectNo: activeProject?.noabProjectNo || '',
                     location: activeProject?.location || '',
                     engineer: activeProject?.engineer || '',
@@ -1973,7 +1973,7 @@
                 action: 'upsert',
                 data: {
                     projectId: activeProjectId,
-                    projectName: report.overview?.projectName || activeProject?.name || 'Unknown Project',
+                    projectName: report.overview?.projectName || activeProject?.projectName || 'Unknown Project',
                     reportDate: todayStr,
                     captureMode: report.meta?.captureMode || 'guided',
                     payload: payload,
@@ -3143,11 +3143,11 @@
                     name: userSettings?.full_name || ""
                 },
                 project: {
-                    name: activeProject?.name || "",
+                    projectName: activeProject?.projectName || "",
                     dayNumber: null
                 },
                 overview: {
-                    projectName: activeProject?.name || "",
+                    projectName: activeProject?.projectName || "",
                     date: new Date().toLocaleDateString(),
                     startTime: new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
                     completedBy: userSettings?.full_name || "",
@@ -4821,9 +4821,9 @@
                 }
 
                 // Auto-populate project info from active project if not already set
-                if (activeProject && !report.project?.name) {
-                    report.project.name = activeProject.name || '';
-                    report.overview.projectName = activeProject.name || '';
+                if (activeProject && !report.project?.projectName) {
+                    report.project.projectName = activeProject.projectName || '';
+                    report.overview.projectName = activeProject.projectName || '';
                     // Don't save here - let regular auto-save handle it
                 }
 
