@@ -102,33 +102,99 @@
     }
 
     // ============ ORIGINAL NOTES POPULATION ============
+    /**
+     * v6.6: Updated to use originalInput from n8n response when available
+     * - If originalInput exists, use it as the source of original data sent to AI
+     * - If aiCaptureMode is 'guided', render structured tables by section
+     * - If aiCaptureMode is 'freeform', render chronological entry list
+     * - Falls back to legacy report.fieldNotes/guidedNotes for older reports
+     */
     function populateOriginalNotes() {
         if (!report) return;
 
-        const mode = report.meta?.captureMode || 'guided';
-        document.getElementById('captureModeBadge').textContent = mode === 'minimal' ? 'Quick Notes' : 'Guided';
+        // v6.6: Use aiCaptureMode from n8n response, fall back to meta.captureMode
+        const mode = report.aiCaptureMode || report.meta?.captureMode || 'guided';
+        document.getElementById('captureModeBadge').textContent =
+            mode === 'minimal' || mode === 'freeform' ? 'Quick Notes' : 'Guided';
 
-        if (mode === 'minimal') {
+        // v6.6: Use originalInput from n8n response when available
+        const original = report.originalInput;
+
+        if (mode === 'minimal' || mode === 'freeform') {
             document.getElementById('minimalNotesSection').classList.remove('hidden');
             document.getElementById('guidedNotesSection').classList.add('hidden');
-            document.getElementById('originalFreeformNotes').textContent = report.fieldNotes?.freeformNotes || 'No notes captured';
+
+            // v6.6: Try to get freeform notes from originalInput, then legacy fallback
+            let freeformContent = 'No notes captured';
+            if (original?.fieldNotes?.freeformNotes) {
+                freeformContent = original.fieldNotes.freeformNotes;
+            } else if (original?.fieldNotes?.freeform_entries?.length > 0) {
+                // Format timestamped entries chronologically
+                freeformContent = original.fieldNotes.freeform_entries
+                    .filter(e => e.content?.trim())
+                    .sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0))
+                    .map(e => {
+                        const time = e.created_at ? new Date(e.created_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '';
+                        return time ? `[${time}] ${e.content}` : e.content;
+                    })
+                    .join('\n\n');
+            } else if (report.fieldNotes?.freeformNotes) {
+                freeformContent = report.fieldNotes.freeformNotes;
+            }
+            document.getElementById('originalFreeformNotes').textContent = freeformContent;
         } else {
             document.getElementById('minimalNotesSection').classList.add('hidden');
             document.getElementById('guidedNotesSection').classList.remove('hidden');
-            document.getElementById('originalWorkSummary').textContent = report.guidedNotes?.workSummary || 'No work summary';
-            document.getElementById('originalIssues').textContent = report.guidedNotes?.issues || report.generalIssues?.join('\n') || 'N/A';
-            document.getElementById('originalSafety').textContent = formatOriginalSafety(report);
+
+            // v6.6: Try to get guided notes from originalInput entries, then legacy fallback
+            let workSummary = 'No work summary';
+            let issuesText = 'N/A';
+            let safetyText = formatOriginalSafety(report);
+
+            if (original?.entries?.length > 0) {
+                // Extract work entries (section starts with 'work_')
+                const workEntries = original.entries.filter(e => e.section?.startsWith('work_') && !e.is_deleted);
+                if (workEntries.length > 0) {
+                    workSummary = workEntries
+                        .sort((a, b) => (a.entry_order || 0) - (b.entry_order || 0))
+                        .map(e => e.content)
+                        .join('\n\n');
+                }
+
+                // Extract issues entries
+                const issueEntries = original.entries.filter(e => e.section === 'issues' && !e.is_deleted);
+                if (issueEntries.length > 0) {
+                    issuesText = issueEntries.map(e => e.content).join('\n');
+                }
+
+                // Extract safety entries
+                const safetyEntries = original.entries.filter(e => e.section === 'safety' && !e.is_deleted);
+                if (safetyEntries.length > 0) {
+                    safetyText = safetyEntries.map(e => e.content).join('\n');
+                } else if (original.safety?.noIncidents) {
+                    safetyText = 'No incidents reported';
+                }
+            } else {
+                // Legacy fallback
+                workSummary = report.guidedNotes?.workSummary || 'No work summary';
+                issuesText = report.guidedNotes?.issues || report.generalIssues?.join('\n') || 'N/A';
+            }
+
+            document.getElementById('originalWorkSummary').textContent = workSummary;
+            document.getElementById('originalIssues').textContent = issuesText;
+            document.getElementById('originalSafety').textContent = safetyText;
         }
 
-        // Weather
-        const w = report.overview?.weather || {};
+        // Weather - use originalInput.weather if available
+        const w = original?.weather || report.overview?.weather || {};
         document.getElementById('originalWeather').innerHTML = `
             High: ${w.highTemp || 'N/A'} | Low: ${w.lowTemp || 'N/A'}<br>
             ${w.generalCondition || 'N/A'} | Site: ${w.jobSiteCondition || 'N/A'}
         `;
 
-        // Photos
-        populateOriginalPhotos(report.photos || []);
+        // Photos - use originalInput.photos if available (has metadata)
+        const photos = original?.photos || report.photos || [];
+        populateOriginalPhotos(photos);
     }
 
     function formatOriginalSafety(report) {
@@ -207,8 +273,15 @@
 
             const result = await response.json();
 
-            // Save AI response
-            if (result.aiGenerated) {
+            // Save AI response - handle new n8n response structure
+            // New structure: { success, captureMode, originalInput, refinedReport }
+            // Legacy structure: { aiGenerated }
+            if (result.refinedReport) {
+                report.aiGenerated = result.refinedReport;
+                report.originalInput = result.originalInput || null;
+                report.aiCaptureMode = result.captureMode || null;
+            } else if (result.aiGenerated) {
+                // Legacy fallback
                 report.aiGenerated = result.aiGenerated;
             }
             report.meta.status = 'refined';
@@ -483,7 +556,10 @@
             }
 
             // AI response - Check localStorage cache first for immediate availability
+            // v6.6: Handle new response structure { refinedReport, originalInput, captureMode }
             let aiGenerated = null;
+            let originalInput = null;
+            let aiCaptureMode = null;
             const cacheKey = `fvp_ai_response_${reportRow.id}`;
             const cachedAI = localStorage.getItem(cacheKey);
 
@@ -493,7 +569,14 @@
                     // Validate cache is recent (within 5 minutes) and matches this report
                     const cacheAge = Date.now() - new Date(cacheData.cachedAt).getTime();
                     if (cacheData.reportId === reportRow.id && cacheAge < 300000) {
-                        aiGenerated = cacheData.aiGenerated;
+                        // Handle new structure (refinedReport) or legacy (aiGenerated)
+                        if (cacheData.refinedReport) {
+                            aiGenerated = cacheData.refinedReport;
+                            originalInput = cacheData.originalInput || null;
+                            aiCaptureMode = cacheData.captureMode || null;
+                        } else {
+                            aiGenerated = cacheData.aiGenerated;
+                        }
                         console.log('[CACHE] Using cached AI response from localStorage');
                     }
                     // Clear cache after use (one-time use)
@@ -507,7 +590,15 @@
             // Fall back to Supabase data if no valid cache
             if (!aiGenerated && aiResponseResult.data) {
                 try {
-                    aiGenerated = aiResponseResult.data.response_payload || null;
+                    const responsePayload = aiResponseResult.data.response_payload;
+                    // Handle new structure (refinedReport) or legacy (direct payload)
+                    if (responsePayload?.refinedReport) {
+                        aiGenerated = responsePayload.refinedReport;
+                        originalInput = responsePayload.originalInput || null;
+                        aiCaptureMode = responsePayload.captureMode || null;
+                    } else {
+                        aiGenerated = responsePayload || null;
+                    }
                     console.log('[SUPABASE] Loaded AI response from database');
                 } catch (e) {
                     console.error('Failed to parse AI response:', e);
@@ -515,6 +606,8 @@
             }
 
             loadedReport.aiGenerated = aiGenerated;
+            loadedReport.originalInput = originalInput;
+            loadedReport.aiCaptureMode = aiCaptureMode;
 
             // User edits (now stored in raw_data.user_edits)
             const userEditsData = rawCaptureResult.data?.raw_data?.user_edits || [];
@@ -579,6 +672,10 @@
             },
             // AI-generated content (populated by AI processing)
             aiGenerated: null,
+            // v6.6: Original input sent to AI (for "Original Notes" view)
+            originalInput: null,
+            // v6.6: Capture mode from AI response ('guided' or 'freeform')
+            aiCaptureMode: null,
             // User edits (tracked separately)
             userEdits: {},
             // Field notes from capture
