@@ -398,19 +398,19 @@ function closeDeleteProjectModal() {
  * Order: Check offline → Delete from Supabase → Delete from IndexedDB
  */
 async function confirmDeleteProject() {
+    // MUST be first check - block deletion when offline
+    if (!navigator.onLine) {
+        showToast('Cannot delete project while offline. Please connect to the internet and try again.', 'error');
+        closeDeleteProjectModal();
+        return;
+    }
+
     if (!currentProject) {
         closeDeleteProjectModal();
         return;
     }
 
     const projectId = currentProject.id;
-
-    // 1. Check if offline - block deletion
-    if (!navigator.onLine) {
-        closeDeleteProjectModal();
-        showToast('Cannot delete project while offline. Please connect to the internet and try again.', 'error');
-        return;
-    }
 
     // Show loading state
     const btn = document.getElementById('confirmDeleteProjectBtn');
