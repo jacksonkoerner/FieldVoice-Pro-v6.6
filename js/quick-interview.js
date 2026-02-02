@@ -3501,7 +3501,6 @@
                             id: photo.id,
                             report_id: currentReportId,
                             storage_path: photo.storagePath,
-                            filename: photo.fileName || photo.id,
                             caption: photo.caption || '',
                             gps_lat: photo.gps?.lat || null,
                             gps_lng: photo.gps?.lng || null,
