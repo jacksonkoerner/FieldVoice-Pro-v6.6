@@ -656,7 +656,9 @@
 
             if (!reportRow) {
                 // No Supabase report - check localStorage for a draft
-                const draftId = `draft_${activeProject?.id}_${reportDateStr}`;
+                // Use getStorageItem for consistency with quick-interview.js
+                const activeProjectId = getStorageItem(STORAGE_KEYS.ACTIVE_PROJECT_ID);
+                const draftId = `draft_${activeProjectId}_${reportDateStr}`;
                 const localDraft = getCurrentReport(draftId);
                 
                 if (localDraft && localDraft._draft_data) {
@@ -848,7 +850,9 @@
             // This ensures Original Notes displays even before AI processing
             if (!loadedReport.originalInput) {
                 try {
-                    const draftId = reportRow.id || `draft_${activeProject?.id}_${reportDateStr}`;
+                    // Try reportRow.id first, then fall back to draft ID format
+                    const activeProjectId = getStorageItem(STORAGE_KEYS.ACTIVE_PROJECT_ID);
+                    const draftId = reportRow.id || `draft_${activeProjectId}_${reportDateStr}`;
                     const localDraft = getCurrentReport(draftId);
                     
                     if (localDraft && localDraft._draft_data) {
