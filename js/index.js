@@ -426,7 +426,19 @@ function renderReportCard(report, type) {
     };
 
     const style = styles[type] || styles.draft;
-    const href = type === 'submitted' ? `archives.html?id=${report.id}` : 'quick-interview.html';
+
+    // Route based on report status:
+    // - submitted: archives (view only)
+    // - refined: report.html (already has AI-processed data)
+    // - draft/pending: quick-interview (needs more input or AI processing)
+    let href;
+    if (type === 'submitted') {
+        href = `archives.html?id=${report.id}`;
+    } else if (report.status === 'refined') {
+        href = `report.html?date=${report.report_date || report.reportDate}`;
+    } else {
+        href = 'quick-interview.html';
+    }
 
     return `
         <a href="${href}" class="block ${style.bg} border-l-4 ${style.border} p-3 mb-2 hover:bg-opacity-80 transition-colors">
