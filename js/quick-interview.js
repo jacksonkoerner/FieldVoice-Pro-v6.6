@@ -848,10 +848,12 @@
         // v6.6.1: Preserve existing draft data for swipe-out recovery
         function updateLocalReportToRefined() {
             const todayStr = getTodayDateString();
-            const reportId = currentReportId || `draft_${activeProject?.id}_${todayStr}`;
+            const draftKey = `draft_${activeProject?.id}_${todayStr}`;
+            const reportId = currentReportId || draftKey;
 
             // Get existing report data to preserve _draft_data
-            const existingReport = getCurrentReport(reportId) || {};
+            // Try the draft key first (has the full data), then the reportId
+            const existingReport = getCurrentReport(draftKey) || getCurrentReport(reportId) || {};
 
             saveCurrentReport({
                 ...existingReport,  // Preserve existing data including _draft_data
@@ -863,6 +865,13 @@
                 status: 'refined',
                 created_at: existingReport.created_at || report.meta?.createdAt || new Date().toISOString()
             });
+
+            // v6.6.1: If we have a real Supabase ID, delete the old draft key to prevent duplicates
+            if (currentReportId && currentReportId !== draftKey) {
+                deleteCurrentReport(draftKey);
+                console.log('[LOCAL] Deleted old draft key:', draftKey);
+            }
+
             console.log('[LOCAL] Report updated to refined status in localStorage (draft data preserved)');
         }
 
