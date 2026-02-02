@@ -2073,8 +2073,45 @@
     }
 
     async function saveReport() {
-        await saveReportToSupabase();
+        // Save to localStorage (primary storage for report.html)
+        saveReportToLocalStorage();
         showSaveIndicator();
+    }
+
+    /**
+     * Save report data to localStorage for persistence across page reloads
+     */
+    function saveReportToLocalStorage() {
+        if (!currentReportId) {
+            console.warn('[LOCAL] No reportId, cannot save');
+            return;
+        }
+
+        // Build the report object to save
+        const reportToSave = {
+            id: currentReportId,
+            project_id: activeProject?.id,
+            report_date: getReportDateStr(),
+            status: report.meta?.status || 'refined',
+            userEdits: report.userEdits || {},
+            activities: report.activities || [],
+            operations: report.operations || [],
+            equipment: report.equipment || [],
+            overview: report.overview || {},
+            aiGenerated: report.aiGenerated || {},
+            originalInput: report.originalInput || {},
+            meta: report.meta || {},
+            fieldNotes: report.fieldNotes || {},
+            guidedNotes: report.guidedNotes || {}
+        };
+
+        // Use saveCurrentReport from storage-keys.js
+        const success = saveCurrentReport(reportToSave);
+        if (success) {
+            console.log('[LOCAL] Report saved to localStorage:', currentReportId);
+        } else {
+            console.error('[LOCAL] Failed to save report to localStorage');
+        }
     }
 
     /**
