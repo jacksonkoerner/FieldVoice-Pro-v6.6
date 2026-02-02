@@ -768,13 +768,16 @@
                     // Validate cache is recent (within 5 minutes) and matches this report
                     const cacheAge = Date.now() - new Date(cacheData.cachedAt).getTime();
                     if (cacheData.reportId === reportRow.id && cacheAge < 300000) {
-                        // Handle new structure (refinedReport) or legacy (aiGenerated)
-                        if (cacheData.refinedReport) {
+                        // Handle both new structure (aiGenerated + originalInput) and legacy
+                        if (cacheData.aiGenerated) {
+                            aiGenerated = cacheData.aiGenerated;
+                            originalInput = cacheData.originalInput || null;
+                            aiCaptureMode = cacheData.captureMode || null;
+                        } else if (cacheData.refinedReport) {
+                            // Legacy support
                             aiGenerated = cacheData.refinedReport;
                             originalInput = cacheData.originalInput || null;
                             aiCaptureMode = cacheData.captureMode || null;
-                        } else {
-                            aiGenerated = cacheData.aiGenerated;
                         }
                         console.log('[CACHE] Using cached AI response from localStorage');
                     }
@@ -790,12 +793,18 @@
             if (!aiGenerated && aiResponseResult.data) {
                 try {
                     const responsePayload = aiResponseResult.data.response_payload;
-                    // Handle new structure (refinedReport) or legacy (direct payload)
-                    if (responsePayload?.refinedReport) {
+                    // Handle both new structure and legacy
+                    if (responsePayload?.aiGenerated) {
+                        aiGenerated = responsePayload.aiGenerated;
+                        originalInput = responsePayload.originalInput || null;
+                        aiCaptureMode = responsePayload.captureMode || null;
+                    } else if (responsePayload?.refinedReport) {
+                        // Legacy support
                         aiGenerated = responsePayload.refinedReport;
                         originalInput = responsePayload.originalInput || null;
                         aiCaptureMode = responsePayload.captureMode || null;
                     } else {
+                        // Very old format - payload IS the AI data
                         aiGenerated = responsePayload || null;
                     }
                     console.log('[SUPABASE] Loaded AI response from database');

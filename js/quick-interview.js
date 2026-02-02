@@ -2144,6 +2144,8 @@
                             reportId: currentReportId,
                             reportDate: todayStr,
                             aiGenerated: result.aiGenerated,
+                            originalInput: result.originalInput || null,
+                            captureMode: result.captureMode || null,
                             cachedAt: new Date().toISOString()
                         }));
                         console.log('[CACHE] AI response cached to localStorage');
@@ -4771,6 +4773,8 @@
                             reportId: currentReportId,
                             reportDate: todayStr,
                             aiGenerated: result.aiGenerated,
+                            originalInput: result.originalInput || null,
+                            captureMode: result.captureMode || null,
                             cachedAt: new Date().toISOString()
                         }));
                         console.log('[CACHE] AI response cached to localStorage');
