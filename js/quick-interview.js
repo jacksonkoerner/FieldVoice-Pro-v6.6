@@ -3463,7 +3463,7 @@
                     gps: photo.gps || null,
                     timestamp: photo.timestamp || new Date().toISOString(),
                     fileName: photo.fileName || photo.id,
-                    syncStatus: photo.storagePath ? 'synced' : 'pending',
+                    syncStatus: 'pending', // Always pending until metadata saved to photos table
                     createdAt: new Date().toISOString()
                 };
 
