@@ -817,6 +817,12 @@
             loadedReport.originalInput = originalInput;
             loadedReport.aiCaptureMode = aiCaptureMode;
 
+            // v6.6: Use weather from originalInput if not already set
+            if (originalInput?.weather && (!loadedReport.overview?.weather?.highTemp || loadedReport.overview?.weather?.highTemp === '--')) {
+                if (!loadedReport.overview) loadedReport.overview = {};
+                loadedReport.overview.weather = originalInput.weather;
+            }
+
             // User edits (now stored in raw_data.user_edits)
             const userEditsData = rawCaptureResult.data?.raw_data?.user_edits || [];
             if (userEditsData && userEditsData.length > 0) {
@@ -2576,5 +2582,13 @@
     window.confirmSubmit = confirmSubmit;
     window.hideSubmitModal = hideSubmitModal;
     window.toggleNoWork = toggleNoWork;
+
+    // Debug access for development
+    window.__fvp_debug = {
+        get report() { return report; },
+        get activeProject() { return activeProject; },
+        get currentReportId() { return currentReportId; },
+        get userEdits() { return userEdits; }
+    };
 
 })();
