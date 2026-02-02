@@ -844,6 +844,23 @@
             console.log('[LOCAL] Draft cleared from localStorage');
         }
 
+        // Update localStorage report to 'refined' status (instead of deleting)
+        function updateLocalReportToRefined() {
+            const todayStr = getTodayDateString();
+            const reportId = currentReportId || `draft_${activeProject?.id}_${todayStr}`;
+
+            saveCurrentReport({
+                id: reportId,
+                project_id: activeProject?.id,
+                project_name: activeProject?.projectName || activeProject?.project_name,
+                date: todayStr,
+                report_date: todayStr,
+                status: 'refined',
+                created_at: report.meta?.createdAt || new Date().toISOString()
+            });
+            console.log('[LOCAL] Report updated to refined status in localStorage');
+        }
+
         // autoExpand(), initAutoExpand(), initAllAutoExpandTextareas() moved to /js/ui-utils.js
 
         // ============ CAPTURE MODE HANDLING ============
@@ -2156,8 +2173,8 @@
                 report.meta.status = 'refined';
                 await saveReportToSupabase();
 
-                // Clear localStorage draft - report is now saved and refined
-                clearLocalStorageDraft();
+                // Update localStorage draft to refined status
+                updateLocalReportToRefined();
 
                 // Release the lock before navigating away
                 if (window.lockManager) {
@@ -4785,8 +4802,8 @@
                 report.meta.status = 'refined';
                 await saveReportToSupabase();
 
-                // Clear localStorage draft - report is now saved and refined
-                clearLocalStorageDraft();
+                // Update localStorage draft to refined status
+                updateLocalReportToRefined();
 
                 // Release the lock before navigating away
                 if (window.lockManager) {
