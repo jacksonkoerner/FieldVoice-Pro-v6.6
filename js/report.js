@@ -616,11 +616,21 @@
         const params = new URLSearchParams(window.location.search);
         const reportIdParam = params.get('reportId');
 
+        const reportDateStr = getReportDateStr();
+
         if (!activeProject && !reportIdParam) {
+            // No project and no reportId - check localStorage for a draft
+            const activeProjectId = getStorageItem(STORAGE_KEYS.ACTIVE_PROJECT_ID);
+            const draftId = `draft_${activeProjectId}_${reportDateStr}`;
+            const localDraft = getCurrentReport(draftId);
+            
+            if (localDraft && localDraft._draft_data) {
+                console.log('[LOAD] No project/reportId, loading from localStorage draft:', draftId);
+                return buildReportFromLocalStorage(localDraft._draft_data, reportDateStr);
+            }
+            
             return createFreshReport();
         }
-
-        const reportDateStr = getReportDateStr();
 
         try {
             let reportRow = null;
