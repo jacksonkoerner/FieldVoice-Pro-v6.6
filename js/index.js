@@ -435,7 +435,7 @@ function renderReportCard(report, type) {
     if (type === 'submitted') {
         href = `archives.html?id=${report.id}`;
     } else if (report.status === 'refined') {
-        href = `report.html?date=${report.report_date || report.reportDate}`;
+        href = `report.html?date=${report.report_date || report.reportDate || report.date}&reportId=${report.id}`;
     } else {
         href = 'quick-interview.html';
     }
