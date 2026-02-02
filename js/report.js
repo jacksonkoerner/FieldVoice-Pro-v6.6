@@ -608,278 +608,79 @@
         return dateParam || new Date().toISOString().split('T')[0];
     }
 
+    /**
+     * v6.6.2: Load report from localStorage ONLY
+     * Source of truth is now fvp_report_{reportId} key
+     */
     async function loadReport() {
         // Clear any stale report ID before loading
         currentReportId = null;
 
-        // Check URL params for reportId (for direct loading after redirect)
+        // Get reportId from URL params (required)
         const params = new URLSearchParams(window.location.search);
         const reportIdParam = params.get('reportId');
-
         const reportDateStr = getReportDateStr();
 
-        if (!activeProject && !reportIdParam) {
-            // No project and no reportId - check localStorage for a draft
-            const activeProjectId = getStorageItem(STORAGE_KEYS.ACTIVE_PROJECT_ID);
-            const draftId = `draft_${activeProjectId}_${reportDateStr}`;
-            const localDraft = getCurrentReport(draftId);
-            
-            if (localDraft && localDraft._draft_data) {
-                console.log('[LOAD] No project/reportId, loading from localStorage draft:', draftId);
-                return buildReportFromLocalStorage(localDraft._draft_data, reportDateStr);
-            }
-            
+        if (!reportIdParam) {
+            console.error('[LOAD] No reportId in URL params');
+            showToast('Report not found. Redirecting to home.', 'error');
+            setTimeout(() => window.location.href = 'index.html', 2000);
             return createFreshReport();
         }
 
-        try {
-            let reportRow = null;
-            let reportError = null;
+        // Load from single localStorage key
+        const reportData = getReportData(reportIdParam);
 
-            // If we have a reportId param, try loading by ID first (most reliable)
-            if (reportIdParam) {
-                const result = await supabaseClient
-                    .from('reports')
-                    .select('*')
-                    .eq('id', reportIdParam)
-                    .single();
-                reportRow = result.data;
-                reportError = result.error;
-                console.log('[LOAD] Loaded report by ID param:', reportIdParam);
-            }
-
-            // Fall back to project_id + date lookup
-            if (!reportRow && activeProject) {
-                const result = await supabaseClient
-                    .from('reports')
-                    .select('*')
-                    .eq('project_id', activeProject.id)
-                    .eq('report_date', reportDateStr)
-                    .single();
-                reportRow = result.data;
-                reportError = result.error;
-            }
-
-            if (reportError && reportError.code !== 'PGRST116') {
-                console.error('Error loading report:', reportError);
-            }
-
-            if (!reportRow) {
-                // No Supabase report - check localStorage for a draft
-                // Use getStorageItem for consistency with quick-interview.js
-                const activeProjectId = getStorageItem(STORAGE_KEYS.ACTIVE_PROJECT_ID);
-                const draftId = `draft_${activeProjectId}_${reportDateStr}`;
-                const localDraft = getCurrentReport(draftId);
-                
-                if (localDraft && localDraft._draft_data) {
-                    console.log('[LOAD] No Supabase data, loading from localStorage draft');
-                    return buildReportFromLocalStorage(localDraft._draft_data, reportDateStr);
-                }
-                
-                // No localStorage draft either, create fresh
-                return createFreshReport();
-            }
-
-            // Store the report ID
-            currentReportId = reportRow.id;
-
-            // Load related data in parallel
-            // Note: user_edits, contractor_work, personnel, and equipment_usage now stored in report_raw_capture.raw_data
-            const [rawCaptureResult, photosResult, aiResponseResult] = await Promise.all([
-                supabaseClient.from('report_raw_capture').select('*').eq('report_id', reportRow.id).maybeSingle(),
-                supabaseClient.from('photos').select('*').eq('report_id', reportRow.id).order('created_at', { ascending: true }),
-                // Get most recent AI response (handles multiple rows from retries)
-                supabaseClient.from('ai_responses').select('*').eq('report_id', reportRow.id).order('received_at', { ascending: false }).limit(1).maybeSingle()
-            ]);
-
-            // Build the report object
-            const loadedReport = createFreshReport();
-
-            // Basic report info
-            loadedReport.meta = {
-                createdAt: reportRow.created_at,
-                lastSaved: reportRow.updated_at,
-                version: 4,
-                status: reportRow.status || 'draft',
-                reportViewed: true
-            };
-
-            loadedReport.overview.completedBy = reportRow.inspector_name || '';
-            loadedReport.overview.date = reportRow.report_date;
-
-            // Raw capture data
-            if (rawCaptureResult.data) {
-                const rc = rawCaptureResult.data;
-                loadedReport.meta.captureMode = rc.capture_mode || 'guided';
-                loadedReport.fieldNotes = {
-                    freeformNotes: rc.freeform_notes || ''
-                };
-                loadedReport.guidedNotes = {
-                    workSummary: rc.work_summary || '',
-                    issues: rc.issues_notes || '',
-                    safety: rc.safety_notes || ''
-                };
-                if (rc.weather_data) {
-                    loadedReport.overview.weather = rc.weather_data;
-                }
-            }
-
-            // Contractor work (activities) - now stored in raw_data.contractor_work
-            const contractorWorkData = rawCaptureResult.data?.raw_data?.contractor_work || [];
-            if (contractorWorkData && contractorWorkData.length > 0) {
-                loadedReport.activities = contractorWorkData.map(cw => ({
-                    contractorId: cw.contractor_id,
-                    noWork: cw.no_work_performed || false,
-                    narrative: cw.narrative || '',
-                    equipmentUsed: cw.equipment_used || '',
-                    crew: cw.crew || ''
-                }));
-            }
-
-            // Personnel (operations) - now stored in raw_data.personnel
-            const personnelData = rawCaptureResult.data?.raw_data?.personnel || [];
-            if (personnelData && personnelData.length > 0) {
-                loadedReport.operations = personnelData.map(p => ({
-                    contractorId: p.contractor_id,
-                    superintendents: p.superintendents || 0,
-                    foremen: p.foremen || 0,
-                    operators: p.operators || 0,
-                    laborers: p.laborers || 0,
-                    surveyors: p.surveyors || 0,
-                    others: p.others || 0
-                }));
-            }
-
-            // Equipment usage - now stored in raw_data.equipment_usage
-            const equipmentUsageData = rawCaptureResult.data?.raw_data?.equipment_usage || [];
-            if (equipmentUsageData && equipmentUsageData.length > 0) {
-                loadedReport.equipment = equipmentUsageData.map(eu => ({
-                    equipmentId: eu.equipment_id,
-                    contractorId: eu.contractor_id || '',
-                    type: eu.type || '',
-                    qty: eu.qty || 1,
-                    status: eu.status === 'idle' ? 'IDLE' : `${eu.hours_used || 0} hrs`,
-                    hoursUtilized: eu.hours_used || null
-                }));
-            }
-
-            // Photos
-            if (photosResult.data && photosResult.data.length > 0) {
-                loadedReport.photos = photosResult.data.map(p => ({
-                    id: p.id,
-                    url: p.storage_path ? `${SUPABASE_URL}/storage/v1/object/public/report-photos/${p.storage_path}` : '',
-                    storagePath: p.storage_path || '',
-                    fileName: p.filename || '',
-                    caption: p.caption || '',
-                    date: p.taken_at ? new Date(p.taken_at).toLocaleDateString() : '',
-                    time: p.taken_at ? new Date(p.taken_at).toLocaleTimeString() : '',
-                    gps: p.gps_lat && p.gps_lng ? { lat: p.gps_lat, lng: p.gps_lng } : null
-                }));
-            }
-
-            // AI response - Check localStorage cache first for immediate availability
-            // v6.6: Handle new response structure { refinedReport, originalInput, captureMode }
-            let aiGenerated = null;
-            let originalInput = null;
-            let aiCaptureMode = null;
-            const cacheKey = `fvp_ai_response_${reportRow.id}`;
-            const cachedAI = localStorage.getItem(cacheKey);
-
-            if (cachedAI) {
-                try {
-                    const cacheData = JSON.parse(cachedAI);
-                    // Validate cache is recent (within 5 minutes) and matches this report
-                    const cacheAge = Date.now() - new Date(cacheData.cachedAt).getTime();
-                    if (cacheData.reportId === reportRow.id && cacheAge < 300000) {
-                        // Handle both new structure (aiGenerated + originalInput) and legacy
-                        if (cacheData.aiGenerated) {
-                            aiGenerated = cacheData.aiGenerated;
-                            originalInput = cacheData.originalInput || null;
-                            aiCaptureMode = cacheData.captureMode || null;
-                        } else if (cacheData.refinedReport) {
-                            // Legacy support
-                            aiGenerated = cacheData.refinedReport;
-                            originalInput = cacheData.originalInput || null;
-                            aiCaptureMode = cacheData.captureMode || null;
-                        }
-                        console.log('[CACHE] Using cached AI response from localStorage');
-                    }
-                    // v6.6.1: Keep cache for swipe-out recovery (was one-time use, now persistent)
-                    // Cache will be cleared on successful submit or when stale (>24h cleanup on index.html)
-                } catch (e) {
-                    console.warn('[CACHE] Failed to parse cached AI response:', e);
-                    localStorage.removeItem(cacheKey);  // Only remove if corrupted
-                }
-            }
-
-            // Fall back to Supabase data if no valid cache
-            if (!aiGenerated && aiResponseResult.data) {
-                try {
-                    const responsePayload = aiResponseResult.data.response_payload;
-                    // Handle both new structure and legacy
-                    if (responsePayload?.aiGenerated) {
-                        aiGenerated = responsePayload.aiGenerated;
-                        originalInput = responsePayload.originalInput || null;
-                        aiCaptureMode = responsePayload.captureMode || null;
-                    } else if (responsePayload?.refinedReport) {
-                        // Legacy support
-                        aiGenerated = responsePayload.refinedReport;
-                        originalInput = responsePayload.originalInput || null;
-                        aiCaptureMode = responsePayload.captureMode || null;
-                    } else {
-                        // Very old format - payload IS the AI data
-                        aiGenerated = responsePayload || null;
-                    }
-                    console.log('[SUPABASE] Loaded AI response from database');
-                } catch (e) {
-                    console.error('Failed to parse AI response:', e);
-                }
-            }
-
-            loadedReport.aiGenerated = aiGenerated;
-            loadedReport.originalInput = originalInput;
-            loadedReport.aiCaptureMode = aiCaptureMode;
-
-            // v6.6: Use weather from originalInput if not already set
-            if (originalInput?.weather && (!loadedReport.overview?.weather?.highTemp || loadedReport.overview?.weather?.highTemp === '--')) {
-                if (!loadedReport.overview) loadedReport.overview = {};
-                loadedReport.overview.weather = originalInput.weather;
-            }
-
-            // User edits (now stored in raw_data.user_edits)
-            const userEditsData = rawCaptureResult.data?.raw_data?.user_edits || [];
-            if (userEditsData && userEditsData.length > 0) {
-                loadedReport.userEdits = {};
-                userEditsData.forEach(ue => {
-                    loadedReport.userEdits[ue.field_path] = ue.edited_value;
-                });
-            }
-
-            // ============ LOCALSTORAGE FALLBACK FOR ORIGINAL NOTES ============
-            // If no originalInput from n8n, build it from localStorage draft data
-            // This ensures Original Notes displays even before AI processing
-            if (!loadedReport.originalInput) {
-                try {
-                    // Try reportRow.id first, then fall back to draft ID format
-                    const activeProjectId = getStorageItem(STORAGE_KEYS.ACTIVE_PROJECT_ID);
-                    const draftId = reportRow.id || `draft_${activeProjectId}_${reportDateStr}`;
-                    const localDraft = getCurrentReport(draftId);
-                    
-                    if (localDraft && localDraft._draft_data) {
-                        console.log('[LOAD] No originalInput from n8n, building from localStorage');
-                        loadedReport.originalInput = buildOriginalInputFromDraft(localDraft._draft_data);
-                        loadedReport.aiCaptureMode = localDraft._draft_data.captureMode || loadedReport.meta?.captureMode;
-                    }
-                } catch (localErr) {
-                    console.warn('[LOAD] Could not build originalInput from localStorage:', localErr);
-                }
-            }
-
-            return loadedReport;
-        } catch (e) {
-            console.error('Failed to load report:', e);
+        if (!reportData) {
+            console.error('[LOAD] No report data found in localStorage for:', reportIdParam);
+            showToast('Report data not found. It may have been cleared.', 'error');
+            setTimeout(() => window.location.href = 'index.html', 2000);
             return createFreshReport();
         }
+
+        console.log('[LOAD] Loaded report from localStorage:', reportIdParam);
+
+        // Store the report ID
+        currentReportId = reportIdParam;
+
+        // Build the report object from localStorage data
+        const loadedReport = createFreshReport();
+
+        // Basic report info from localStorage
+        loadedReport.meta = {
+            createdAt: reportData.createdAt,
+            lastSaved: reportData.lastSaved,
+            version: 4,
+            status: reportData.status || 'refined',
+            captureMode: reportData.captureMode || 'minimal',
+            reportViewed: true
+        };
+
+        loadedReport.overview.date = reportData.reportDate;
+
+        // AI-generated content
+        loadedReport.aiGenerated = reportData.aiGenerated || null;
+
+        // Original input for "Original Notes" tab
+        loadedReport.originalInput = reportData.originalInput || null;
+
+        // Capture mode
+        loadedReport.aiCaptureMode = reportData.captureMode || null;
+
+        // User edits
+        loadedReport.userEdits = reportData.userEdits || {};
+
+        // Weather from originalInput
+        if (reportData.originalInput?.weather) {
+            loadedReport.overview.weather = reportData.originalInput.weather;
+        }
+
+        // Photos from originalInput (metadata only, URLs need to be resolved)
+        if (reportData.originalInput?.photos) {
+            loadedReport.photos = reportData.originalInput.photos;
+        }
+
+        return loadedReport;
     }
 
     function createFreshReport() {
@@ -2079,7 +1880,8 @@
     }
 
     /**
-     * Save report data to localStorage for persistence across page reloads
+     * v6.6.2: Save report data to localStorage using single key pattern
+     * Key: fvp_report_{reportId}
      */
     function saveReportToLocalStorage() {
         if (!currentReportId) {
@@ -2087,26 +1889,33 @@
             return;
         }
 
-        // Build the report object to save
+        // Read current data to preserve fields we don't modify here
+        const existingData = getReportData(currentReportId) || {};
+
+        // Build the report object to save (matches spec structure)
         const reportToSave = {
-            id: currentReportId,
-            project_id: activeProject?.id,
-            report_date: getReportDateStr(),
-            status: report.meta?.status || 'refined',
+            reportId: currentReportId,
+            projectId: existingData.projectId || activeProject?.id,
+            reportDate: existingData.reportDate || getReportDateStr(),
+            status: report.meta?.status || existingData.status || 'refined',
+
+            // From n8n webhook response (preserve original)
+            aiGenerated: report.aiGenerated || existingData.aiGenerated || {},
+            captureMode: report.aiCaptureMode || existingData.captureMode || 'minimal',
+
+            // Original field notes (preserve original)
+            originalInput: report.originalInput || existingData.originalInput || {},
+
+            // User edits - this is what we're updating
             userEdits: report.userEdits || {},
-            activities: report.activities || [],
-            operations: report.operations || [],
-            equipment: report.equipment || [],
-            overview: report.overview || {},
-            aiGenerated: report.aiGenerated || {},
-            originalInput: report.originalInput || {},
-            meta: report.meta || {},
-            fieldNotes: report.fieldNotes || {},
-            guidedNotes: report.guidedNotes || {}
+
+            // Metadata
+            createdAt: existingData.createdAt || report.meta?.createdAt || new Date().toISOString(),
+            lastSaved: new Date().toISOString()
         };
 
-        // Use saveCurrentReport from storage-keys.js
-        const success = saveCurrentReport(reportToSave);
+        // Use saveReportData from storage-keys.js
+        const success = saveReportData(currentReportId, reportToSave);
         if (success) {
             console.log('[LOCAL] Report saved to localStorage:', currentReportId);
         } else {

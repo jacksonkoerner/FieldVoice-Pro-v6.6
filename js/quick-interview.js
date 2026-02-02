@@ -2167,28 +2167,47 @@
                 // Save AI response to local report
                 if (result.aiGenerated) {
                     report.aiGenerated = result.aiGenerated;
-
-                    // Cache AI response to localStorage for immediate availability on report.html
-                    const todayStr = new Date().toISOString().split('T')[0];
-                    try {
-                        localStorage.setItem(`fvp_ai_response_${currentReportId}`, JSON.stringify({
-                            reportId: currentReportId,
-                            reportDate: todayStr,
-                            aiGenerated: result.aiGenerated,
-                            originalInput: result.originalInput || null,
-                            captureMode: result.captureMode || null,
-                            cachedAt: new Date().toISOString()
-                        }));
-                        console.log('[CACHE] AI response cached to localStorage');
-                    } catch (e) {
-                        console.warn('[CACHE] Failed to cache AI response:', e);
-                    }
                 }
                 report.meta.status = 'refined';
                 await saveReportToSupabase();
 
-                // Update localStorage draft to refined status
-                updateLocalReportToRefined();
+                // v6.6.2: Save complete report package to single localStorage key
+                // This is the source of truth for report.html
+                const todayStr = new Date().toISOString().split('T')[0];
+                const reportDataPackage = {
+                    reportId: currentReportId,
+                    projectId: activeProject?.id,
+                    reportDate: todayStr,
+                    status: 'refined',
+
+                    // From n8n webhook response
+                    aiGenerated: result.aiGenerated || {},
+                    captureMode: result.captureMode || report.meta?.captureMode || 'minimal',
+
+                    // Original field notes (for "Original Notes" tab)
+                    originalInput: result.originalInput || payload,
+
+                    // User edits - initialize empty (will be populated on report.html)
+                    userEdits: {},
+
+                    // Metadata
+                    createdAt: report.meta?.createdAt || new Date().toISOString(),
+                    lastSaved: new Date().toISOString()
+                };
+
+                const saveSuccess = saveReportData(currentReportId, reportDataPackage);
+                if (saveSuccess) {
+                    console.log('[LOCAL] Complete report package saved to localStorage:', currentReportId);
+                } else {
+                    console.warn('[LOCAL] Failed to save report package to localStorage');
+                }
+
+                // Clean up old draft key if we have a real Supabase ID
+                const draftKey = `draft_${activeProject?.id}_${todayStr}`;
+                if (currentReportId && currentReportId !== draftKey) {
+                    deleteCurrentReport(draftKey);
+                    console.log('[LOCAL] Cleaned up old draft key:', draftKey);
+                }
 
                 // Release the lock before navigating away
                 if (window.lockManager) {
@@ -2196,7 +2215,6 @@
                 }
 
                 // Navigate to report with date and reportId parameters
-                const todayStr = new Date().toISOString().split('T')[0];
                 window.location.href = `report.html?date=${todayStr}&reportId=${currentReportId}`;
             } catch (error) {
                 console.error('AI processing failed:', error);
@@ -4796,28 +4814,47 @@
                 // Save AI response to local report
                 if (result.aiGenerated) {
                     report.aiGenerated = result.aiGenerated;
-
-                    // Cache AI response to localStorage for immediate availability on report.html
-                    const todayStr = new Date().toISOString().split('T')[0];
-                    try {
-                        localStorage.setItem(`fvp_ai_response_${currentReportId}`, JSON.stringify({
-                            reportId: currentReportId,
-                            reportDate: todayStr,
-                            aiGenerated: result.aiGenerated,
-                            originalInput: result.originalInput || null,
-                            captureMode: result.captureMode || null,
-                            cachedAt: new Date().toISOString()
-                        }));
-                        console.log('[CACHE] AI response cached to localStorage');
-                    } catch (e) {
-                        console.warn('[CACHE] Failed to cache AI response:', e);
-                    }
                 }
                 report.meta.status = 'refined';
                 await saveReportToSupabase();
 
-                // Update localStorage draft to refined status
-                updateLocalReportToRefined();
+                // v6.6.2: Save complete report package to single localStorage key
+                // This is the source of truth for report.html
+                const todayStr = new Date().toISOString().split('T')[0];
+                const reportDataPackage = {
+                    reportId: currentReportId,
+                    projectId: activeProject?.id,
+                    reportDate: todayStr,
+                    status: 'refined',
+
+                    // From n8n webhook response
+                    aiGenerated: result.aiGenerated || {},
+                    captureMode: result.captureMode || report.meta?.captureMode || 'guided',
+
+                    // Original field notes (for "Original Notes" tab)
+                    originalInput: result.originalInput || payload,
+
+                    // User edits - initialize empty (will be populated on report.html)
+                    userEdits: {},
+
+                    // Metadata
+                    createdAt: report.meta?.createdAt || new Date().toISOString(),
+                    lastSaved: new Date().toISOString()
+                };
+
+                const saveSuccess = saveReportData(currentReportId, reportDataPackage);
+                if (saveSuccess) {
+                    console.log('[LOCAL] Complete report package saved to localStorage:', currentReportId);
+                } else {
+                    console.warn('[LOCAL] Failed to save report package to localStorage');
+                }
+
+                // Clean up old draft key if we have a real Supabase ID
+                const draftKey = `draft_${activeProject?.id}_${todayStr}`;
+                if (currentReportId && currentReportId !== draftKey) {
+                    deleteCurrentReport(draftKey);
+                    console.log('[LOCAL] Cleaned up old draft key:', draftKey);
+                }
 
                 // Release the lock before navigating away
                 if (window.lockManager) {
@@ -4825,7 +4862,6 @@
                 }
 
                 // Navigate to report with date and reportId parameters
-                const todayStr = new Date().toISOString().split('T')[0];
                 window.location.href = `report.html?date=${todayStr}&reportId=${currentReportId}`;
             } catch (error) {
                 console.error('AI processing failed:', error);

@@ -17,6 +17,7 @@ const STORAGE_KEYS = {
   PROJECTS: 'fvp_projects',
   ACTIVE_PROJECT_ID: 'fvp_active_project_id',
   CURRENT_REPORTS: 'fvp_current_reports',
+  REPORT_DATA: 'fvp_report_',  // Pattern: fvp_report_{reportId}
   AI_REPORTS: 'fvp_ai_reports',
   DRAFTS: 'fvp_drafts',
   SYNC_QUEUE: 'fvp_sync_queue',
@@ -329,6 +330,54 @@ function clearSyncQueue() {
   console.log('Sync queue cleared');
 }
 
+/**
+ * Gets the localStorage key for a specific report
+ * @param {string} reportId - The report UUID
+ * @returns {string} The localStorage key
+ */
+function getReportDataKey(reportId) {
+  return `${STORAGE_KEYS.REPORT_DATA}${reportId}`;
+}
+
+/**
+ * Gets report data from localStorage by reportId
+ * @param {string} reportId - The report UUID
+ * @returns {Object|null} The report data or null if not found
+ */
+function getReportData(reportId) {
+  if (!reportId) return null;
+  const key = getReportDataKey(reportId);
+  return getStorageItem(key);
+}
+
+/**
+ * Saves report data to localStorage
+ * @param {string} reportId - The report UUID
+ * @param {Object} data - The report data to save
+ * @returns {boolean} True on success, false on failure
+ */
+function saveReportData(reportId, data) {
+  if (!reportId || !data) {
+    console.error('Cannot save report data: missing reportId or data');
+    return false;
+  }
+
+  const key = getReportDataKey(reportId);
+  data.lastSaved = new Date().toISOString();
+  return setStorageItem(key, data);
+}
+
+/**
+ * Deletes report data from localStorage
+ * @param {string} reportId - The report UUID
+ */
+function deleteReportData(reportId) {
+  if (!reportId) return;
+  const key = getReportDataKey(reportId);
+  removeStorageItem(key);
+  console.log('Report data deleted:', key);
+}
+
 // Expose to window for non-module scripts
 if (typeof window !== 'undefined') {
   window.STORAGE_KEYS = STORAGE_KEYS;
@@ -343,4 +392,8 @@ if (typeof window !== 'undefined') {
   window.addToSyncQueue = addToSyncQueue;
   window.getSyncQueue = getSyncQueue;
   window.clearSyncQueue = clearSyncQueue;
+  window.getReportDataKey = getReportDataKey;
+  window.getReportData = getReportData;
+  window.saveReportData = saveReportData;
+  window.deleteReportData = deleteReportData;
 }
