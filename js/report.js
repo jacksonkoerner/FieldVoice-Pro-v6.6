@@ -804,11 +804,11 @@
                         }
                         console.log('[CACHE] Using cached AI response from localStorage');
                     }
-                    // Clear cache after use (one-time use)
-                    localStorage.removeItem(cacheKey);
+                    // v6.6.1: Keep cache for swipe-out recovery (was one-time use, now persistent)
+                    // Cache will be cleared on successful submit or when stale (>24h cleanup on index.html)
                 } catch (e) {
                     console.warn('[CACHE] Failed to parse cached AI response:', e);
-                    localStorage.removeItem(cacheKey);
+                    localStorage.removeItem(cacheKey);  // Only remove if corrupted
                 }
             }
 

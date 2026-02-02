@@ -845,20 +845,25 @@
         }
 
         // Update localStorage report to 'refined' status (instead of deleting)
+        // v6.6.1: Preserve existing draft data for swipe-out recovery
         function updateLocalReportToRefined() {
             const todayStr = getTodayDateString();
             const reportId = currentReportId || `draft_${activeProject?.id}_${todayStr}`;
 
+            // Get existing report data to preserve _draft_data
+            const existingReport = getCurrentReport(reportId) || {};
+
             saveCurrentReport({
+                ...existingReport,  // Preserve existing data including _draft_data
                 id: reportId,
                 project_id: activeProject?.id,
                 project_name: activeProject?.projectName || activeProject?.project_name,
                 date: todayStr,
                 report_date: todayStr,
                 status: 'refined',
-                created_at: report.meta?.createdAt || new Date().toISOString()
+                created_at: existingReport.created_at || report.meta?.createdAt || new Date().toISOString()
             });
-            console.log('[LOCAL] Report updated to refined status in localStorage');
+            console.log('[LOCAL] Report updated to refined status in localStorage (draft data preserved)');
         }
 
         // autoExpand(), initAutoExpand(), initAllAutoExpandTextareas() moved to /js/ui-utils.js
