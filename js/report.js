@@ -181,7 +181,9 @@
         document.getElementById('originalWeather').innerHTML = weatherHtml;
 
         // === PHOTOS (both modes) ===
-        const photos = original?.photos || report.photos || [];
+        // Always use report.photos for display - has URLs from Supabase
+        // original.photos only has metadata (no URLs)
+        const photos = report.photos || [];
         populateOriginalPhotos(photos);
     }
 
