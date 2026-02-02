@@ -655,7 +655,16 @@
             }
 
             if (!reportRow) {
-                // No existing report, create fresh
+                // No Supabase report - check localStorage for a draft
+                const draftId = `draft_${activeProject?.id}_${reportDateStr}`;
+                const localDraft = getCurrentReport(draftId);
+                
+                if (localDraft && localDraft._draft_data) {
+                    console.log('[LOAD] No Supabase data, loading from localStorage draft');
+                    return buildReportFromLocalStorage(localDraft._draft_data, reportDateStr);
+                }
+                
+                // No localStorage draft either, create fresh
                 return createFreshReport();
             }
 
@@ -834,6 +843,24 @@
                 });
             }
 
+            // ============ LOCALSTORAGE FALLBACK FOR ORIGINAL NOTES ============
+            // If no originalInput from n8n, build it from localStorage draft data
+            // This ensures Original Notes displays even before AI processing
+            if (!loadedReport.originalInput) {
+                try {
+                    const draftId = reportRow.id || `draft_${activeProject?.id}_${reportDateStr}`;
+                    const localDraft = getCurrentReport(draftId);
+                    
+                    if (localDraft && localDraft._draft_data) {
+                        console.log('[LOAD] No originalInput from n8n, building from localStorage');
+                        loadedReport.originalInput = buildOriginalInputFromDraft(localDraft._draft_data);
+                        loadedReport.aiCaptureMode = localDraft._draft_data.captureMode || loadedReport.meta?.captureMode;
+                    }
+                } catch (localErr) {
+                    console.warn('[LOAD] Could not build originalInput from localStorage:', localErr);
+                }
+            }
+
             return loadedReport;
         } catch (e) {
             console.error('Failed to load report:', e);
@@ -897,6 +924,112 @@
             // Field notes from capture
             fieldNotes: { freeformNotes: '' },
             guidedNotes: { workSummary: '' }
+        };
+    }
+
+    /**
+     * Build a full report object from localStorage draft data
+     * Used when no Supabase data exists yet
+     */
+    function buildReportFromLocalStorage(draftData, reportDateStr) {
+        const loadedReport = createFreshReport();
+        
+        // Meta
+        loadedReport.meta.captureMode = draftData.captureMode || draftData.meta?.captureMode || 'guided';
+        loadedReport.meta.createdAt = draftData.meta?.createdAt;
+        loadedReport.meta.status = 'draft';
+        
+        // Weather
+        if (draftData.weather) {
+            loadedReport.overview.weather = draftData.weather;
+        }
+        
+        // Date
+        loadedReport.overview.date = reportDateStr;
+        
+        // Build originalInput for Original Notes display
+        loadedReport.originalInput = buildOriginalInputFromDraft(draftData);
+        loadedReport.aiCaptureMode = loadedReport.meta.captureMode;
+        
+        // Activities
+        if (draftData.activities) {
+            loadedReport.activities = draftData.activities;
+        }
+        
+        // Operations/Personnel
+        if (draftData.operations) {
+            loadedReport.operations = draftData.operations;
+        }
+        
+        // Equipment
+        if (draftData.equipmentRows) {
+            loadedReport.equipmentRows = draftData.equipmentRows;
+        }
+        if (draftData.equipment) {
+            loadedReport.equipment = draftData.equipment;
+        }
+        
+        // Safety
+        loadedReport.safety = {
+            noIncidents: draftData.safetyNoIncidents || false,
+            hasIncidents: draftData.safetyHasIncidents || false,
+            notes: draftData.safetyNotes || []
+        };
+        
+        // Photos
+        if (draftData.photos) {
+            loadedReport.photos = draftData.photos;
+        }
+        
+        // Legacy notes
+        if (draftData.freeformNotes) {
+            loadedReport.fieldNotes = { freeformNotes: draftData.freeformNotes };
+        }
+        if (draftData.workSummary) {
+            loadedReport.guidedNotes = { workSummary: draftData.workSummary };
+        }
+        
+        return loadedReport;
+    }
+
+    /**
+     * Build an originalInput object from localStorage draft data
+     * This matches the structure that n8n would provide
+     */
+    function buildOriginalInputFromDraft(draftData) {
+        return {
+            // Weather
+            weather: draftData.weather || {},
+            
+            // Entries (v6 format - for guided mode sections)
+            entries: draftData.entries || [],
+            
+            // Operations/Personnel
+            operations: draftData.operations || [],
+            
+            // Equipment rows
+            equipmentRows: draftData.equipmentRows || [],
+            
+            // Safety status
+            safety: {
+                noIncidents: draftData.safetyNoIncidents || false,
+                hasIncidents: draftData.safetyHasIncidents || false,
+                notes: draftData.safetyNotes || []
+            },
+            
+            // Toggle states
+            toggleStates: draftData.toggleStates || {},
+            
+            // Freeform mode data
+            fieldNotes: {
+                freeformNotes: draftData.freeformNotes || '',
+                freeform_entries: draftData.freeform_entries || []
+            },
+            
+            // Project context (for contractor name lookups)
+            projectContext: {
+                contractors: activeProject?.contractors || projectContractors || []
+            }
         };
     }
 
