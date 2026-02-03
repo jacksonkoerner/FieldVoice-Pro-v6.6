@@ -1,5 +1,6 @@
 // FieldVoice Pro - Final Review Page Logic
 // DOT RPR Daily Report viewer with print-optimized layout
+// v6.6.14: Fix reports table - add project_id, device_id, user_id
 // v6.6.12: Fix PDF pagination - add explicit page breaks to .page elements
 
 // ============ STATE ============
@@ -1345,25 +1346,34 @@ async function uploadPDFToStorage(pdf) {
 async function ensureReportExists() {
     const reportData = getReportData(currentReportId) || {};
     const reportDate = getReportDate();
-    
+
     const reportRow = {
         id: currentReportId,
-        project_id: report.projectId,
+        project_id: activeProject?.id || null,
+        device_id: getDeviceId(),
+        user_id: getStorageItem(STORAGE_KEYS.USER_ID) || null,
         report_date: reportDate,
         status: 'draft', // Will be updated to 'submitted' after
         capture_mode: reportData.captureMode || 'guided',
         created_at: reportData.createdAt || new Date().toISOString(),
         updated_at: new Date().toISOString()
     };
-    
+
+    console.log('[SUBMIT] Report row:', {
+        id: reportRow.id,
+        project_id: reportRow.project_id,
+        device_id: reportRow.device_id,
+        user_id: reportRow.user_id
+    });
+
     const { error } = await supabaseClient
         .from('reports')
         .upsert(reportRow, { onConflict: 'id' });
-    
+
     if (error) {
         throw new Error('Failed to create report record: ' + error.message);
     }
-    
+
     console.log('[SUBMIT] Report record ensured in reports table:', currentReportId);
 }
 
