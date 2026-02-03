@@ -34,6 +34,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         // Setup auto-save listeners for editable fields (v6.6.5)
         setupAutoSave();
+
+        // Initialize auto-resize for textareas (v6.6.5)
+        initAutoResize();
     } catch (err) {
         console.error('Failed to initialize:', err);
         alert('Failed to load report data. Please try again.');
@@ -464,11 +467,10 @@ function renderWorkSummary() {
         const narrative = activity?.narrative || '';
         html += `<div class="contractor-narrative-container" style="margin-bottom: 8px;">
             <textarea
-                class="editable-field contractor-narrative w-full min-h-[60px] p-2 border border-gray-300 rounded resize-y text-sm"
+                class="editable-field contractor-narrative"
                 data-path="${activityPath}.narrative"
                 data-contractor-id="${contractor.id}"
                 placeholder="Describe work performed by ${escapeHtml(contractor.name)}..."
-                style="font-family: inherit; line-height: 1.4;"
             >${escapeHtml(narrative)}</textarea>
         </div>`;
 
@@ -477,23 +479,21 @@ function renderWorkSummary() {
         const crew = activity?.crew || '';
         html += `<div class="contractor-details-container" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
             <div>
-                <label class="text-xs font-bold text-gray-500 uppercase">Equipment</label>
+                <label style="font-size: 8pt; font-weight: bold; color: #666; text-transform: uppercase;">Equipment</label>
                 <textarea
-                    class="editable-field contractor-equipment w-full p-2 border border-gray-300 rounded resize-y text-sm"
+                    class="editable-field contractor-equipment"
                     data-path="${activityPath}.equipmentUsed"
                     data-contractor-id="${contractor.id}"
                     placeholder="Equipment used..."
-                    style="font-family: inherit; min-height: 40px;"
                 >${escapeHtml(equipment)}</textarea>
             </div>
             <div>
-                <label class="text-xs font-bold text-gray-500 uppercase">Crew</label>
+                <label style="font-size: 8pt; font-weight: bold; color: #666; text-transform: uppercase;">Crew</label>
                 <textarea
-                    class="editable-field contractor-crew w-full p-2 border border-gray-300 rounded resize-y text-sm"
+                    class="editable-field contractor-crew"
                     data-path="${activityPath}.crew"
                     data-contractor-id="${contractor.id}"
                     placeholder="Crew count/description..."
-                    style="font-family: inherit; min-height: 40px;"
                 >${escapeHtml(crew)}</textarea>
             </div>
         </div>`;
@@ -556,16 +556,28 @@ function renderOperationsTable() {
         const ops = getContractorOperations(contractor.id);
         const abbrev = contractor.abbreviation || contractor.name.substring(0, 10).toUpperCase();
         const trades = formatTradesAbbrev(contractor.trades);
+        const opsPath = `operations_${contractor.id}`;
+
+        // Create editable input for each personnel field
+        const createEditableCell = (field, value) => {
+            const displayVal = value || '';
+            return `<input type="text"
+                class="editable-cell"
+                data-path="${opsPath}.${field}"
+                data-contractor-id="${contractor.id}"
+                value="${escapeHtml(displayVal)}"
+                placeholder="--">`;
+        };
 
         html += `<tr>
             <td>${escapeHtml(abbrev)}</td>
             <td>${escapeHtml(trades)}</td>
-            <td>${ops?.superintendents || 'N/A'}</td>
-            <td>${ops?.foremen || 'N/A'}</td>
-            <td>${ops?.operators || 'N/A'}</td>
-            <td>${ops?.laborers || 'N/A'}</td>
-            <td>${ops?.surveyors || 'N/A'}</td>
-            <td>${ops?.others || 'N/A'}</td>
+            <td>${createEditableCell('superintendents', ops?.superintendents)}</td>
+            <td>${createEditableCell('foremen', ops?.foremen)}</td>
+            <td>${createEditableCell('operators', ops?.operators)}</td>
+            <td>${createEditableCell('laborers', ops?.laborers)}</td>
+            <td>${createEditableCell('surveyors', ops?.surveyors)}</td>
+            <td>${createEditableCell('others', ops?.others)}</td>
         </tr>`;
     });
 
@@ -643,17 +655,34 @@ function renderEquipmentTable() {
     }
 
     let html = '';
-    equipmentData.forEach(item => {
+    equipmentData.forEach((item, index) => {
         // v6.6: Pass contractorName fallback for freeform mode
         const contractorName = getContractorName(item.contractorId, item.contractorName);
         const status = item.status || 'IDLE';
         const notes = status === 'IDLE' ? 'IDLE' : `${status.replace(' hrs', '')} HOURS UTILIZED`;
+        const equipPath = `equipment_${index}`;
 
         html += `<tr>
             <td>${escapeHtml(contractorName)}</td>
-            <td>${escapeHtml(item.type || 'N/A')}</td>
-            <td>${item.qty || 1}</td>
-            <td>${notes}</td>
+            <td><input type="text"
+                class="editable-cell"
+                data-path="${equipPath}.type"
+                data-equipment-index="${index}"
+                value="${escapeHtml(item.type || '')}"
+                placeholder="Equipment type..."></td>
+            <td><input type="text"
+                class="editable-cell"
+                data-path="${equipPath}.qty"
+                data-equipment-index="${index}"
+                value="${item.qty || 1}"
+                placeholder="1"
+                style="width: 40px;"></td>
+            <td><input type="text"
+                class="editable-cell"
+                data-path="${equipPath}.notes"
+                data-equipment-index="${index}"
+                value="${escapeHtml(notes)}"
+                placeholder="Notes..."></td>
         </tr>`;
     });
 
@@ -735,10 +764,9 @@ function renderTextSections() {
 function createEditableTextarea(path, value, placeholder) {
     const escapedValue = escapeHtml(value || '');
     return `<textarea
-        class="editable-field w-full min-h-[80px] p-2 border border-gray-300 rounded resize-y text-sm"
+        class="editable-field"
         data-path="${path}"
         placeholder="${placeholder}"
-        style="font-family: inherit; line-height: 1.4;"
     >${escapedValue}</textarea>`;
 }
 
@@ -905,11 +933,10 @@ function renderPhotos() {
                     </div>
                     <div class="photo-meta"><span>Date:</span> ${photo.date || formatDisplayDate(report.overview?.date)}</div>
                     <textarea
-                        class="editable-field photo-caption w-full p-1 text-sm border border-gray-300 rounded resize-y"
+                        class="editable-field photo-caption"
                         data-path="photos[${i}].caption"
                         data-photo-index="${i}"
                         placeholder="Add caption..."
-                        style="font-family: inherit; min-height: 40px;"
                     >${escapeHtml(photo.caption || '')}</textarea>
                 </div>
             `;
@@ -953,11 +980,10 @@ function addAdditionalPhotoPages(remainingPhotos) {
                         </div>
                         <div class="photo-meta"><span>Date:</span> ${photo.date || formatDisplayDate(report.overview?.date)}</div>
                         <textarea
-                            class="editable-field photo-caption w-full p-1 text-sm border border-gray-300 rounded resize-y"
+                            class="editable-field photo-caption"
                             data-path="photos[${photoIndex}].caption"
                             data-photo-index="${photoIndex}"
                             placeholder="Add caption..."
-                            style="font-family: inherit; min-height: 40px;"
                         >${escapeHtml(photo.caption || '')}</textarea>
                     </div>
                 `;
@@ -1245,12 +1271,19 @@ async function saveToFinalReports(pdfUrl) {
     const submittedAt = new Date().toISOString();
 
     // Helper to clean weather values - convert "--", "N/A", empty to null
-    const cleanWeatherValue = (val) => {
+    // Also extract numeric values from strings like "71°F", "39°F", "0.00""
+    function cleanWeatherValue(val) {
         if (val === null || val === undefined || val === '' || val === '--' || val === 'N/A') {
             return null;
         }
-        return val;
-    };
+        // Extract numeric value from strings like "71°F", "39°F", "0.00""
+        const numMatch = String(val).match(/^[\d.]+/);
+        if (numMatch) {
+            const num = parseFloat(numMatch[0]);
+            return isNaN(num) ? null : num;
+        }
+        return null;
+    }
 
     const finalReportData = {
         report_id: currentReportId,
@@ -1583,6 +1616,27 @@ function dismissIncompleteBanner() {
     }
 }
 
+// ============ AUTO-RESIZE (v6.6.5) ============
+/**
+ * v6.6.5: Auto-resize textarea to fit content
+ */
+function autoResize(textarea) {
+    textarea.style.height = 'auto';
+    textarea.style.height = textarea.scrollHeight + 'px';
+}
+
+/**
+ * v6.6.5: Initialize auto-resize for all editable fields
+ */
+function initAutoResize() {
+    document.querySelectorAll('.editable-field').forEach(field => {
+        if (field.tagName === 'TEXTAREA') {
+            autoResize(field);
+            field.addEventListener('input', () => autoResize(field));
+        }
+    });
+}
+
 // ============ AUTO-SAVE (v6.6.5) ============
 /**
  * v6.6.5: Setup auto-save listeners for all editable fields
@@ -1625,6 +1679,32 @@ function setupAutoSave() {
                 } else {
                     // Simple activity path without nested field
                     userEdits[path] = value;
+                }
+                report.userEdits = userEdits;
+            } else if (path.startsWith('operations_')) {
+                // Operations table: operations_uuid.field -> update userEdits as nested object
+                const match = path.match(/^(operations_[^.]+)\.(.+)$/);
+                if (match) {
+                    const opsKey = match[1];
+                    const fieldName = match[2];
+
+                    if (!userEdits[opsKey]) {
+                        userEdits[opsKey] = {};
+                    }
+                    userEdits[opsKey][fieldName] = value;
+                }
+                report.userEdits = userEdits;
+            } else if (path.startsWith('equipment_')) {
+                // Equipment table: equipment_index.field -> update userEdits as nested object
+                const match = path.match(/^(equipment_\d+)\.(.+)$/);
+                if (match) {
+                    const equipKey = match[1];
+                    const fieldName = match[2];
+
+                    if (!userEdits[equipKey]) {
+                        userEdits[equipKey] = {};
+                    }
+                    userEdits[equipKey][fieldName] = value;
                 }
                 report.userEdits = userEdits;
             } else {
