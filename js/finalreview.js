@@ -138,234 +138,143 @@ async function loadReport() {
     const reportIdParam = params.get('reportId');
     const reportDateStr = getReportDateStr();
 
-    if (!activeProject) {
-        console.log('[SUPABASE] No active project, cannot load report');
+    // v6.6.2: Load from localStorage (same source as report.html)
+    // This ensures userEdits made on report.html are available here
+    if (!reportIdParam) {
+        console.error('[FINAL] No reportId in URL params');
         return null;
     }
 
-    try {
-        let reportRow = null;
+    // Load from localStorage using getReportData from storage-keys.js
+    const reportData = getReportData(reportIdParam);
 
-        // If we have a report ID from URL, load directly
-        if (reportIdParam) {
-            const { data, error } = await supabaseClient
-                .from('reports')
-                .select('*')
-                .eq('id', reportIdParam)
-                .single();
+    if (!reportData) {
+        console.error('[FINAL] No report data found in localStorage for:', reportIdParam);
+        return null;
+    }
 
-            if (!error && data) {
-                reportRow = data;
-            }
-        }
+    console.log('[FINAL] Loaded report from localStorage:', reportIdParam);
 
-        // Otherwise, try to find by project and date
-        if (!reportRow) {
-            const { data: existingReport, error: reportError } = await supabaseClient
-                .from('reports')
-                .select('*')
-                .eq('project_id', activeProject.id)
-                .eq('report_date', reportDateStr)
-                .single();
+    // Store the report ID
+    currentReportId = reportIdParam;
 
-            if (reportError) {
-                console.log('[SUPABASE] No report found for this date:', reportError.message);
-                return null;
-            }
+    // Extract data from localStorage structure
+    const aiPayload = reportData.aiGenerated || {};
+    const originalInput = reportData.originalInput || {};
 
-            reportRow = existingReport;
-        }
+    // Build the report object matching the expected structure
+    const loadedReport = {
+        overview: {
+            projectName: activeProject?.projectName || '',
+            noabProjectNo: activeProject?.noabProjectNo || '',
+            date: reportData.reportDate || reportDateStr,
+            startTime: originalInput.startTime || activeProject?.defaultStartTime || '',
+            endTime: originalInput.endTime || activeProject?.defaultEndTime || '',
+            completedBy: userSettings?.fullName || '',
+            weather: originalInput.weather || {},
+            location: activeProject?.location || '',
+            cnoSolicitationNo: activeProject?.cnoSolicitationNo || 'N/A',
+            engineer: activeProject?.engineer || '',
+            contractor: activeProject?.primeContractor || '',
+            contractDay: calculateContractDay(activeProject?.noticeToProceed, reportData.reportDate || reportDateStr),
+            weatherDays: activeProject?.weatherDays || 0
+        },
+        meta: {
+            status: reportData.status || 'refined',
+            submitted: reportData.status === 'submitted',
+            submittedAt: null,
+            createdAt: reportData.createdAt,
+            updatedAt: reportData.lastSaved
+        },
+        activities: [],
+        operations: [],
+        equipment: [],
+        photos: [],
+        aiGenerated: {},
+        userEdits: reportData.userEdits || {},
+        originalInput: originalInput,
+        fieldNotes: originalInput.transcript || '',
+        guidedNotes: originalInput.guidedNotes || {},
+        issues: '',
+        communications: '',
+        qaqc: '',
+        visitors: '',
+        safety: { hasIncident: false, notes: '' }
+    };
 
-        if (!reportRow) {
-            return null;
-        }
-
-        // Store the report ID
-        currentReportId = reportRow.id;
-
-        // Load related data in parallel
-        // Note: user_edits, contractor_work, personnel, and equipment_usage now stored in report_raw_capture.raw_data
-        const [rawCaptureResult, photosResult, aiResponseResult] = await Promise.all([
-            supabaseClient.from('report_raw_capture').select('*').eq('report_id', reportRow.id).maybeSingle(),
-            supabaseClient.from('photos').select('*').eq('report_id', reportRow.id).order('created_at', { ascending: true }),
-            // Get most recent AI response (handles multiple rows from retries)
-            supabaseClient.from('ai_responses').select('*').eq('report_id', reportRow.id).order('received_at', { ascending: false }).limit(1).maybeSingle()
-        ]);
-
-        // Build the report object
-        const loadedReport = {
-            overview: {
-                projectName: reportRow.project_name || activeProject?.projectName || '',
-                noabProjectNo: reportRow.project_no || activeProject?.noabProjectNo || '',
-                date: reportRow.report_date,
-                startTime: rawCaptureResult.data?.start_time || activeProject?.defaultStartTime || '',
-                endTime: rawCaptureResult.data?.end_time || activeProject?.defaultEndTime || '',
-                completedBy: reportRow.inspector_name || userSettings?.fullName || '',
-                weather: rawCaptureResult.data?.weather_data || {},
-                location: activeProject?.location || '',
-                cnoSolicitationNo: activeProject?.cnoSolicitationNo || 'N/A',
-                engineer: activeProject?.engineer || '',
-                contractor: activeProject?.primeContractor || '',
-                contractDay: calculateContractDay(activeProject?.noticeToProceed, reportRow.report_date),
-                weatherDays: activeProject?.weatherDays || 0
-            },
-            meta: {
-                status: reportRow.status || 'draft',
-                submitted: reportRow.status === 'submitted',
-                submittedAt: reportRow.submitted_at || null,
-                createdAt: reportRow.created_at,
-                updatedAt: reportRow.updated_at
-            },
-            activities: [],
-            operations: [],
-            equipment: [],
-            photos: [],
-            aiGenerated: {},
-            userEdits: {},
-            fieldNotes: rawCaptureResult.data?.transcript || '',
-            guidedNotes: rawCaptureResult.data?.guided_notes || {},
-            issues: '',
-            communications: '',
-            qaqc: '',
-            visitors: '',
-            safety: { hasIncident: false, notes: '' }
+    // Process AI-generated content if available
+    if (aiPayload) {
+        // v6.6: Support both old and new field names for backwards compatibility
+        loadedReport.aiGenerated = {
+            activities: aiPayload.activities || [],
+            operations: aiPayload.operations || [],
+            equipment: aiPayload.equipment || [],
+            // v6.6: Support both old (generalIssues) and new (issues_delays) field names
+            issues_delays: aiPayload.issues_delays || aiPayload.generalIssues || [],
+            qaqc_notes: aiPayload.qaqc_notes || aiPayload.qaqcNotes || [],
+            safety: aiPayload.safety || { has_incidents: false, hasIncidents: false, noIncidents: true, summary: '', notes: '' },
+            communications: aiPayload.communications || aiPayload.contractorCommunications || '',
+            visitors_deliveries: aiPayload.visitors_deliveries || aiPayload.visitorsRemarks || '',
+            // v6.6: New fields
+            executive_summary: aiPayload.executive_summary || '',
+            work_performed: aiPayload.work_performed || '',
+            inspector_notes: aiPayload.inspector_notes || '',
+            extraction_confidence: aiPayload.extraction_confidence || 'high',
+            missing_data_flags: aiPayload.missing_data_flags || []
         };
 
-        // Process contractor work (now stored in raw_data.contractor_work)
-        const contractorWorkData = rawCaptureResult.data?.raw_data?.contractor_work || [];
-        if (contractorWorkData && contractorWorkData.length > 0) {
-            loadedReport.activities = contractorWorkData.map(row => ({
-                contractorId: row.contractor_id,
-                noWork: row.no_work_performed || false,
-                narrative: row.narrative || '',
-                equipmentUsed: row.equipment_used || '',
-                crew: row.crew || ''
-            }));
+        console.log('[FINAL] Loaded AI data from localStorage:', loadedReport.aiGenerated);
+
+        // Copy AI text sections to report for easy access
+        // v6.6: Handle both old and new field names
+        const issuesData = aiPayload.issues_delays || aiPayload.generalIssues;
+        if (Array.isArray(issuesData)) {
+            loadedReport.issues = issuesData.join('\n');
+        } else {
+            loadedReport.issues = issuesData || '';
         }
 
-        // Process personnel/operations (now stored in raw_data.personnel)
-        const personnelData = rawCaptureResult.data?.raw_data?.personnel || [];
-        if (personnelData && personnelData.length > 0) {
-            loadedReport.operations = personnelData.map(row => ({
-                contractorId: row.contractor_id,
-                superintendents: row.superintendents || 0,
-                foremen: row.foremen || 0,
-                operators: row.operators || 0,
-                laborers: row.laborers || 0,
-                surveyors: row.surveyors || 0,
-                others: row.others || 0
-            }));
+        loadedReport.communications = aiPayload.communications || aiPayload.contractorCommunications || '';
+
+        // Handle both array and string formats for qaqc
+        const qaqcData = aiPayload.qaqc_notes || aiPayload.qaqcNotes;
+        if (Array.isArray(qaqcData)) {
+            loadedReport.qaqc = qaqcData.join('\n');
+        } else {
+            loadedReport.qaqc = qaqcData || '';
         }
 
-        // Process equipment usage (now stored in raw_data.equipment_usage)
-        const equipmentUsageData = rawCaptureResult.data?.raw_data?.equipment_usage || [];
-        if (equipmentUsageData && equipmentUsageData.length > 0) {
-            loadedReport.equipment = equipmentUsageData.map(row => ({
-                contractorId: row.contractor_id,
-                type: row.type || '',
-                qty: row.qty || 1,
-                status: row.status === 'idle' ? 'IDLE' : (row.hours_used ? `${row.hours_used} hrs` : 'IDLE')
-            }));
-        }
+        loadedReport.visitors = aiPayload.visitors_deliveries || aiPayload.visitorsRemarks || '';
 
-        // Process photos - use storage_path to build full URL
-        if (photosResult.data && photosResult.data.length > 0) {
-            loadedReport.photos = photosResult.data.map(row => ({
-                id: row.id,
-                url: row.storage_path ? `${SUPABASE_URL}/storage/v1/object/public/report-photos/${row.storage_path}` : '',
-                storagePath: row.storage_path || '',
-                fileName: row.filename || '',
-                caption: row.caption || '',
-                date: row.taken_at ? new Date(row.taken_at).toLocaleDateString() : '',
-                time: row.taken_at ? new Date(row.taken_at).toLocaleTimeString() : '',
-                gps: row.gps_lat && row.gps_lng ? { lat: row.gps_lat, lng: row.gps_lng } : null
-            }));
-        }
-
-        // Process AI response - data is stored as JSONB in response_payload column
-        if (aiResponseResult.data && aiResponseResult.data.response_payload) {
-            const aiPayload = aiResponseResult.data.response_payload;
-
-            // v6.6: Support both old and new field names for backwards compatibility
-            // Use response_payload directly - it already contains the aiGenerated object
-            loadedReport.aiGenerated = {
-                activities: aiPayload.activities || [],
-                operations: aiPayload.operations || [],
-                equipment: aiPayload.equipment || [],
-                // v6.6: Support both old (generalIssues) and new (issues_delays) field names
-                issues_delays: aiPayload.issues_delays || aiPayload.generalIssues || [],
-                qaqc_notes: aiPayload.qaqc_notes || aiPayload.qaqcNotes || [],
-                safety: aiPayload.safety || { has_incidents: false, hasIncidents: false, noIncidents: true, summary: '', notes: '' },
-                communications: aiPayload.communications || aiPayload.contractorCommunications || '',
-                visitors_deliveries: aiPayload.visitors_deliveries || aiPayload.visitorsRemarks || '',
-                // v6.6: New fields
-                executive_summary: aiPayload.executive_summary || '',
-                work_performed: aiPayload.work_performed || '',
-                inspector_notes: aiPayload.inspector_notes || '',
-                extraction_confidence: aiPayload.extraction_confidence || 'high',
-                missing_data_flags: aiPayload.missing_data_flags || []
+        // Safety - handle different property names (has_incidents vs hasIncidents vs hasIncident)
+        if (aiPayload.safety) {
+            // v6.6: Support new safety.summary field alongside old safety.notes
+            const safetyNotes = aiPayload.safety.summary ||
+                (Array.isArray(aiPayload.safety.notes) ? aiPayload.safety.notes.join('\n') : (aiPayload.safety.notes || ''));
+            loadedReport.safety = {
+                hasIncident: aiPayload.safety.has_incidents || aiPayload.safety.hasIncidents || aiPayload.safety.hasIncident || false,
+                noIncidents: aiPayload.safety.noIncidents || !aiPayload.safety.has_incidents || false,
+                notes: safetyNotes
             };
-
-            console.log('[SUPABASE] Loaded AI response from response_payload:', loadedReport.aiGenerated);
-
-            // Copy AI text sections to report for easy access
-            // v6.6: Handle both old and new field names
-            const issuesData = aiPayload.issues_delays || aiPayload.generalIssues;
-            if (Array.isArray(issuesData)) {
-                loadedReport.issues = issuesData.join('\n');
-            } else {
-                loadedReport.issues = issuesData || '';
-            }
-
-            loadedReport.communications = aiPayload.communications || aiPayload.contractorCommunications || '';
-
-            // Handle both array and string formats for qaqc
-            const qaqcData = aiPayload.qaqc_notes || aiPayload.qaqcNotes;
-            if (Array.isArray(qaqcData)) {
-                loadedReport.qaqc = qaqcData.join('\n');
-            } else {
-                loadedReport.qaqc = qaqcData || '';
-            }
-
-            loadedReport.visitors = aiPayload.visitors_deliveries || aiPayload.visitorsRemarks || '';
-
-            // Safety - handle different property names (has_incidents vs hasIncidents vs hasIncident)
-            if (aiPayload.safety) {
-                // v6.6: Support new safety.summary field alongside old safety.notes
-                const safetyNotes = aiPayload.safety.summary || 
-                    (Array.isArray(aiPayload.safety.notes) ? aiPayload.safety.notes.join('\n') : (aiPayload.safety.notes || ''));
-                loadedReport.safety = {
-                    hasIncident: aiPayload.safety.has_incidents || aiPayload.safety.hasIncidents || aiPayload.safety.hasIncident || false,
-                    noIncidents: aiPayload.safety.noIncidents || !aiPayload.safety.has_incidents || false,
-                    notes: safetyNotes
-                };
-            }
         }
-
-        // Process user edits (now stored in raw_data.user_edits)
-        const userEditsData = rawCaptureResult.data?.raw_data?.user_edits || [];
-        if (userEditsData && userEditsData.length > 0) {
-            userEditsData.forEach(row => {
-                let value = row.edited_value;
-                // Try to parse JSON values
-                try {
-                    const parsed = JSON.parse(value);
-                    if (typeof parsed === 'object') {
-                        value = parsed;
-                    }
-                } catch (e) {
-                    // Keep as string
-                }
-                loadedReport.userEdits[row.field_path] = value;
-            });
-        }
-
-        console.log('[SUPABASE] Loaded report for date:', reportDateStr);
-        return loadedReport;
-    } catch (e) {
-        console.error('[SUPABASE] Failed to load report:', e);
-        return null;
     }
+
+    // Process photos from originalInput (these have URLs from Supabase storage)
+    if (originalInput.photos && originalInput.photos.length > 0) {
+        loadedReport.photos = originalInput.photos.map(photo => ({
+            id: photo.id || '',
+            url: photo.url || '',
+            storagePath: photo.storagePath || '',
+            fileName: photo.fileName || '',
+            caption: photo.caption || '',
+            date: photo.date || '',
+            time: photo.time || '',
+            gps: photo.gps || null
+        }));
+    }
+
+    console.log('[FINAL] Report loaded with userEdits:', Object.keys(loadedReport.userEdits));
+    return loadedReport;
 }
 
 function calculateContractDay(noticeToProceed, reportDate) {
