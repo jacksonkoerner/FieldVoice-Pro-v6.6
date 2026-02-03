@@ -1284,12 +1284,14 @@ async function generatePDF() {
         input.parentNode.replaceChild(div, input);
     });
     
-    // v6.6.7: Position clone for html2canvas capture
+    // v6.6.8: Position clone for html2canvas capture with explicit dimensions
     // Note: html2canvas requires the element to be in the visible viewport
     // We position at 0,0 with fixed position but below the modal overlay
+    // CRITICAL: Must set explicit width - fixed elements don't inherit width from viewport
     clonedElement.style.position = 'fixed';
     clonedElement.style.left = '0';
     clonedElement.style.top = '0';
+    clonedElement.style.width = '8.5in'; // Explicit width required for fixed positioning
     clonedElement.style.zIndex = '1'; // Below modal overlay (z-index: 1000)
     clonedElement.style.pointerEvents = 'none';
     clonedElement.style.background = '#fff'; // Ensure white background
