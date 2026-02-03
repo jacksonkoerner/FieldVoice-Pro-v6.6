@@ -383,7 +383,7 @@
      */
     async function savePhoto(photo) {
         const photoRecord = {
-            id: photo.id || `photo_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            id: photo.id || crypto.randomUUID(),
             reportId: photo.reportId,
             blob: photo.blob,
             caption: photo.caption || '',

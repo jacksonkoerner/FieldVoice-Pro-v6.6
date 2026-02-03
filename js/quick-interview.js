@@ -1775,7 +1775,7 @@
                         console.warn('[PHOTO] GPS failed:', e);
                     }
 
-                    const photoId = `photo_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+                    const photoId = crypto.randomUUID();
                     const now = new Date();
 
                     // Compress image
@@ -3956,7 +3956,7 @@
                     const date = now.toLocaleDateString();
                     const time = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit' });
 
-                    const photoId = `photo_${Date.now()}_${i}`;
+                    const photoId = crypto.randomUUID();
 
                     // Compress image
                     showToast('Compressing photo...', 'info');

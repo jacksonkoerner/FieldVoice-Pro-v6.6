@@ -2625,6 +2625,8 @@
     window.confirmSubmit = confirmSubmit;
     window.hideSubmitModal = hideSubmitModal;
     window.toggleNoWork = toggleNoWork;
+    window.handlePhotoLoad = handlePhotoLoad;
+    window.handlePhotoError = handlePhotoError;
 
     // Debug access for development
     window.__fvp_debug = {
