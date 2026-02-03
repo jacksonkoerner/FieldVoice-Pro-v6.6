@@ -1,6 +1,6 @@
 // FieldVoice Pro - Final Review Page Logic
 // DOT RPR Daily Report viewer with print-optimized layout
-// v6.6.11: Fix blank PDF - remove overflow clipping, position on-screen
+// v6.6.12: Fix PDF pagination - add explicit page breaks to .page elements
 
 // ============ STATE ============
 let report = null;
@@ -1332,6 +1332,17 @@ async function generatePDF() {
         el.style.background = '#fff';
     });
 
+    // v6.6.12: Add explicit page breaks to each .page element
+    const pages = clonedElement.querySelectorAll('.page');
+    pages.forEach((page, index) => {
+        if (index < pages.length - 1) {
+            page.classList.add('page-break');
+            page.style.pageBreakAfter = 'always';
+            page.style.breakAfter = 'page';
+        }
+    });
+    console.log('[PDF] Added page breaks to', pages.length, 'pages');
+
     document.body.appendChild(clonedElement);
 
     // v6.6.11: Wait for browser to compute layout
@@ -1373,7 +1384,7 @@ async function generatePDF() {
             orientation: 'portrait'
         },
         pagebreak: {
-            mode: ['css'],
+            mode: ['avoid-all', 'css'],  // v6.6.12: Added 'avoid-all' for robust pagination
             before: '.page-break',
             avoid: ['tr', 'td', '.contractor-block', '.photo-cell']
         }
