@@ -1,6 +1,6 @@
 // FieldVoice Pro - Final Review Page Logic
 // DOT RPR Daily Report viewer with print-optimized layout
-// v6.6.5: Now supports editable text fields with auto-save to localStorage
+// v6.6.10: Fix blank PDF - absolute positioning, image wait, layout wait
 
 // ============ STATE ============
 let report = null;
@@ -1114,6 +1114,28 @@ function goToEdit() {
 // ============ PDF GENERATION & SUBMIT FLOW ============
 
 /**
+ * v6.6.10: Wait for all images in an element to load
+ * @param {HTMLElement} element - Element containing images
+ * @param {number} timeout - Max wait time per image in ms
+ */
+async function waitForImages(element, timeout = 5000) {
+    const images = element.querySelectorAll('img');
+    if (images.length === 0) return;
+
+    const promises = Array.from(images).map(img => {
+        if (img.complete && img.naturalWidth > 0) {
+            return Promise.resolve();
+        }
+        return new Promise(resolve => {
+            const timer = setTimeout(resolve, timeout);
+            img.onload = () => { clearTimeout(timer); resolve(); };
+            img.onerror = () => { clearTimeout(timer); resolve(); };
+        });
+    });
+    await Promise.all(promises);
+}
+
+/**
  * Main submit function - orchestrates the complete submit flow
  * 1. Check online status
  * 2. Generate PDF from page content
@@ -1284,18 +1306,31 @@ async function generatePDF() {
         input.parentNode.replaceChild(div, input);
     });
     
-    // v6.6.8: Position clone for html2canvas capture with explicit dimensions
-    // Note: html2canvas requires the element to be in the visible viewport
-    // We position at 0,0 with fixed position but below the modal overlay
-    // CRITICAL: Must set explicit width - fixed elements don't inherit width from viewport
-    clonedElement.style.position = 'fixed';
-    clonedElement.style.left = '0';
+    // v6.6.10: Position clone off-screen with absolute positioning for reliable capture
+    // Fixed positioning caused zero-dimension issues; absolute with explicit width works
+    clonedElement.style.position = 'absolute';
+    clonedElement.style.left = '-9999px';
     clonedElement.style.top = '0';
-    clonedElement.style.width = '8.5in'; // Explicit width required for fixed positioning
-    clonedElement.style.zIndex = '1'; // Below modal overlay (z-index: 1000)
-    clonedElement.style.pointerEvents = 'none';
-    clonedElement.style.background = '#fff'; // Ensure white background
+    clonedElement.style.width = '816px';      // 8.5in at 96dpi
+    clonedElement.style.minWidth = '816px';   // Force width
+    clonedElement.style.display = 'block';
+    clonedElement.style.visibility = 'visible';
+    clonedElement.style.background = '#fff';
     document.body.appendChild(clonedElement);
+
+    // v6.6.10: Wait for browser to compute layout
+    await new Promise(resolve => {
+        requestAnimationFrame(() => {
+            requestAnimationFrame(resolve);
+        });
+    });
+
+    // v6.6.10: Wait for all images to load
+    await waitForImages(clonedElement, 5000);
+
+    // v6.6.10: Debug log (remove after confirmed working)
+    console.log('[PDF] Clone ready - width:', clonedElement.offsetWidth, 'height:', clonedElement.offsetHeight);
+    console.log('[PDF] Images loaded:', Array.from(clonedElement.querySelectorAll('img')).map(img => img.complete));
 
     // Generate filename
     const projectName = getProjectName().replace(/[^a-zA-Z0-9]/g, '_').substring(0, 30);
@@ -1309,9 +1344,12 @@ async function generatePDF() {
         html2canvas: {
             scale: 2,
             useCORS: true,
-            logging: false,
+            logging: true,           // v6.6.10: Enable for debugging
             letterRendering: true,
-            allowTaint: true
+            allowTaint: false,       // v6.6.10: Prevent tainted canvas
+            windowWidth: 816,        // v6.6.10: Force desktop width context
+            scrollX: 0,              // v6.6.10: Prevent scroll artifacts
+            scrollY: 0
         },
         jsPDF: {
             unit: 'in',
