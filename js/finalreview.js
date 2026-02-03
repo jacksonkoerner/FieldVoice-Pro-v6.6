@@ -1082,138 +1082,349 @@ function goToEdit() {
     }
 }
 
+// ============ PDF GENERATION & SUBMIT FLOW ============
+
+/**
+ * Main submit function - orchestrates the complete submit flow
+ * 1. Check online status
+ * 2. Generate PDF from page content
+ * 3. Upload PDF to Supabase Storage
+ * 4. Save metadata to final_reports table
+ * 5. Update reports table status to 'submitted'
+ * 6. Clear local storage for this report
+ * 7. Navigate to archives with success message
+ */
 async function submitReport() {
+    // 1. Check online status
+    if (!navigator.onLine) {
+        showError('Cannot submit offline. Please connect to internet.');
+        return;
+    }
+
     if (!report) {
-        alert('No report data found.');
+        showError('No report data found.');
         return;
     }
 
     if (!currentReportId) {
-        alert('No report ID found. Cannot submit.');
+        showError('No report ID found. Cannot submit.');
         return;
     }
 
-    // Disable the submit button while saving
-    const submitBtn = document.querySelector('.btn-submit');
-    if (submitBtn) {
-        submitBtn.disabled = true;
-        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i><span>Submitting...</span>';
-    }
+    // 2. Show loading state
+    showSubmitLoading(true);
 
     try {
-        const submittedAt = new Date().toISOString();
+        console.log('[SUBMIT] Starting report submission for:', currentReportId);
 
-        // 1. Save final version to final_reports table
-        // Note: Schema uses individual columns, not a single final_data JSONB
-        const finalData = {
-            report_id: currentReportId,
-            // Store structured data in JSONB columns
-            contractors_json: report.activities || [],
-            personnel_json: report.operations || [],
-            equipment_json: report.equipment || [],
-            // Text summary fields
-            work_performed: report.aiGenerated?.workPerformed || '',
-            executive_summary: report.aiGenerated?.executiveSummary || '',
-            safety_observations: report.safety?.notes || '',
-            delays_issues: report.issues || '',
-            qaqc_notes: report.qaqc || '',
-            communications_notes: report.communications || '',
-            visitors_deliveries_notes: report.visitors || '',
-            // Boolean flags
-            has_contractor_personnel: (report.activities?.length > 0) || (report.operations?.length > 0),
-            has_equipment: report.equipment?.length > 0,
-            has_issues: !!report.issues,
-            has_communications: !!report.communications,
-            has_qaqc: !!report.qaqc,
-            has_safety_incidents: report.safety?.hasIncident || false,
-            has_visitors_deliveries: !!report.visitors,
-            has_photos: report.photos?.length > 0,
-            submitted_at: submittedAt
-        };
+        // 3. Generate PDF from page content
+        console.log('[SUBMIT] Generating PDF...');
+        const pdf = await generatePDF();
+        console.log('[SUBMIT] PDF generated:', pdf.filename);
 
-        // Check if a final record already exists
-        const { data: existingFinal } = await supabaseClient
-            .from('final_reports')
-            .select('id')
-            .eq('report_id', currentReportId)
-            .single();
+        // 4. Upload PDF to Supabase Storage
+        console.log('[SUBMIT] Uploading PDF to storage...');
+        const pdfUrl = await uploadPDFToStorage(pdf);
+        console.log('[SUBMIT] PDF uploaded:', pdfUrl);
 
-        if (existingFinal) {
-            // Update existing - use all individual columns
-            const { error: finalError } = await supabaseClient
-                .from('final_reports')
-                .update({
-                    contractors_json: finalData.contractors_json,
-                    personnel_json: finalData.personnel_json,
-                    equipment_json: finalData.equipment_json,
-                    work_performed: finalData.work_performed,
-                    executive_summary: finalData.executive_summary,
-                    safety_observations: finalData.safety_observations,
-                    delays_issues: finalData.delays_issues,
-                    qaqc_notes: finalData.qaqc_notes,
-                    communications_notes: finalData.communications_notes,
-                    visitors_deliveries_notes: finalData.visitors_deliveries_notes,
-                    has_contractor_personnel: finalData.has_contractor_personnel,
-                    has_equipment: finalData.has_equipment,
-                    has_issues: finalData.has_issues,
-                    has_communications: finalData.has_communications,
-                    has_qaqc: finalData.has_qaqc,
-                    has_safety_incidents: finalData.has_safety_incidents,
-                    has_visitors_deliveries: finalData.has_visitors_deliveries,
-                    has_photos: finalData.has_photos,
-                    submitted_at: submittedAt
-                })
-                .eq('report_id', currentReportId);
+        // 5. Save metadata to final_reports table
+        console.log('[SUBMIT] Saving to final_reports...');
+        await saveToFinalReports(pdfUrl);
+        console.log('[SUBMIT] Saved to final_reports');
 
-            if (finalError) {
-                console.error('[SUPABASE] Error updating final_reports:', finalError);
-                throw finalError;
-            }
-        } else {
-            // Insert new
-            const { error: finalError } = await supabaseClient
-                .from('final_reports')
-                .insert(finalData);
+        // 6. Update reports table status to 'submitted'
+        console.log('[SUBMIT] Updating report status...');
+        await updateReportStatus('submitted', pdfUrl);
+        console.log('[SUBMIT] Report status updated');
 
-            if (finalError) {
-                console.error('[SUPABASE] Error inserting final_reports:', finalError);
-                throw finalError;
-            }
+        // 7. Clear local storage for this report
+        console.log('[SUBMIT] Cleaning up local storage...');
+        await cleanupLocalStorage();
+        console.log('[SUBMIT] Local storage cleaned up');
+
+        // 8. Navigate to archives with success message
+        console.log('[SUBMIT] Submit complete, navigating to archives...');
+        window.location.href = 'archives.html?submitted=true';
+
+    } catch (error) {
+        console.error('[SUBMIT] Error:', error);
+        showError('Submit failed: ' + error.message);
+        showSubmitLoading(false);
+    }
+}
+
+/**
+ * Generate PDF from the page content using html2pdf.js
+ * @returns {Promise<{blob: Blob, filename: string}>}
+ */
+async function generatePDF() {
+    // Get the printable content area (page-container contains all pages)
+    const element = document.querySelector('.page-container');
+
+    if (!element) {
+        throw new Error('Could not find report content to generate PDF');
+    }
+
+    // Generate filename
+    const projectName = getProjectName().replace(/[^a-zA-Z0-9]/g, '_').substring(0, 30);
+    const reportDate = getReportDate();
+    const filename = `${projectName}_${reportDate}.pdf`;
+
+    const options = {
+        margin: [0.25, 0.25, 0.25, 0.25], // inches - smaller margins for better fit
+        filename: filename,
+        image: { type: 'jpeg', quality: 0.95 },
+        html2canvas: {
+            scale: 2,
+            useCORS: true,
+            logging: false,
+            letterRendering: true,
+            allowTaint: true
+        },
+        jsPDF: {
+            unit: 'in',
+            format: 'letter',
+            orientation: 'portrait'
+        },
+        pagebreak: {
+            mode: ['avoid-all', 'css', 'legacy'],
+            before: '.page-break',
+            after: '.page-break',
+            avoid: ['tr', 'td', '.contractor-block', '.photo-cell']
         }
+    };
 
-        // 2. Update reports table status to 'submitted'
-        const { error: reportError } = await supabaseClient
-            .from('reports')
-            .update({
-                status: 'submitted',
-                submitted_at: submittedAt,
-                updated_at: submittedAt
-            })
-            .eq('id', currentReportId);
+    // Generate PDF blob
+    const pdfBlob = await html2pdf()
+        .set(options)
+        .from(element)
+        .outputPdf('blob');
 
-        if (reportError) {
-            console.error('[SUPABASE] Error updating report status:', reportError);
-            throw reportError;
-        }
+    return {
+        blob: pdfBlob,
+        filename: filename
+    };
+}
 
-        // Update local state
-        report.meta = report.meta || {};
-        report.meta.submitted = true;
-        report.meta.submittedAt = submittedAt;
-        report.meta.status = 'submitted';
+/**
+ * Upload PDF to Supabase Storage (report-pdfs bucket)
+ * @param {Object} pdf - PDF object with blob and filename
+ * @returns {Promise<string>} Public URL of the uploaded PDF
+ */
+async function uploadPDFToStorage(pdf) {
+    const storagePath = `${currentReportId}/${pdf.filename}`;
 
-        console.log('[SUPABASE] Report submitted successfully');
-        showSubmitSuccess();
-    } catch (e) {
-        console.error('[SUPABASE] Failed to submit report:', e);
-        alert('Failed to submit report. Please try again.');
+    const { data, error } = await supabaseClient
+        .storage
+        .from('report-pdfs')
+        .upload(storagePath, pdf.blob, {
+            contentType: 'application/pdf',
+            upsert: true
+        });
 
-        // Re-enable the submit button
-        if (submitBtn) {
-            submitBtn.disabled = false;
-            submitBtn.innerHTML = '<i class="fas fa-paper-plane"></i><span>Submit</span>';
+    if (error) {
+        throw new Error('PDF upload failed: ' + error.message);
+    }
+
+    // Get public URL
+    const { data: urlData } = supabaseClient
+        .storage
+        .from('report-pdfs')
+        .getPublicUrl(storagePath);
+
+    return urlData.publicUrl;
+}
+
+/**
+ * Save report metadata to final_reports table
+ * @param {string} pdfUrl - URL of the uploaded PDF
+ */
+async function saveToFinalReports(pdfUrl) {
+    const reportData = getReportData(currentReportId) || {};
+    const weather = report.overview?.weather || {};
+    const submittedAt = new Date().toISOString();
+
+    const finalReportData = {
+        report_id: currentReportId,
+        pdf_url: pdfUrl,
+        submitted_at: submittedAt,
+        // Weather fields
+        weather_high_temp: weather.highTemp || null,
+        weather_low_temp: weather.lowTemp || null,
+        weather_precipitation: weather.precipitation || null,
+        weather_general_condition: weather.generalCondition || null,
+        weather_job_site_condition: weather.jobSiteCondition || null,
+        weather_adverse_conditions: weather.adverseConditions || null,
+        // Text summary fields
+        executive_summary: report.aiGenerated?.executive_summary || report.aiGenerated?.executiveSummary || '',
+        work_performed: report.aiGenerated?.work_performed || report.aiGenerated?.workPerformed || '',
+        safety_observations: report.safety?.notes || report.aiGenerated?.safety?.summary || '',
+        delays_issues: report.issues || '',
+        qaqc_notes: report.qaqc || '',
+        communications_notes: report.communications || '',
+        visitors_deliveries_notes: report.visitors || '',
+        inspector_notes: report.aiGenerated?.inspector_notes || '',
+        // Store structured data in JSONB columns
+        contractors_json: report.aiGenerated?.activities || report.activities || [],
+        personnel_json: report.aiGenerated?.operations || report.operations || [],
+        equipment_json: report.aiGenerated?.equipment || report.equipment || [],
+        // Boolean flags
+        has_contractor_personnel: (report.aiGenerated?.activities?.length > 0) || (report.aiGenerated?.operations?.length > 0),
+        has_equipment: (report.aiGenerated?.equipment?.length > 0) || (report.equipment?.length > 0),
+        has_issues: !!report.issues,
+        has_communications: !!report.communications,
+        has_qaqc: !!report.qaqc,
+        has_safety_incidents: report.safety?.hasIncident || report.aiGenerated?.safety?.has_incidents || false,
+        has_visitors_deliveries: !!report.visitors,
+        has_photos: report.photos?.length > 0
+    };
+
+    // Upsert to final_reports (insert or update if exists)
+    const { error } = await supabaseClient
+        .from('final_reports')
+        .upsert(finalReportData, { onConflict: 'report_id' });
+
+    if (error) {
+        throw new Error('Failed to save report: ' + error.message);
+    }
+}
+
+/**
+ * Update reports table status
+ * @param {string} status - New status (e.g., 'submitted')
+ * @param {string} pdfUrl - URL of the uploaded PDF
+ */
+async function updateReportStatus(status, pdfUrl) {
+    const submittedAt = new Date().toISOString();
+
+    const { error } = await supabaseClient
+        .from('reports')
+        .update({
+            status: status,
+            submitted_at: submittedAt,
+            updated_at: submittedAt,
+            pdf_url: pdfUrl
+        })
+        .eq('id', currentReportId);
+
+    if (error) {
+        throw new Error('Failed to update status: ' + error.message);
+    }
+
+    // Update local state
+    report.meta = report.meta || {};
+    report.meta.submitted = true;
+    report.meta.submittedAt = submittedAt;
+    report.meta.status = 'submitted';
+}
+
+/**
+ * Clean up local storage for this report after successful submit
+ */
+async function cleanupLocalStorage() {
+    // Remove report data using storage-keys.js helper
+    deleteReportData(currentReportId);
+
+    // Remove from current reports list
+    const currentReports = JSON.parse(localStorage.getItem('fvp_current_reports') || '{}');
+    delete currentReports[currentReportId];
+    localStorage.setItem('fvp_current_reports', JSON.stringify(currentReports));
+
+    // Clear photos from IndexedDB for this report (if available)
+    if (window.idb && typeof window.idb.deletePhotosByReportId === 'function') {
+        try {
+            await window.idb.deletePhotosByReportId(currentReportId);
+            console.log('[SUBMIT] IndexedDB photos cleaned up for:', currentReportId);
+        } catch (e) {
+            console.warn('[SUBMIT] Could not clean IndexedDB photos:', e);
         }
     }
+
+    console.log('[SUBMIT] Local storage cleaned up for:', currentReportId);
+}
+
+/**
+ * Show/hide loading state on submit button
+ * @param {boolean} show - Whether to show loading state
+ */
+function showSubmitLoading(show) {
+    const btn = document.querySelector('.btn-submit');
+    if (!btn) return;
+
+    if (show) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Submitting...';
+        btn.style.cursor = 'wait';
+    } else {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-paper-plane"></i><span>Submit</span>';
+        btn.style.cursor = 'pointer';
+    }
+}
+
+/**
+ * Show error message to user
+ * @param {string} message - Error message to display
+ */
+function showError(message) {
+    // Create error toast/modal
+    const existingToast = document.getElementById('errorToast');
+    if (existingToast) existingToast.remove();
+
+    const toast = document.createElement('div');
+    toast.id = 'errorToast';
+    toast.style.cssText = `
+        position: fixed;
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: #dc2626;
+        color: white;
+        padding: 16px 24px;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 500;
+        z-index: 10000;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        max-width: 90vw;
+    `;
+    toast.innerHTML = `
+        <i class="fas fa-exclamation-circle"></i>
+        <span>${escapeHtml(message)}</span>
+        <button onclick="this.parentElement.remove()" style="
+            background: transparent;
+            border: none;
+            color: white;
+            cursor: pointer;
+            padding: 4px;
+            margin-left: 8px;
+        "><i class="fas fa-times"></i></button>
+    `;
+    document.body.appendChild(toast);
+
+    // Auto-dismiss after 8 seconds
+    setTimeout(() => {
+        if (toast.parentElement) toast.remove();
+    }, 8000);
+}
+
+/**
+ * Get project name for PDF filename
+ * @returns {string}
+ */
+function getProjectName() {
+    return report?.overview?.projectName || activeProject?.projectName || 'Report';
+}
+
+/**
+ * Get report date for PDF filename
+ * @returns {string}
+ */
+function getReportDate() {
+    return report?.overview?.date || getReportDateStr() || new Date().toISOString().split('T')[0];
 }
 
 function showSubmitSuccess() {
