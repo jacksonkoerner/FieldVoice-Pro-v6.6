@@ -296,9 +296,16 @@ function populateReport() {
     const ai = report.aiGenerated || {};
     const userEdits = report.userEdits || {};
 
+    // v6.6.4: Debug logging for userEdits
+    console.log('[FINAL] populateReport() - userEdits keys:', Object.keys(userEdits));
+    console.log('[FINAL] populateReport() - userEdits object:', JSON.stringify(userEdits, null, 2).substring(0, 500));
+
     // Helper to get value with priority
     function getValue(path, defaultVal = '') {
-        if (userEdits[path] !== undefined) return userEdits[path];
+        if (userEdits[path] !== undefined) {
+            console.log('[FINAL] getValue() - Using userEdit for', path, ':', userEdits[path]);
+            return userEdits[path];
+        }
         const aiVal = getNestedValue(ai, path);
         if (aiVal !== undefined && aiVal !== null && aiVal !== '') {
             if (Array.isArray(aiVal)) return aiVal.join('\n');
@@ -469,11 +476,16 @@ function renderWorkSummary() {
 
 /**
  * v6.6: Supports matching by contractorName for freeform mode (when contractorId is null)
+ * v6.6.4: Added debug logging
  */
 function getContractorActivity(contractorId) {
     const userEdits = report.userEdits || {};
     const userEditKey = `activity_${contractorId}`;
-    if (userEdits[userEditKey]) return userEdits[userEditKey];
+    if (userEdits[userEditKey]) {
+        console.log('[FINAL] getContractorActivity() - Using userEdit for', userEditKey);
+        return userEdits[userEditKey];
+    }
+    console.log('[FINAL] getContractorActivity() - No userEdit for', userEditKey, ', checking AI');
 
     // Get contractor name for freeform matching
     const contractor = projectContractors.find(c => c.id === contractorId);
@@ -687,14 +699,17 @@ function renderTextSections() {
 
 /**
  * v6.6: Get text value with support for both new and legacy AI field names
+ * v6.6.4: Added debug logging
  */
 function getTextValueWithFallback(reportPath, aiPath, legacyAiPath, fallbackPath, defaultVal) {
     const userEdits = report.userEdits || {};
 
     // User edits first
     if (userEdits[reportPath] !== undefined) {
+        console.log('[FINAL] getTextValueWithFallback() - Using userEdit for', reportPath, ':', userEdits[reportPath]);
         return userEdits[reportPath];
     }
+    console.log('[FINAL] getTextValueWithFallback() - No userEdit for', reportPath, ', checking AI/fallback');
 
     // AI generated - try new field name first, then legacy
     if (report.aiGenerated) {
@@ -732,8 +747,10 @@ function getTextValue(reportPath, aiPath, fallbackPath, defaultVal) {
 
     // User edits first
     if (userEdits[reportPath] !== undefined) {
+        console.log('[FINAL] getTextValue() - Using userEdit for', reportPath, ':', userEdits[reportPath]);
         return userEdits[reportPath];
     }
+    console.log('[FINAL] getTextValue() - No userEdit for', reportPath, ', checking AI/fallback');
 
     // AI generated
     if (report.aiGenerated) {
