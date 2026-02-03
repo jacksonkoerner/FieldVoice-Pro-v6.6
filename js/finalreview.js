@@ -1,6 +1,6 @@
 // FieldVoice Pro - Final Review Page Logic
 // DOT RPR Daily Report viewer with print-optimized layout
-// v6.6.10: Fix blank PDF - absolute positioning, image wait, layout wait
+// v6.6.11: Fix blank PDF - remove overflow clipping, position on-screen
 
 // ============ STATE ============
 let report = null;
@@ -1306,29 +1306,45 @@ async function generatePDF() {
         input.parentNode.replaceChild(div, input);
     });
     
-    // v6.6.10: Position clone off-screen with absolute positioning for reliable capture
-    // Fixed positioning caused zero-dimension issues; absolute with explicit width works
-    clonedElement.style.position = 'absolute';
-    clonedElement.style.left = '-9999px';
+    // v6.6.11: Position on-screen but behind everything (off-screen causes clipping issues)
+    clonedElement.style.position = 'fixed';
+    clonedElement.style.left = '0';
     clonedElement.style.top = '0';
     clonedElement.style.width = '816px';      // 8.5in at 96dpi
     clonedElement.style.minWidth = '816px';   // Force width
+    clonedElement.style.zIndex = '-9999';
+    clonedElement.style.pointerEvents = 'none';
+    clonedElement.style.opacity = '0.999';    // Tiny reduction prevents browser optimizations that skip "invisible" elements
     clonedElement.style.display = 'block';
     clonedElement.style.visibility = 'visible';
     clonedElement.style.background = '#fff';
+
+    // v6.6.11: Remove overflow clipping that causes blank capture
+    clonedElement.style.overflow = 'visible';
+    clonedElement.querySelectorAll('.page-container, .page').forEach(el => {
+        el.style.overflow = 'visible';
+        el.style.overflowX = 'visible';
+        el.style.overflowY = 'visible';
+    });
+
+    // v6.6.11: Ensure all .page elements have explicit white background
+    clonedElement.querySelectorAll('.page').forEach(el => {
+        el.style.background = '#fff';
+    });
+
     document.body.appendChild(clonedElement);
 
-    // v6.6.10: Wait for browser to compute layout
+    // v6.6.11: Wait for browser to compute layout
     await new Promise(resolve => {
         requestAnimationFrame(() => {
             requestAnimationFrame(resolve);
         });
     });
 
-    // v6.6.10: Wait for all images to load
+    // v6.6.11: Wait for all images to load
     await waitForImages(clonedElement, 5000);
 
-    // v6.6.10: Debug log (remove after confirmed working)
+    // v6.6.11: Debug log (remove after confirmed working)
     console.log('[PDF] Clone ready - width:', clonedElement.offsetWidth, 'height:', clonedElement.offsetHeight);
     console.log('[PDF] Images loaded:', Array.from(clonedElement.querySelectorAll('img')).map(img => img.complete));
 
@@ -1344,11 +1360,11 @@ async function generatePDF() {
         html2canvas: {
             scale: 2,
             useCORS: true,
-            logging: true,           // v6.6.10: Enable for debugging
+            logging: true,           // v6.6.11: Enable for debugging
             letterRendering: true,
-            allowTaint: false,       // v6.6.10: Prevent tainted canvas
-            windowWidth: 816,        // v6.6.10: Force desktop width context
-            scrollX: 0,              // v6.6.10: Prevent scroll artifacts
+            allowTaint: false,       // v6.6.11: Prevent tainted canvas
+            windowWidth: 816,        // v6.6.11: Force desktop width context
+            scrollX: 0,              // v6.6.11: Prevent scroll artifacts
             scrollY: 0
         },
         jsPDF: {
