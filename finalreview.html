@@ -729,6 +729,63 @@
                 margin-top: 20px;
             }
         }
+
+        /* v6.6.5: Editable field styles */
+        .editable-field {
+            background: white;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            padding: 8px;
+            font-family: inherit;
+            font-size: inherit;
+            line-height: 1.4;
+            width: 100%;
+            resize: vertical;
+            min-height: 60px;
+        }
+
+        .editable-field:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+        }
+
+        .editable-field.user-edited {
+            background: #fefce8;
+            border-color: #fbbf24;
+        }
+
+        .editable-field::placeholder {
+            color: #9ca3af;
+            font-style: italic;
+        }
+
+        /* Photo captions - smaller height */
+        .photo-caption.editable-field {
+            min-height: 40px;
+            font-size: 9pt;
+        }
+
+        /* Print styles for editable fields */
+        @media print {
+            .editable-field {
+                border: none !important;
+                background: transparent !important;
+                box-shadow: none !important;
+                padding: 0 !important;
+                resize: none !important;
+                overflow: visible !important;
+            }
+
+            .editable-field:focus {
+                outline: none !important;
+            }
+
+            /* Hide placeholder text in print */
+            .editable-field::placeholder {
+                color: transparent !important;
+            }
+        }
     </style>
 </head>
 <body>
