@@ -1330,6 +1330,16 @@
         activity.equipmentUsed = equipment?.value?.trim() || '';
         activity.crew = crew?.value?.trim() || '';
 
+        // Track in userEdits for persistence
+        const userEditKey = `activity_${contractorId}`;
+        userEdits[userEditKey] = activity;
+        report.userEdits = userEdits;
+
+        // Add visual indicator to edited fields
+        if (narrative) narrative.classList.add('user-edited');
+        if (equipment) equipment.classList.add('user-edited');
+        if (crew) crew.classList.add('user-edited');
+
         scheduleSave();
     }
 
@@ -1439,7 +1449,13 @@
             const value = parseInt(input.value) || 0;
             ops[input.dataset.field] = value || null;
             rowTotal += value;
+            input.classList.add('user-edited');
         });
+
+        // Track in userEdits for persistence
+        const userEditKey = `operations_${contractorId}`;
+        userEdits[userEditKey] = ops;
+        report.userEdits = userEdits;
 
         row.querySelector('.row-total').textContent = rowTotal || '-';
         scheduleSave();
@@ -1860,7 +1876,12 @@
         const generalSummary = document.getElementById('generalWorkSummary');
         if (generalSummary) {
             generalSummary.addEventListener('blur', () => {
-                setNestedValue(report, 'guidedNotes.workSummary', generalSummary.value);
+                const path = 'guidedNotes.workSummary';
+                const value = generalSummary.value;
+                setNestedValue(report, path, value);
+                userEdits[path] = value;
+                report.userEdits = userEdits;
+                generalSummary.classList.add('user-edited');
                 scheduleSave();
             });
         }
