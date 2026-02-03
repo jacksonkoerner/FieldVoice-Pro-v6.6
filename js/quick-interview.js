@@ -1917,6 +1917,8 @@
 
                 photos: (report.photos || []).map(p => ({
                     id: p.id,
+                    url: p.url,
+                    storagePath: p.storagePath,
                     caption: p.caption || '',
                     timestamp: p.timestamp,
                     date: p.date,
@@ -3284,8 +3286,9 @@
             // Set photos with public URLs
             if (photos && photos.length > 0) {
                 report.photos = photos.map(p => {
-                    let url = '';
-                    if (p.storage_path) {
+                    // Use stored photo_url, or regenerate from storage_path as fallback
+                    let url = p.photo_url || '';
+                    if (!url && p.storage_path) {
                         const { data } = supabaseClient.storage
                             .from('report-photos')
                             .getPublicUrl(p.storage_path);
@@ -3299,8 +3302,9 @@
                         timestamp: p.taken_at,
                         date: new Date(p.taken_at).toLocaleDateString(),
                         time: new Date(p.taken_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
-                        gps: p.gps_lat && p.gps_lng ? { lat: p.gps_lat, lng: p.gps_lng } : null,
-                        fileName: p.filename
+                        gps: p.location_lat && p.location_lng ? { lat: p.location_lat, lng: p.location_lng } : null,
+                        fileName: p.photo_type,
+                        fileType: p.photo_type
                     };
                 });
             }
@@ -3588,10 +3592,11 @@
                             id: photo.id,
                             report_id: currentReportId,
                             storage_path: photo.storagePath,
-                            filename: photo.fileName || photo.id,
+                            photo_url: photo.url || null,
                             caption: photo.caption || '',
-                            gps_lat: photo.gps?.lat || null,
-                            gps_lng: photo.gps?.lng || null,
+                            photo_type: photo.fileType || photo.fileName || null,
+                            location_lat: photo.gps?.lat || null,
+                            location_lng: photo.gps?.lng || null,
                             taken_at: photo.timestamp || new Date().toISOString(),
                             created_at: photo.createdAt || new Date().toISOString()
                         };
