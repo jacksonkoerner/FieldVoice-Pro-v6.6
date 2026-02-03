@@ -1156,22 +1156,27 @@ async function submitReport() {
         const pdfUrl = await uploadPDFToStorage(pdf);
         console.log('[SUBMIT] PDF uploaded:', pdfUrl);
 
-        // 5. Save metadata to final_reports table
+        // 5. Ensure report exists in reports table (foreign key requirement)
+        console.log('[SUBMIT] Ensuring report exists in reports table...');
+        await ensureReportExists();
+        console.log('[SUBMIT] Report record ensured');
+
+        // 6. Save metadata to final_reports table
         console.log('[SUBMIT] Saving to final_reports...');
         await saveToFinalReports(pdfUrl);
         console.log('[SUBMIT] Saved to final_reports');
 
-        // 6. Update reports table status to 'submitted'
+        // 7. Update reports table status to 'submitted'
         console.log('[SUBMIT] Updating report status...');
         await updateReportStatus('submitted', pdfUrl);
         console.log('[SUBMIT] Report status updated');
 
-        // 7. Clear local storage for this report
+        // 8. Clear local storage for this report
         console.log('[SUBMIT] Cleaning up local storage...');
         await cleanupLocalStorage();
         console.log('[SUBMIT] Local storage cleaned up');
 
-        // 8. Navigate to archives with success message
+        // 9. Navigate to archives with success message
         console.log('[SUBMIT] Submit complete, navigating to archives...');
         window.location.href = 'archives.html?submitted=true';
 
@@ -1360,6 +1365,35 @@ async function uploadPDFToStorage(pdf) {
         .getPublicUrl(storagePath);
 
     return urlData.publicUrl;
+}
+
+/**
+ * Ensure the report exists in the reports table (required for foreign key)
+ * This upserts the report before we can insert into final_reports
+ */
+async function ensureReportExists() {
+    const reportData = getReportData(currentReportId) || {};
+    const reportDate = getReportDate();
+    
+    const reportRow = {
+        id: currentReportId,
+        project_id: report.projectId,
+        report_date: reportDate,
+        status: 'draft', // Will be updated to 'submitted' after
+        capture_mode: reportData.captureMode || 'guided',
+        created_at: reportData.createdAt || new Date().toISOString(),
+        updated_at: new Date().toISOString()
+    };
+    
+    const { error } = await supabaseClient
+        .from('reports')
+        .upsert(reportRow, { onConflict: 'id' });
+    
+    if (error) {
+        throw new Error('Failed to create report record: ' + error.message);
+    }
+    
+    console.log('[SUBMIT] Report record ensured in reports table:', currentReportId);
 }
 
 /**
