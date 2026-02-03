@@ -2202,6 +2202,21 @@
                     console.warn('[LOCAL] Failed to save report package to localStorage');
                 }
 
+                // v6.6.3: Update fvp_current_reports so dashboard can find this refined report
+                const currentReports = JSON.parse(localStorage.getItem('fvp_current_reports') || '{}');
+                currentReports[currentReportId] = {
+                    id: currentReportId,
+                    project_id: activeProject?.id,
+                    project_name: activeProject?.projectName || activeProject?.project_name,
+                    date: todayStr,
+                    report_date: todayStr,
+                    status: 'refined',
+                    created_at: report.meta?.createdAt ? new Date(report.meta.createdAt).getTime() : Date.now(),
+                    lastSaved: new Date().toISOString()
+                };
+                localStorage.setItem('fvp_current_reports', JSON.stringify(currentReports));
+                console.log('[LOCAL] Updated fvp_current_reports with refined status:', currentReportId);
+
                 // Clean up old draft key if we have a real Supabase ID
                 const draftKey = `draft_${activeProject?.id}_${todayStr}`;
                 if (currentReportId && currentReportId !== draftKey) {
@@ -4848,6 +4863,21 @@
                 } else {
                     console.warn('[LOCAL] Failed to save report package to localStorage');
                 }
+
+                // v6.6.3: Update fvp_current_reports so dashboard can find this refined report
+                const currentReports = JSON.parse(localStorage.getItem('fvp_current_reports') || '{}');
+                currentReports[currentReportId] = {
+                    id: currentReportId,
+                    project_id: activeProject?.id,
+                    project_name: activeProject?.projectName || activeProject?.project_name,
+                    date: todayStr,
+                    report_date: todayStr,
+                    status: 'refined',
+                    created_at: report.meta?.createdAt ? new Date(report.meta.createdAt).getTime() : Date.now(),
+                    lastSaved: new Date().toISOString()
+                };
+                localStorage.setItem('fvp_current_reports', JSON.stringify(currentReports));
+                console.log('[LOCAL] Updated fvp_current_reports with refined status:', currentReportId);
 
                 // Clean up old draft key if we have a real Supabase ID
                 const draftKey = `draft_${activeProject?.id}_${todayStr}`;
