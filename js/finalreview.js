@@ -1244,17 +1244,25 @@ async function saveToFinalReports(pdfUrl) {
     const weather = report.overview?.weather || {};
     const submittedAt = new Date().toISOString();
 
+    // Helper to clean weather values - convert "--", "N/A", empty to null
+    const cleanWeatherValue = (val) => {
+        if (val === null || val === undefined || val === '' || val === '--' || val === 'N/A') {
+            return null;
+        }
+        return val;
+    };
+
     const finalReportData = {
         report_id: currentReportId,
         pdf_url: pdfUrl,
         submitted_at: submittedAt,
-        // Weather fields
-        weather_high_temp: weather.highTemp || null,
-        weather_low_temp: weather.lowTemp || null,
-        weather_precipitation: weather.precipitation || null,
-        weather_general_condition: weather.generalCondition || null,
-        weather_job_site_condition: weather.jobSiteCondition || null,
-        weather_adverse_conditions: weather.adverseConditions || null,
+        // Weather fields (cleaned to convert "--" to null for numeric columns)
+        weather_high_temp: cleanWeatherValue(weather.highTemp),
+        weather_low_temp: cleanWeatherValue(weather.lowTemp),
+        weather_precipitation: cleanWeatherValue(weather.precipitation),
+        weather_general_condition: cleanWeatherValue(weather.generalCondition),
+        weather_job_site_condition: cleanWeatherValue(weather.jobSiteCondition),
+        weather_adverse_conditions: cleanWeatherValue(weather.adverseConditions),
         // Text summary fields
         executive_summary: report.aiGenerated?.executive_summary || report.aiGenerated?.executiveSummary || '',
         work_performed: report.aiGenerated?.work_performed || report.aiGenerated?.workPerformed || '',
