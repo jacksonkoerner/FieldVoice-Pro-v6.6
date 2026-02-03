@@ -1718,11 +1718,39 @@
             }
 
             grid.innerHTML = photos.map((p, idx) => `
-                <div class="relative aspect-square bg-slate-200 overflow-hidden">
-                    <img src="${p.url}" class="w-full h-full object-cover">
-                    <button onclick="deleteMinimalPhoto(${idx})" class="absolute top-1 right-1 w-6 h-6 bg-red-600 text-white flex items-center justify-center hover:bg-red-700">
-                        <i class="fas fa-times text-xs"></i>
-                    </button>
+                <div class="border-2 border-slate-300 overflow-hidden bg-slate-100">
+                    <div class="relative">
+                        <img src="${p.url}" class="w-full aspect-square object-cover" onerror="this.onerror=null; this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%23cbd5e1%22 width=%22100%22 height=%22100%22/><text x=%2250%22 y=%2250%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%2364748b%22 font-size=%2212%22>Error</text></svg>';">
+                        <button onclick="deleteMinimalPhoto(${idx})" class="absolute top-2 right-2 w-7 h-7 bg-red-600 text-white text-xs flex items-center justify-center shadow-lg"><i class="fas fa-times"></i></button>
+                        <div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent p-2 pt-6">
+                            <div class="flex items-center gap-1 text-white/90 mb-1">
+                                <i class="fas fa-clock text-[8px]"></i>
+                                <p class="text-[10px] font-medium">${p.date || ''} ${p.time || ''}</p>
+                            </div>
+                            ${p.gps ? `
+                                <div class="flex items-center gap-1 text-safety-green">
+                                    <i class="fas fa-map-marker-alt text-[8px]"></i>
+                                    <p class="text-[9px] font-mono">${p.gps.lat.toFixed(5)}, ${p.gps.lng.toFixed(5)}</p>
+                                    ${p.gps.accuracy ? `<span class="text-[8px] text-white/60">(±${p.gps.accuracy}m)</span>` : ''}
+                                </div>
+                            ` : `
+                                <div class="flex items-center gap-1 text-dot-orange">
+                                    <i class="fas fa-location-crosshairs text-[8px]"></i>
+                                    <p class="text-[9px]">No GPS</p>
+                                </div>
+                            `}
+                        </div>
+                    </div>
+                    <div class="p-2 bg-white">
+                        <textarea
+                            class="w-full text-xs border border-slate-200 rounded p-2 bg-slate-50 focus:bg-white focus:border-dot-blue focus:outline-none resize-none"
+                            placeholder="Add caption..."
+                            maxlength="500"
+                            rows="2"
+                            oninput="updateMinimalPhotoCaption(${idx}, this.value)"
+                            onblur="updateMinimalPhotoCaption(${idx}, this.value)"
+                        >${p.caption || ''}</textarea>
+                    </div>
                 </div>
             `).join('');
         }
@@ -1781,7 +1809,9 @@
                         date: now.toLocaleDateString(),
                         time: now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
                         gps: gps,
-                        fileName: file.name
+                        fileName: file.name,
+                        fileSize: file.size,
+                        fileType: file.type
                     };
 
                     report.photos.push(photoObj);
@@ -1829,6 +1859,16 @@
             report.photos.splice(idx, 1);
             saveReport();
             renderMinimalPhotos();
+        }
+
+        /**
+         * Update photo caption in minimal/freeform mode
+         */
+        function updateMinimalPhotoCaption(idx, caption) {
+            if (report.photos[idx]) {
+                report.photos[idx].caption = caption;
+                saveReport();
+            }
         }
 
         // ============ AI PROCESSING WEBHOOK ============
