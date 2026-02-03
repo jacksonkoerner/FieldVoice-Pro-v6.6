@@ -385,7 +385,7 @@ function populateReport() {
 
     // Weather
     const weather = o.weather || {};
-    document.getElementById('weatherTemps').textContent = `High Temp: ${weather.highTemp || '--'}° Low Temp: ${weather.lowTemp || '--'}°`;
+    document.getElementById('weatherTemps').textContent = `High Temp: ${weather.highTemp || 'N/A'}° Low Temp: ${weather.lowTemp || 'N/A'}°`;
     document.getElementById('weatherPrecip').textContent = `Precipitation: ${weather.precipitation || '0.00"'}`;
     document.getElementById('weatherCondition').textContent = `General Condition: ${weather.generalCondition || 'N/A'}`;
     document.getElementById('weatherJobSite').textContent = `Job Site Condition: ${weather.jobSiteCondition || 'N/A'}`;
@@ -658,8 +658,8 @@ function renderEquipmentTable() {
     equipmentData.forEach((item, index) => {
         // v6.6: Pass contractorName fallback for freeform mode
         const contractorName = getContractorName(item.contractorId, item.contractorName);
-        const status = item.status || 'IDLE';
-        const notes = status === 'IDLE' ? 'IDLE' : `${status.replace(' hrs', '')} HOURS UTILIZED`;
+        // v6.6.6: Improved equipment notes parsing
+        const notes = formatEquipmentNotes(item.status, item.hoursUsed);
         const equipPath = `equipment_${index}`;
 
         html += `<tr>
@@ -687,6 +687,33 @@ function renderEquipmentTable() {
     });
 
     tbody.innerHTML = html;
+}
+
+/**
+ * v6.6.6: Format equipment notes column properly
+ * Shows "IDLE" when idle, "X HRS UTILIZED" when has hours
+ */
+function formatEquipmentNotes(status, hoursUsed) {
+    // Check for explicit idle status
+    if (!status || status.toLowerCase() === 'idle' || status === '0' || status === '0 hrs') {
+        return 'IDLE';
+    }
+    
+    // Extract hours from various formats
+    let hours = hoursUsed;
+    if (!hours && status) {
+        // Try to extract number from status string (e.g., "8 hrs", "8", "8 hours")
+        const match = status.match(/(\d+(?:\.\d+)?)/);
+        if (match) {
+            hours = parseFloat(match[1]);
+        }
+    }
+    
+    if (hours && hours > 0) {
+        return `${hours} HRS UTILIZED`;
+    }
+    
+    return 'IDLE';
 }
 
 /**
@@ -904,51 +931,37 @@ function renderPhotos() {
     document.getElementById('photoProjectName').textContent = projectName;
     document.getElementById('photoProjectNo').textContent = projectNo;
 
+    // v6.6.6: Only render cells for actual photos, single message when empty
     if (photos.length === 0) {
         grid.innerHTML = `
-            <div class="photo-cell">
-                <div class="photo-image empty">No photos captured</div>
-                <div class="photo-meta"><span>Date:</span> --</div>
-            </div>
-            <div class="photo-cell">
-                <div class="photo-image empty"></div>
-                <div class="photo-meta"><span>Date:</span> --</div>
+            <div class="photo-cell no-photos-message" style="grid-column: 1 / -1; text-align: center; min-height: 100px; display: flex; align-items: center; justify-content: center;">
+                <p style="color: #666; font-style: italic;">No photos documented for this date.</p>
             </div>
         `;
         return;
     }
 
-    // Generate photo cells (4 per page, 2x2 grid)
+    // Generate photo cells only for actual photos (no empty cells)
     // v6.6.5: Photo captions are now editable textareas
     let html = '';
     const displayPhotos = photos.slice(0, 4); // First 4 photos for page 4
 
-    for (let i = 0; i < 4; i++) {
-        const photo = displayPhotos[i];
-        if (photo) {
-            html += `
-                <div class="photo-cell">
-                    <div class="photo-image">
-                        <img src="${photo.url}" alt="Photo ${i + 1}">
-                    </div>
-                    <div class="photo-meta"><span>Date:</span> ${photo.date || formatDisplayDate(report.overview?.date)}</div>
-                    <textarea
-                        class="editable-field photo-caption"
-                        data-path="photos[${i}].caption"
-                        data-photo-index="${i}"
-                        placeholder="Add caption..."
-                    >${escapeHtml(photo.caption || '')}</textarea>
+    displayPhotos.forEach((photo, i) => {
+        html += `
+            <div class="photo-cell">
+                <div class="photo-image">
+                    <img src="${photo.url}" alt="Photo ${i + 1}">
                 </div>
-            `;
-        } else {
-            html += `
-                <div class="photo-cell">
-                    <div class="photo-image empty"></div>
-                    <div class="photo-meta"><span>Date:</span> ${formatDisplayDate(report.overview?.date)}</div>
-                </div>
-            `;
-        }
-    }
+                <div class="photo-meta"><span>Date:</span> ${photo.date || formatDisplayDate(report.overview?.date)}</div>
+                <textarea
+                    class="editable-field photo-caption"
+                    data-path="photos[${i}].caption"
+                    data-photo-index="${i}"
+                    placeholder="Add caption..."
+                >${escapeHtml(photo.caption || '')}</textarea>
+            </div>
+        `;
+    });
 
     grid.innerHTML = html;
 
@@ -967,35 +980,25 @@ function addAdditionalPhotoPages(remainingPhotos) {
         const page = document.createElement('div');
         page.className = 'page' + (i + 4 < remainingPhotos.length ? ' page-break' : '');
 
-        // v6.6.5: Photo captions are now editable textareas
+        // v6.6.6: Only render actual photos, no empty cells
         let photosHtml = '';
-        for (let j = 0; j < 4; j++) {
-            const photo = pagePhotos[j];
+        pagePhotos.forEach((photo, j) => {
             const photoIndex = 4 + i + j; // Actual index in photos array (first 4 are on page 4)
-            if (photo) {
-                photosHtml += `
-                    <div class="photo-cell">
-                        <div class="photo-image">
-                            <img src="${photo.url}" alt="Photo">
-                        </div>
-                        <div class="photo-meta"><span>Date:</span> ${photo.date || formatDisplayDate(report.overview?.date)}</div>
-                        <textarea
-                            class="editable-field photo-caption"
-                            data-path="photos[${photoIndex}].caption"
-                            data-photo-index="${photoIndex}"
-                            placeholder="Add caption..."
-                        >${escapeHtml(photo.caption || '')}</textarea>
+            photosHtml += `
+                <div class="photo-cell">
+                    <div class="photo-image">
+                        <img src="${photo.url}" alt="Photo">
                     </div>
-                `;
-            } else {
-                photosHtml += `
-                    <div class="photo-cell">
-                        <div class="photo-image empty"></div>
-                        <div class="photo-meta"><span>Date:</span> --</div>
-                    </div>
-                `;
-            }
-        }
+                    <div class="photo-meta"><span>Date:</span> ${photo.date || formatDisplayDate(report.overview?.date)}</div>
+                    <textarea
+                        class="editable-field photo-caption"
+                        data-path="photos[${photoIndex}].caption"
+                        data-photo-index="${photoIndex}"
+                        placeholder="Add caption..."
+                    >${escapeHtml(photo.caption || '')}</textarea>
+                </div>
+            `;
+        });
 
         // Determine logo HTML based on whether project has a logo
         // Priority: logoUrl (full quality) > logoThumbnail (compressed) > logo (legacy)
@@ -1031,7 +1034,7 @@ function updateTotalPages() {
 
 // ============ UTILITY FUNCTIONS ============
 function formatDisplayDate(dateStr) {
-    if (!dateStr) return '--';
+    if (!dateStr) return 'N/A';
     try {
         const d = new Date(dateStr);
         if (isNaN(d.getTime())) return dateStr;
@@ -1191,6 +1194,97 @@ async function generatePDF() {
         throw new Error('Could not find report content to generate PDF');
     }
 
+    // v6.6.6: Clone the DOM and convert for clean PDF output
+    const clonedElement = element.cloneNode(true);
+    
+    // v6.6.6: Convert contractor blocks to DOT inline format
+    clonedElement.querySelectorAll('.contractor-block').forEach(block => {
+        const nameEl = block.querySelector('.contractor-name');
+        const narrativeEl = block.querySelector('.contractor-narrative');
+        const equipmentEl = block.querySelector('.contractor-equipment');
+        const crewEl = block.querySelector('.contractor-crew');
+        
+        const contractorName = nameEl ? nameEl.textContent : '';
+        const narrative = narrativeEl ? (narrativeEl.value || narrativeEl.textContent || '').trim() : '';
+        const equipment = equipmentEl ? (equipmentEl.value || equipmentEl.textContent || '').trim() : '';
+        const crew = crewEl ? (crewEl.value || crewEl.textContent || '').trim() : '';
+        
+        // Build DOT-style inline format
+        let html = `<div class="contractor-name" style="font-weight: bold; text-transform: uppercase; margin-bottom: 4px;">${escapeHtml(contractorName)}</div>`;
+        
+        if (narrative || equipment || crew) {
+            html += `<p style="margin: 0 0 4px 0;">${escapeHtml(narrative) || 'No work performed.'}</p>`;
+            
+            // Inline equipment and crew
+            const details = [];
+            if (equipment) details.push(`EQUIPMENT: ${escapeHtml(equipment)}`);
+            if (crew) details.push(`CREW: ${escapeHtml(crew)}`);
+            
+            if (details.length > 0) {
+                html += `<p style="margin: 0; font-size: 9pt; text-transform: uppercase;">${details.join('. ')}.</p>`;
+            }
+        } else {
+            html += `<p style="margin: 0;">No work performed on this date.</p>`;
+        }
+        
+        block.innerHTML = html;
+    });
+    
+    // v6.6.6: Convert text sections to bulleted format
+    const textSectionIds = ['issuesContent', 'communicationsContent', 'qaqcContent', 'visitorsContent', 'safetyContent'];
+    textSectionIds.forEach(sectionId => {
+        const section = clonedElement.querySelector(`#${sectionId}`);
+        if (!section) return;
+        
+        const textarea = section.querySelector('textarea');
+        if (!textarea) return;
+        
+        const text = (textarea.value || textarea.textContent || '').trim();
+        
+        if (!text) {
+            section.innerHTML = '<ul><li style="color: #666;">N/A</li></ul>';
+            return;
+        }
+        
+        // Split by newlines and create bullet list
+        const lines = text.split('\n').filter(line => line.trim());
+        if (lines.length === 0) {
+            section.innerHTML = '<ul><li style="color: #666;">N/A</li></ul>';
+        } else if (lines.length === 1) {
+            section.innerHTML = `<ul><li>${escapeHtml(lines[0])}</li></ul>`;
+        } else {
+            section.innerHTML = '<ul>' + lines.map(line => `<li>• ${escapeHtml(line.replace(/^[•\-\*]\s*/, ''))}</li>`).join('') + '</ul>';
+        }
+    });
+    
+    // Convert any remaining textareas/inputs to styled divs (photo captions, table cells, etc.)
+    clonedElement.querySelectorAll('textarea, input[type="text"]').forEach(input => {
+        const div = document.createElement('div');
+        div.className = 'pdf-text-content';
+        div.style.cssText = `
+            font-family: inherit;
+            font-size: inherit;
+            line-height: 1.4;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        `;
+        
+        const text = input.value || input.textContent || '';
+        if (text.trim()) {
+            div.textContent = text;
+        } else {
+            div.innerHTML = '<span style="color: #666;">N/A</span>';
+        }
+        
+        input.parentNode.replaceChild(div, input);
+    });
+    
+    // Temporarily append cloned element for rendering
+    clonedElement.style.position = 'absolute';
+    clonedElement.style.left = '-9999px';
+    clonedElement.style.top = '0';
+    document.body.appendChild(clonedElement);
+
     // Generate filename
     const projectName = getProjectName().replace(/[^a-zA-Z0-9]/g, '_').substring(0, 30);
     const reportDate = getReportDate();
@@ -1213,18 +1307,20 @@ async function generatePDF() {
             orientation: 'portrait'
         },
         pagebreak: {
-            mode: ['avoid-all', 'css', 'legacy'],
+            mode: ['css'],
             before: '.page-break',
-            after: '.page-break',
             avoid: ['tr', 'td', '.contractor-block', '.photo-cell']
         }
     };
 
-    // Generate PDF blob
+    // Generate PDF blob from cloned element
     const pdfBlob = await html2pdf()
         .set(options)
-        .from(element)
+        .from(clonedElement)
         .outputPdf('blob');
+    
+    // Clean up cloned element
+    document.body.removeChild(clonedElement);
 
     return {
         blob: pdfBlob,
