@@ -2184,6 +2184,9 @@
             // Ensure report is saved to Supabase first
             await saveReportToSupabase();
 
+            // Upload any pending photos and insert metadata into photos table
+            await uploadPendingPhotos();
+
             // Build payload
             const payload = buildProcessPayload();
 
