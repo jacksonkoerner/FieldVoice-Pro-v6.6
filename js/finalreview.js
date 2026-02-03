@@ -1,5 +1,6 @@
 // FieldVoice Pro - Final Review Page Logic
-// Read-only DOT RPR Daily Report viewer with print-optimized layout
+// DOT RPR Daily Report viewer with print-optimized layout
+// v6.6.5: Now supports editable text fields with auto-save to localStorage
 
 // ============ STATE ============
 let report = null;
@@ -7,6 +8,8 @@ let currentReportId = null; // Supabase report ID
 let activeProject = null;
 let projectContractors = [];
 let userSettings = null;
+let userEdits = {}; // Track user edits separately (v6.6.5)
+let saveTimeout = null; // For debounced auto-save (v6.6.5)
 
 // ============ INITIALIZATION ============
 document.addEventListener('DOMContentLoaded', async () => {
@@ -21,10 +24,16 @@ document.addEventListener('DOMContentLoaded', async () => {
             return;
         }
 
+        // Initialize userEdits from loaded report (v6.6.5)
+        userEdits = report.userEdits || {};
+
         populateReport();
         updateTotalPages();
         checkSubmittedState();
         checkEmptyFields();
+
+        // Setup auto-save listeners for editable fields (v6.6.5)
+        setupAutoSave();
     } catch (err) {
         console.error('Failed to initialize:', err);
         alert('Failed to load report data. Please try again.');
@@ -434,40 +443,61 @@ function renderWorkSummary() {
     const container = document.getElementById('workSummaryContent');
 
     if (projectContractors.length === 0) {
-        // No contractors - show general work summary
+        // No contractors - show general work summary with editable textarea (v6.6.5)
         const workText = getTextValue('guidedNotes.workSummary', 'issues', 'generalIssues', '');
-        container.innerHTML = `<p>${escapeHtml(workText) || '<span class="na-text">No work activities recorded.</span>'}</p>`;
+        container.innerHTML = createEditableTextarea('guidedNotes.workSummary', workText, 'Enter work summary...');
         return;
     }
 
+    // v6.6.5: Render contractor blocks with editable textareas
     let html = '';
     projectContractors.forEach(contractor => {
         const activity = getContractorActivity(contractor.id);
         const typeLabel = contractor.type === 'prime' ? 'PRIME CONTRACTOR' : 'SUBCONTRACTOR';
         const trades = contractor.trades ? ` (${contractor.trades.toUpperCase()})` : '';
+        const activityPath = `activity_${contractor.id}`;
 
-        html += `<div class="contractor-block">`;
-        html += `<div class="contractor-name">${escapeHtml(contractor.name)} – ${typeLabel}${trades}</div>`;
+        html += `<div class="contractor-block" style="margin-bottom: 16px;">`;
+        html += `<div class="contractor-name" style="font-weight: bold; margin-bottom: 8px;">${escapeHtml(contractor.name)} – ${typeLabel}${trades}</div>`;
 
-        if (activity?.noWork) {
-            html += `<div class="contractor-narrative">No work performed on ${formatDisplayDate(report.overview?.date)}.</div>`;
-        } else {
-            const narrative = activity?.narrative || '';
-            if (narrative) {
-                html += `<div class="contractor-narrative">${escapeHtml(narrative)}</div>`;
-            }
-            const equipment = activity?.equipmentUsed || '';
-            const crew = activity?.crew || '';
-            if (equipment || crew) {
-                html += `<div class="contractor-details">`;
-                if (equipment) html += `EQUIPMENT: ${escapeHtml(equipment.toUpperCase())}. `;
-                if (crew) html += `CREW: ${escapeHtml(crew.toUpperCase())}.`;
-                html += `</div>`;
-            }
-            if (!narrative && !equipment && !crew) {
-                html += `<div class="contractor-narrative">No work performed on ${formatDisplayDate(report.overview?.date)}.</div>`;
-            }
-        }
+        // Narrative - editable textarea
+        const narrative = activity?.narrative || '';
+        html += `<div class="contractor-narrative-container" style="margin-bottom: 8px;">
+            <textarea
+                class="editable-field contractor-narrative w-full min-h-[60px] p-2 border border-gray-300 rounded resize-y text-sm"
+                data-path="${activityPath}.narrative"
+                data-contractor-id="${contractor.id}"
+                placeholder="Describe work performed by ${escapeHtml(contractor.name)}..."
+                style="font-family: inherit; line-height: 1.4;"
+            >${escapeHtml(narrative)}</textarea>
+        </div>`;
+
+        // Equipment and Crew - editable textareas
+        const equipment = activity?.equipmentUsed || '';
+        const crew = activity?.crew || '';
+        html += `<div class="contractor-details-container" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+            <div>
+                <label class="text-xs font-bold text-gray-500 uppercase">Equipment</label>
+                <textarea
+                    class="editable-field contractor-equipment w-full p-2 border border-gray-300 rounded resize-y text-sm"
+                    data-path="${activityPath}.equipmentUsed"
+                    data-contractor-id="${contractor.id}"
+                    placeholder="Equipment used..."
+                    style="font-family: inherit; min-height: 40px;"
+                >${escapeHtml(equipment)}</textarea>
+            </div>
+            <div>
+                <label class="text-xs font-bold text-gray-500 uppercase">Crew</label>
+                <textarea
+                    class="editable-field contractor-crew w-full p-2 border border-gray-300 rounded resize-y text-sm"
+                    data-path="${activityPath}.crew"
+                    data-contractor-id="${contractor.id}"
+                    placeholder="Crew count/description..."
+                    style="font-family: inherit; min-height: 40px;"
+                >${escapeHtml(crew)}</textarea>
+            </div>
+        </div>`;
+
         html += `</div>`;
     });
 
@@ -680,21 +710,36 @@ function getContractorName(contractorId, contractorNameFallback = null) {
 // ============ TEXT SECTIONS ============
 function renderTextSections() {
     // v6.6: Updated to use new field names with fallback to old names
+    // v6.6.5: Now renders editable textareas instead of static HTML
+
     // Issues
     const issues = getTextValueWithFallback('issues', 'issues_delays', 'generalIssues', 'guidedNotes.issues', '');
-    document.getElementById('issuesContent').innerHTML = formatTextSection(issues);
+    document.getElementById('issuesContent').innerHTML = createEditableTextarea('issues', issues, 'Enter issues/delays...');
 
     // Communications
     const comms = getTextValueWithFallback('communications', 'communications', 'contractorCommunications', '', '');
-    document.getElementById('communicationsContent').innerHTML = formatTextSection(comms);
+    document.getElementById('communicationsContent').innerHTML = createEditableTextarea('communications', comms, 'Enter communications...');
 
     // QA/QC
     const qaqc = getTextValueWithFallback('qaqc', 'qaqc_notes', 'qaqcNotes', '', '');
-    document.getElementById('qaqcContent').innerHTML = formatTextSection(qaqc);
+    document.getElementById('qaqcContent').innerHTML = createEditableTextarea('qaqc', qaqc, 'Enter QA/QC notes...');
 
     // Visitors
     const visitors = getTextValueWithFallback('visitors', 'visitors_deliveries', 'visitorsRemarks', '', '');
-    document.getElementById('visitorsContent').innerHTML = formatTextSection(visitors);
+    document.getElementById('visitorsContent').innerHTML = createEditableTextarea('visitors', visitors, 'Enter visitors/deliveries...');
+}
+
+/**
+ * v6.6.5: Create an editable textarea for text sections
+ */
+function createEditableTextarea(path, value, placeholder) {
+    const escapedValue = escapeHtml(value || '');
+    return `<textarea
+        class="editable-field w-full min-h-[80px] p-2 border border-gray-300 rounded resize-y text-sm"
+        data-path="${path}"
+        placeholder="${placeholder}"
+        style="font-family: inherit; line-height: 1.4;"
+    >${escapedValue}</textarea>`;
 }
 
 /**
@@ -804,9 +849,9 @@ function formatTextSection(text) {
 // ============ SAFETY SECTION ============
 function renderSafetySection() {
     // v6.6: Support both old (hasIncidents) and new (has_incidents) field names
-    const hasIncident = report.safety?.hasIncident || 
-                        report.aiGenerated?.safety?.has_incidents || 
-                        report.aiGenerated?.safety?.hasIncidents || 
+    const hasIncident = report.safety?.hasIncident ||
+                        report.aiGenerated?.safety?.has_incidents ||
+                        report.aiGenerated?.safety?.hasIncidents ||
                         false;
     const noIncident = !hasIncident;
 
@@ -816,8 +861,9 @@ function renderSafetySection() {
     document.getElementById('checkNo').classList.toggle('checked', noIncident);
 
     // v6.6: Support both old (safety.notes) and new (safety.summary) field names
+    // v6.6.5: Now renders editable textarea instead of static HTML
     const safetyNotes = getTextValueWithFallback('safety.notes', 'safety.summary', 'safety.notes', 'guidedNotes.safety', '');
-    document.getElementById('safetyContent').innerHTML = formatTextSection(safetyNotes);
+    document.getElementById('safetyContent').innerHTML = createEditableTextarea('safety.notes', safetyNotes, 'Enter safety observations...');
 }
 
 // ============ PHOTOS ============
@@ -845,6 +891,7 @@ function renderPhotos() {
     }
 
     // Generate photo cells (4 per page, 2x2 grid)
+    // v6.6.5: Photo captions are now editable textareas
     let html = '';
     const displayPhotos = photos.slice(0, 4); // First 4 photos for page 4
 
@@ -857,7 +904,13 @@ function renderPhotos() {
                         <img src="${photo.url}" alt="Photo ${i + 1}">
                     </div>
                     <div class="photo-meta"><span>Date:</span> ${photo.date || formatDisplayDate(report.overview?.date)}</div>
-                    <div class="photo-caption">${escapeHtml(photo.caption) || ''}</div>
+                    <textarea
+                        class="editable-field photo-caption w-full p-1 text-sm border border-gray-300 rounded resize-y"
+                        data-path="photos[${i}].caption"
+                        data-photo-index="${i}"
+                        placeholder="Add caption..."
+                        style="font-family: inherit; min-height: 40px;"
+                    >${escapeHtml(photo.caption || '')}</textarea>
                 </div>
             `;
         } else {
@@ -887,9 +940,11 @@ function addAdditionalPhotoPages(remainingPhotos) {
         const page = document.createElement('div');
         page.className = 'page' + (i + 4 < remainingPhotos.length ? ' page-break' : '');
 
+        // v6.6.5: Photo captions are now editable textareas
         let photosHtml = '';
         for (let j = 0; j < 4; j++) {
             const photo = pagePhotos[j];
+            const photoIndex = 4 + i + j; // Actual index in photos array (first 4 are on page 4)
             if (photo) {
                 photosHtml += `
                     <div class="photo-cell">
@@ -897,7 +952,13 @@ function addAdditionalPhotoPages(remainingPhotos) {
                             <img src="${photo.url}" alt="Photo">
                         </div>
                         <div class="photo-meta"><span>Date:</span> ${photo.date || formatDisplayDate(report.overview?.date)}</div>
-                        <div class="photo-caption">${escapeHtml(photo.caption) || ''}</div>
+                        <textarea
+                            class="editable-field photo-caption w-full p-1 text-sm border border-gray-300 rounded resize-y"
+                            data-path="photos[${photoIndex}].caption"
+                            data-photo-index="${photoIndex}"
+                            placeholder="Add caption..."
+                            style="font-family: inherit; min-height: 40px;"
+                        >${escapeHtml(photo.caption || '')}</textarea>
                     </div>
                 `;
             } else {
@@ -1301,6 +1362,170 @@ function dismissIncompleteBanner() {
     if (banner) {
         banner.style.display = 'none';
     }
+}
+
+// ============ AUTO-SAVE (v6.6.5) ============
+/**
+ * v6.6.5: Setup auto-save listeners for all editable fields
+ * Matches the pattern from report.js for consistency
+ */
+function setupAutoSave() {
+    // Find all editable fields with data-path attribute
+    document.querySelectorAll('[data-path]').forEach(field => {
+        // Input event: update userEdits and schedule debounced save
+        field.addEventListener('input', () => {
+            const path = field.getAttribute('data-path');
+            const value = field.value;
+
+            // Handle special paths for photos and contractor activities
+            if (path.startsWith('photos[')) {
+                // Photo caption: photos[0].caption -> update report.photos[0].caption
+                const match = path.match(/photos\[(\d+)\]\.caption/);
+                if (match) {
+                    const photoIndex = parseInt(match[1]);
+                    if (report.photos && report.photos[photoIndex]) {
+                        report.photos[photoIndex].caption = value;
+                    }
+                    // Also store in userEdits for persistence
+                    userEdits[path] = value;
+                    report.userEdits = userEdits;
+                }
+            } else if (path.startsWith('activity_')) {
+                // Contractor activity: activity_uuid.narrative -> update userEdits as nested object
+                // Path format: activity_{contractorId}.{field} (e.g., activity_abc123.narrative)
+                const match = path.match(/^(activity_[^.]+)\.(.+)$/);
+                if (match) {
+                    const activityKey = match[1]; // e.g., "activity_abc123"
+                    const fieldName = match[2];   // e.g., "narrative"
+
+                    // Initialize the activity object if needed
+                    if (!userEdits[activityKey]) {
+                        userEdits[activityKey] = {};
+                    }
+                    userEdits[activityKey][fieldName] = value;
+                } else {
+                    // Simple activity path without nested field
+                    userEdits[path] = value;
+                }
+                report.userEdits = userEdits;
+            } else {
+                // Standard text field
+                userEdits[path] = value;
+                report.userEdits = userEdits;
+            }
+
+            field.classList.add('user-edited');
+            scheduleSave();
+        });
+
+        // Blur event: cancel pending debounce and save immediately
+        field.addEventListener('blur', () => {
+            if (saveTimeout) {
+                clearTimeout(saveTimeout);
+                saveTimeout = null;
+            }
+            saveReportToLocalStorage();
+            showSaveIndicator();
+        });
+    });
+
+    console.log('[FINAL] Auto-save listeners attached to', document.querySelectorAll('[data-path]').length, 'fields');
+}
+
+/**
+ * v6.6.5: Schedule a debounced save (500ms delay)
+ */
+function scheduleSave() {
+    if (saveTimeout) clearTimeout(saveTimeout);
+    saveTimeout = setTimeout(() => {
+        saveReportToLocalStorage();
+        showSaveIndicator();
+    }, 500);
+}
+
+/**
+ * v6.6.5: Save report data to localStorage using single key pattern
+ * Key: fvp_report_{reportId}
+ * Matches the pattern from report.js
+ */
+function saveReportToLocalStorage() {
+    if (!currentReportId) {
+        console.warn('[FINAL] No reportId, cannot save');
+        return;
+    }
+
+    // Read current data to preserve fields we don't modify here
+    const existingData = getReportData(currentReportId) || {};
+
+    // Build the report object to save (matches spec structure)
+    const reportToSave = {
+        reportId: currentReportId,
+        projectId: existingData.projectId || activeProject?.id,
+        reportDate: existingData.reportDate || getReportDateStr(),
+        status: report.meta?.status || existingData.status || 'refined',
+
+        // From n8n webhook response (preserve original)
+        aiGenerated: report.aiGenerated || existingData.aiGenerated || {},
+        captureMode: report.aiCaptureMode || existingData.captureMode || 'minimal',
+
+        // Original field notes (preserve original)
+        originalInput: {
+            ...existingData.originalInput,
+            // Update photos with edited captions
+            photos: report.photos || existingData.originalInput?.photos || []
+        },
+
+        // User edits - this is what we're updating
+        userEdits: { ...existingData.userEdits, ...userEdits },
+
+        // Metadata
+        createdAt: existingData.createdAt || report.meta?.createdAt || new Date().toISOString(),
+        lastSaved: new Date().toISOString()
+    };
+
+    // Use saveReportData from storage-keys.js
+    const success = saveReportData(currentReportId, reportToSave);
+    if (success) {
+        console.log('[FINAL] Report saved to localStorage:', currentReportId);
+    } else {
+        console.error('[FINAL] Failed to save report to localStorage');
+    }
+}
+
+/**
+ * v6.6.5: Show brief save indicator
+ */
+function showSaveIndicator() {
+    // Check if indicator already exists
+    let indicator = document.getElementById('saveIndicator');
+    if (!indicator) {
+        indicator = document.createElement('div');
+        indicator.id = 'saveIndicator';
+        indicator.style.cssText = `
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: #16a34a;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            z-index: 9999;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        `;
+        indicator.textContent = 'Saved';
+        document.body.appendChild(indicator);
+    }
+
+    // Show indicator
+    indicator.style.opacity = '1';
+
+    // Hide after 1.5 seconds
+    setTimeout(() => {
+        indicator.style.opacity = '0';
+    }, 1500);
 }
 
 // ============ EXPOSE TO WINDOW FOR ONCLICK HANDLERS ============
