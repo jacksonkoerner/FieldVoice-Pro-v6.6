@@ -1210,199 +1210,103 @@ async function submitReport() {
 }
 
 /**
- * Generate PDF from the page content using html2pdf.js
+ * v6.6.13: Generate PDF using direct html2canvas + jsPDF (Option D)
+ * Replaces html2pdf.js which has broken dimension calculation in its Worker pattern
  * @returns {Promise<{blob: Blob, filename: string}>}
  */
 async function generatePDF() {
-    // Get the printable content area (page-container contains all pages)
-    const element = document.querySelector('.page-container');
+    console.log('[PDF] Starting PDF generation with direct html2canvas + jsPDF');
 
-    if (!element) {
-        throw new Error('Could not find report content to generate PDF');
+    const container = document.querySelector('.page-container');
+    if (!container) {
+        throw new Error('Page container not found');
     }
 
-    // v6.6.6: Clone the DOM and convert for clean PDF output
-    const clonedElement = element.cloneNode(true);
-    
-    // v6.6.6: Convert contractor blocks to DOT inline format
-    clonedElement.querySelectorAll('.contractor-block').forEach(block => {
-        const nameEl = block.querySelector('.contractor-name');
-        const narrativeEl = block.querySelector('.contractor-narrative');
-        const equipmentEl = block.querySelector('.contractor-equipment');
-        const crewEl = block.querySelector('.contractor-crew');
-        
-        const contractorName = nameEl ? nameEl.textContent : '';
-        const narrative = narrativeEl ? (narrativeEl.value || narrativeEl.textContent || '').trim() : '';
-        const equipment = equipmentEl ? (equipmentEl.value || equipmentEl.textContent || '').trim() : '';
-        const crew = crewEl ? (crewEl.value || crewEl.textContent || '').trim() : '';
-        
-        // Build DOT-style inline format
-        let html = `<div class="contractor-name" style="font-weight: bold; text-transform: uppercase; margin-bottom: 4px;">${escapeHtml(contractorName)}</div>`;
-        
-        if (narrative || equipment || crew) {
-            html += `<p style="margin: 0 0 4px 0;">${escapeHtml(narrative) || 'No work performed.'}</p>`;
-            
-            // Inline equipment and crew
-            const details = [];
-            if (equipment) details.push(`EQUIPMENT: ${escapeHtml(equipment)}`);
-            if (crew) details.push(`CREW: ${escapeHtml(crew)}`);
-            
-            if (details.length > 0) {
-                html += `<p style="margin: 0; font-size: 9pt; text-transform: uppercase;">${details.join('. ')}.</p>`;
-            }
-        } else {
-            html += `<p style="margin: 0;">No work performed on this date.</p>`;
+    const pages = container.querySelectorAll('.page');
+    console.log('[PDF] Found', pages.length, 'pages to render');
+
+    if (pages.length === 0) {
+        throw new Error('No pages found to render');
+    }
+
+    // Get jsPDF constructor - try different access patterns
+    const jsPDFConstructor = (typeof jspdf !== 'undefined' && jspdf.jsPDF)
+        || (typeof jsPDF !== 'undefined' && jsPDF)
+        || (typeof window !== 'undefined' && window.jspdf && window.jspdf.jsPDF)
+        || (typeof window !== 'undefined' && window.jsPDF);
+
+    if (!jsPDFConstructor) {
+        throw new Error('jsPDF library not found. Please ensure jsPDF is loaded.');
+    }
+
+    // Create PDF (letter size: 8.5 x 11 inches)
+    const pdf = new jsPDFConstructor({
+        orientation: 'portrait',
+        unit: 'in',
+        format: 'letter'
+    });
+
+    const html2canvasOptions = {
+        scale: 2,
+        useCORS: true,
+        allowTaint: false,
+        logging: true,
+        backgroundColor: '#ffffff',
+        windowWidth: 816
+    };
+
+    for (let i = 0; i < pages.length; i++) {
+        const page = pages[i];
+        console.log(`[PDF] Rendering page ${i + 1}/${pages.length}`);
+
+        // Wait for images on this page to load
+        const images = page.querySelectorAll('img');
+        await Promise.all(Array.from(images).map(img => {
+            if (img.complete && img.naturalWidth > 0) return Promise.resolve();
+            return new Promise(resolve => {
+                img.onload = resolve;
+                img.onerror = resolve;
+                setTimeout(resolve, 3000);
+            });
+        }));
+
+        // Capture this page
+        const canvas = await html2canvas(page, html2canvasOptions);
+        console.log(`[PDF] Page ${i + 1} canvas: ${canvas.width}x${canvas.height}`);
+
+        // Convert to image
+        const imgData = canvas.toDataURL('image/jpeg', 0.95);
+
+        // Add new page (except for first)
+        if (i > 0) {
+            pdf.addPage();
         }
-        
-        block.innerHTML = html;
-    });
-    
-    // v6.6.6: Convert text sections to bulleted format
-    const textSectionIds = ['issuesContent', 'communicationsContent', 'qaqcContent', 'visitorsContent', 'safetyContent'];
-    textSectionIds.forEach(sectionId => {
-        const section = clonedElement.querySelector(`#${sectionId}`);
-        if (!section) return;
-        
-        const textarea = section.querySelector('textarea');
-        if (!textarea) return;
-        
-        const text = (textarea.value || textarea.textContent || '').trim();
-        
-        if (!text) {
-            section.innerHTML = '<ul><li style="color: #666;">N/A</li></ul>';
-            return;
-        }
-        
-        // Split by newlines and create bullet list
-        const lines = text.split('\n').filter(line => line.trim());
-        if (lines.length === 0) {
-            section.innerHTML = '<ul><li style="color: #666;">N/A</li></ul>';
-        } else if (lines.length === 1) {
-            section.innerHTML = `<ul><li>${escapeHtml(lines[0])}</li></ul>`;
-        } else {
-            section.innerHTML = '<ul>' + lines.map(line => `<li>• ${escapeHtml(line.replace(/^[•\-\*]\s*/, ''))}</li>`).join('') + '</ul>';
-        }
-    });
-    
-    // Convert any remaining textareas/inputs to styled divs (photo captions, table cells, etc.)
-    clonedElement.querySelectorAll('textarea, input[type="text"]').forEach(input => {
-        const div = document.createElement('div');
-        div.className = 'pdf-text-content';
-        div.style.cssText = `
-            font-family: inherit;
-            font-size: inherit;
-            line-height: 1.4;
-            white-space: pre-wrap;
-            word-wrap: break-word;
-        `;
-        
-        const text = input.value || input.textContent || '';
-        if (text.trim()) {
-            div.textContent = text;
-        } else {
-            div.innerHTML = '<span style="color: #666;">N/A</span>';
-        }
-        
-        input.parentNode.replaceChild(div, input);
-    });
-    
-    // v6.6.11: Position on-screen but behind everything (off-screen causes clipping issues)
-    clonedElement.style.position = 'fixed';
-    clonedElement.style.left = '0';
-    clonedElement.style.top = '0';
-    clonedElement.style.width = '816px';      // 8.5in at 96dpi
-    clonedElement.style.minWidth = '816px';   // Force width
-    clonedElement.style.zIndex = '-9999';
-    clonedElement.style.pointerEvents = 'none';
-    clonedElement.style.opacity = '0.999';    // Tiny reduction prevents browser optimizations that skip "invisible" elements
-    clonedElement.style.display = 'block';
-    clonedElement.style.visibility = 'visible';
-    clonedElement.style.background = '#fff';
 
-    // v6.6.11: Remove overflow clipping that causes blank capture
-    clonedElement.style.overflow = 'visible';
-    clonedElement.querySelectorAll('.page-container, .page').forEach(el => {
-        el.style.overflow = 'visible';
-        el.style.overflowX = 'visible';
-        el.style.overflowY = 'visible';
-    });
+        // Add image to PDF with margins
+        // Page is 8.5 x 11, using 0.25in margins = 8 x 10.5 content area
+        const imgWidth = 8;
+        const imgHeight = (canvas.height * imgWidth) / canvas.width;
 
-    // v6.6.11: Ensure all .page elements have explicit white background
-    clonedElement.querySelectorAll('.page').forEach(el => {
-        el.style.background = '#fff';
-    });
-
-    // v6.6.12: Add explicit page breaks to each .page element
-    const pages = clonedElement.querySelectorAll('.page');
-    pages.forEach((page, index) => {
-        if (index < pages.length - 1) {
-            page.classList.add('page-break');
-            page.style.pageBreakAfter = 'always';
-            page.style.breakAfter = 'page';
-        }
-    });
-    console.log('[PDF] Added page breaks to', pages.length, 'pages');
-
-    document.body.appendChild(clonedElement);
-
-    // v6.6.11: Wait for browser to compute layout
-    await new Promise(resolve => {
-        requestAnimationFrame(() => {
-            requestAnimationFrame(resolve);
-        });
-    });
-
-    // v6.6.11: Wait for all images to load
-    await waitForImages(clonedElement, 5000);
-
-    // v6.6.11: Debug log (remove after confirmed working)
-    console.log('[PDF] Clone ready - width:', clonedElement.offsetWidth, 'height:', clonedElement.offsetHeight);
-    console.log('[PDF] Images loaded:', Array.from(clonedElement.querySelectorAll('img')).map(img => img.complete));
+        pdf.addImage(imgData, 'JPEG', 0.25, 0.25, imgWidth, Math.min(imgHeight, 10.5));
+    }
 
     // Generate filename
     const projectName = getProjectName().replace(/[^a-zA-Z0-9]/g, '_').substring(0, 30);
     const reportDate = getReportDate();
     const filename = `${projectName}_${reportDate}.pdf`;
 
-    const options = {
-        margin: [0.25, 0.25, 0.25, 0.25], // inches - smaller margins for better fit
-        filename: filename,
-        image: { type: 'jpeg', quality: 0.95 },
-        html2canvas: {
-            scale: 2,
-            useCORS: true,
-            logging: true,           // v6.6.11: Enable for debugging
-            letterRendering: true,
-            allowTaint: false,       // v6.6.11: Prevent tainted canvas
-            windowWidth: 816,        // v6.6.11: Force desktop width context
-            scrollX: 0,              // v6.6.11: Prevent scroll artifacts
-            scrollY: 0
-        },
-        jsPDF: {
-            unit: 'in',
-            format: 'letter',
-            orientation: 'portrait'
-        },
-        pagebreak: {
-            mode: ['avoid-all', 'css'],  // v6.6.12: Added 'avoid-all' for robust pagination
-            before: '.page-break',
-            avoid: ['tr', 'td', '.contractor-block', '.photo-cell']
-        }
-    };
+    console.log('[PDF] PDF generation complete:', filename);
 
-    // Generate PDF blob from cloned element
-    const pdfBlob = await html2pdf()
-        .set(options)
-        .from(clonedElement)
-        .outputPdf('blob');
-    
-    // Clean up cloned element
-    document.body.removeChild(clonedElement);
+    // Return blob and filename
+    const blob = pdf.output('blob');
+    console.log('[PDF] Blob size:', blob.size, 'bytes');
 
-    return {
-        blob: pdfBlob,
-        filename: filename
-    };
+    // Validate blob size
+    if (blob.size < 10000) {
+        console.warn('[PDF] Warning: PDF blob is suspiciously small:', blob.size, 'bytes');
+    }
+
+    return { blob, filename };
 }
 
 /**
