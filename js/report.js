@@ -1842,13 +1842,28 @@
             const field = document.getElementById(fieldId);
             if (!field) return;
 
-            field.addEventListener('blur', () => {
+            // v6.6.3: Input event with debounce - saves 500ms after typing stops
+            field.addEventListener('input', () => {
+                // Update userEdits immediately so data isn't lost
                 const value = field.value;
                 setNestedValue(report, path, value);
                 userEdits[path] = value;
                 report.userEdits = userEdits;
                 field.classList.add('user-edited');
+
+                // Debounced save to localStorage
                 scheduleSave();
+            });
+
+            // Safety net: blur cancels pending debounce and saves immediately
+            field.addEventListener('blur', () => {
+                if (saveTimeout) {
+                    clearTimeout(saveTimeout);
+                    saveTimeout = null;
+                }
+                // Save immediately on blur
+                saveReportToLocalStorage();
+                showSaveIndicator();
             });
         });
 
@@ -1875,14 +1890,26 @@
         // General work summary (when no contractors)
         const generalSummary = document.getElementById('generalWorkSummary');
         if (generalSummary) {
-            generalSummary.addEventListener('blur', () => {
-                const path = 'guidedNotes.workSummary';
+            const path = 'guidedNotes.workSummary';
+
+            // v6.6.3: Input event with debounce
+            generalSummary.addEventListener('input', () => {
                 const value = generalSummary.value;
                 setNestedValue(report, path, value);
                 userEdits[path] = value;
                 report.userEdits = userEdits;
                 generalSummary.classList.add('user-edited');
                 scheduleSave();
+            });
+
+            // Safety net: blur saves immediately
+            generalSummary.addEventListener('blur', () => {
+                if (saveTimeout) {
+                    clearTimeout(saveTimeout);
+                    saveTimeout = null;
+                }
+                saveReportToLocalStorage();
+                showSaveIndicator();
             });
         }
     }
