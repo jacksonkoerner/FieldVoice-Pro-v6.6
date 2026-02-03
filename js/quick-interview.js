@@ -1838,7 +1838,7 @@
          * Build the payload for AI processing
          */
         function buildProcessPayload() {
-            const todayStr = new Date().toISOString().split('T')[0];
+            const todayStr = getTodayDateString();
             const reportKey = getReportKey(activeProject?.id, todayStr);
 
             return {
@@ -2173,7 +2173,7 @@
 
                 // v6.6.2: Save complete report package to single localStorage key
                 // This is the source of truth for report.html
-                const todayStr = new Date().toISOString().split('T')[0];
+                const todayStr = getTodayDateString();
                 const reportDataPackage = {
                     reportId: currentReportId,
                     projectId: activeProject?.id,
@@ -3083,7 +3083,7 @@
          * Generate a report storage key (kept for legacy/reference)
          */
         function getReportKey(projectId, dateStr) {
-            const date = dateStr || new Date().toISOString().split('T')[0];
+            const date = dateStr || getTodayDateString();
             return projectId
                 ? `fieldvoice_report_${projectId}_${date}`
                 : `fieldvoice_report_${date}`;
@@ -3100,7 +3100,7 @@
             // Clear any stale report ID before loading
             currentReportId = null;
 
-            const todayStr = new Date().toISOString().split('T')[0];
+            const todayStr = getTodayDateString();
 
             if (!activeProject) {
                 return createFreshReport();
@@ -3336,7 +3336,7 @@
             isSaving = true;
 
             try {
-                const todayStr = new Date().toISOString().split('T')[0];
+                const todayStr = getTodayDateString();
 
                 // 1. Upsert the main report record
                 let reportId = currentReportId;
@@ -4835,7 +4835,7 @@
 
                 // v6.6.2: Save complete report package to single localStorage key
                 // This is the source of truth for report.html
-                const todayStr = new Date().toISOString().split('T')[0];
+                const todayStr = getTodayDateString();
                 const reportDataPackage = {
                     reportId: currentReportId,
                     projectId: activeProject?.id,
