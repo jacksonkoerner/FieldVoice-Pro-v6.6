@@ -734,6 +734,7 @@
         }
 
         /* v6.6.5: Editable field styles - invisible until focused */
+        /* v6.6.21: Fixed overflow for PDF capture - was truncating content */
         .editable-field {
             /* Invisible until focused */
             border: none;
@@ -745,8 +746,8 @@
             font-size: inherit;
             line-height: inherit;
             width: 100%;
-            min-height: 1.5em;
-            overflow: hidden;
+            min-height: auto;
+            overflow: visible;
         }
 
         .editable-field:focus {
@@ -827,6 +828,86 @@
             .editable-cell::placeholder {
                 color: transparent !important;
             }
+        }
+
+        /* v6.6.21: PDF Generation & Print-Ready Styles */
+        @media print, screen {
+            .page {
+                box-sizing: border-box;
+                overflow: visible !important;
+            }
+
+            .editable-field,
+            .contractor-narrative,
+            textarea {
+                overflow: visible !important;
+                height: auto !important;
+                min-height: auto !important;
+                white-space: pre-wrap;
+                word-wrap: break-word;
+            }
+
+            /* Ensure tables don't break mid-row */
+            table {
+                page-break-inside: avoid;
+            }
+
+            tr {
+                page-break-inside: avoid;
+            }
+
+            /* Section headers - consistent green */
+            .section-header {
+                background-color: #4a7c34 !important;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+        }
+
+        /* v6.6.21: Contractor narrative container styling */
+        .contractor-narrative-container {
+            margin-bottom: 12px;
+            width: 100%;
+        }
+
+        .contractor-narrative {
+            width: 100%;
+            min-height: 40px;
+            padding: 4px 8px;
+            font-size: 9pt;
+            line-height: 1.4;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .contractor-details-container {
+            margin-top: 8px;
+        }
+
+        .contractor-details-container label {
+            font-weight: bold;
+            text-transform: uppercase;
+            font-size: 8pt;
+            color: #333;
+        }
+
+        .contractor-equipment,
+        .contractor-crew {
+            min-height: 24px;
+            font-size: 9pt;
+            padding: 2px 4px;
+        }
+
+        /* v6.6.21: Textarea replacement divs for PDF capture */
+        .textarea-replacement {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            overflow: visible;
+            height: auto;
+            min-height: auto;
+            font-family: inherit;
+            font-size: inherit;
+            line-height: inherit;
         }
     </style>
 </head>
