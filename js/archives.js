@@ -171,7 +171,7 @@ function getRecentReports() {
     }).sort((a, b) => {
         // Sort by submittedAt descending (most recent first)
         return new Date(b.submittedAt) - new Date(a.submittedAt);
-    });
+    }).slice(0, 5);
 }
 
 function renderReports() {
