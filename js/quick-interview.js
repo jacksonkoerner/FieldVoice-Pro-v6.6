@@ -527,48 +527,13 @@
 
         // ============ STATE PROTECTION ============
         /**
-         * Check if report is already refined - redirect if so
-         * This prevents users from editing after AI refinement
-         * v6: Uses canReturnToNotes() from report-rules.js
+         * v6.6.15: Simplified - always allow page to load
+         * With the new composite report system, each session creates a new report,
+         * so we don't need to check for existing reports by project+date
          */
         async function checkReportState() {
-            const activeProjectId = getStorageItem(STORAGE_KEYS.ACTIVE_PROJECT_ID);
-            if (!activeProjectId) {
-                return true; // No project selected, allow page to load (will show project picker)
-            }
-
-            const today = getTodayDateString();
-
-            try {
-                const { data: reportData, error } = await supabaseClient
-                    .from('reports')
-                    .select('id, status')
-                    .eq('project_id', activeProjectId)
-                    .eq('report_date', today)
-                    .maybeSingle();
-
-                if (error) {
-                    console.error('[STATE CHECK] Error checking report state:', error);
-                    return true; // Allow page to load on error, let normal flow handle it
-                }
-
-                if (reportData) {
-                    // v6: Use canReturnToNotes() from report-rules.js to check if editing is allowed
-                    // Note: canReturnToNotes expects a reportId, but we check status directly here
-                    // since we already have the status from Supabase
-                    const canEdit = reportData.status === REPORT_STATUS.DRAFT;
-                    if (!canEdit) {
-                        console.log('[STATE CHECK] Cannot edit - status:', reportData.status);
-                        window.location.href = `report.html?date=${today}`;
-                        return false;
-                    }
-                }
-
-                return true;
-            } catch (e) {
-                console.error('[STATE CHECK] Failed to check report state:', e);
-                return true; // Allow page to load on error
-            }
+            // Always allow page to load - each session can create a new report
+            return true;
         }
 
         // ============ LOCALSTORAGE DRAFT MANAGEMENT ============
@@ -3140,76 +3105,14 @@
 
         /**
          * Load report from Supabase
+         * v6.6.15: Simplified - always create fresh reports
+         * With the new composite report system, each session creates a new report,
+         * so we don't lookup existing reports by project+date
          */
         async function getReport() {
-            // Clear any stale report ID before loading
+            // Clear any stale report ID - each session starts fresh
             currentReportId = null;
-
-            const todayStr = getTodayDateString();
-
-            if (!activeProject) {
-                return createFreshReport();
-            }
-
-            try {
-                // Query for existing report for this project and date
-                const { data: reportRow, error: reportError } = await supabaseClient
-                    .from('reports')
-                    .select('*')
-                    .eq('project_id', activeProject.id)
-                    .eq('report_date', todayStr)
-                    .maybeSingle();
-
-                if (reportError) {
-                    console.error('Error fetching report:', reportError);
-                    return createFreshReport();
-                }
-
-                if (!reportRow) {
-                    return createFreshReport();
-                }
-
-                // If report was already submitted, create fresh
-                if (reportRow.status === 'submitted') {
-                    return createFreshReport();
-                }
-
-                // Store the report ID for updates
-                currentReportId = reportRow.id;
-
-                // Load raw capture data (includes contractor_work, personnel, equipment_usage in raw_data)
-                const { data: rawCapture } = await supabaseClient
-                    .from('report_raw_capture')
-                    .select('*')
-                    .eq('report_id', reportRow.id)
-                    .maybeSingle();
-
-                // contractor_work now stored in raw_data.contractor_work
-                const contractorWork = rawCapture?.raw_data?.contractor_work || [];
-
-                // personnel now stored in raw_data.personnel
-                const personnel = rawCapture?.raw_data?.personnel || [];
-
-                // equipment_usage now stored in raw_data.equipment_usage
-                const equipmentUsage = rawCapture?.raw_data?.equipment_usage || [];
-
-                // Load photos
-                const { data: photos } = await supabaseClient
-                    .from('photos')
-                    .select('*')
-                    .eq('report_id', reportRow.id)
-                    .order('taken_at', { ascending: true });
-
-                // Reconstruct the report object
-                const reconstructedReport = reconstructReportFromSupabase(
-                    reportRow, rawCapture, contractorWork, personnel, equipmentUsage, photos
-                );
-
-                return reconstructedReport;
-            } catch (e) {
-                console.error('Failed to load report from Supabase:', e);
-                return createFreshReport();
-            }
+            return createFreshReport();
         }
 
         /**
@@ -3386,22 +3289,14 @@
                 const todayStr = getTodayDateString();
 
                 // 1. Upsert the main report record
-                let reportId = currentReportId;
-                if (!reportId) {
-                    // Check if a report already exists for this project+date before generating new ID
-                    const { data: existingReport } = await supabaseClient
-                        .from('reports')
-                        .select('id')
-                        .eq('project_id', activeProject.id)
-                        .eq('report_date', todayStr)
-                        .maybeSingle();
-
-                    reportId = existingReport?.id || generateId();
-                }
+                // v6.6.15: Always generate fresh UUID - never reuse IDs based on project+date
+                const reportId = currentReportId || generateId();
 
                 const reportData = {
                     id: reportId,
                     project_id: activeProject.id,
+                    user_id: getStorageItem(STORAGE_KEYS.USER_ID) || null,
+                    device_id: getDeviceId(),
                     report_date: todayStr,
                     inspector_name: report.overview?.completedBy || userSettings?.full_name || '',
                     status: report.meta?.status || 'draft',
