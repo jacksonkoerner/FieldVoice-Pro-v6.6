@@ -16,7 +16,6 @@ const STATIC_ASSETS = [
     './settings.html',
     './landing.html',
     './archives.html',
-    './drafts.html',
     './project-config.html',
     './projects.html',
     './js/config.js',
