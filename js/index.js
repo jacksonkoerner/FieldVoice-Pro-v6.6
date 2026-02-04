@@ -476,7 +476,6 @@ function renderReportCard(report, type) {
 // ============ WEATHER ============
 async function syncWeather() {
     const syncIcon = document.getElementById('syncIcon');
-    const syncBtn = document.getElementById('syncWeatherBtn');
     syncIcon.classList.add('fa-spin');
 
     try {
@@ -488,21 +487,62 @@ async function syncWeather() {
             return;
         }
 
-        if (!navigator.geolocation) {
-            throw { code: -1, message: 'Geolocation not supported' };
+        // Try to get location - use cache first to avoid prompting user
+        let latitude, longitude;
+        const cachedLocation = getLocationFromCache();
+
+        if (cachedLocation) {
+            // Use cached location - no prompt needed
+            latitude = cachedLocation.lat;
+            longitude = cachedLocation.lng;
+            console.log('[Weather] Using cached location');
+        } else {
+            // No cached location - check if permission was granted
+            const granted = localStorage.getItem(STORAGE_KEYS.LOC_GRANTED) === 'true';
+            if (!granted) {
+                // Permission not granted - show message, don't prompt
+                console.log('[Weather] Location permission not granted, skipping weather sync');
+                document.getElementById('weatherCondition').textContent = 'Location needed';
+                document.getElementById('weatherIcon').className = 'fas fa-location-dot text-2xl text-slate-400 mb-1';
+                syncIcon.classList.remove('fa-spin');
+                return;
+            }
+
+            // Permission was granted but cache expired/cleared - get fresh location
+            if (!navigator.geolocation) {
+                throw { code: -1, message: 'Geolocation not supported' };
+            }
+
+            try {
+                const position = await new Promise((resolve, reject) => {
+                    navigator.geolocation.getCurrentPosition(
+                        resolve,
+                        reject,
+                        { enableHighAccuracy: true, timeout: 15000, maximumAge: 300000 }
+                    );
+                });
+                latitude = position.coords.latitude;
+                longitude = position.coords.longitude;
+                // Update cache with fresh location
+                cacheLocation(latitude, longitude);
+                console.log('[Weather] Got fresh location and cached');
+            } catch (geoError) {
+                // Location failed - handle gracefully
+                if (geoError.code === 1) {
+                    // Permission denied - clear cached permission status
+                    clearCachedLocation();
+                    document.getElementById('weatherCondition').textContent = 'Location blocked';
+                    document.getElementById('weatherIcon').className = 'fas fa-location-crosshairs text-2xl text-red-500 mb-1';
+                } else {
+                    document.getElementById('weatherCondition').textContent = 'GPS unavailable';
+                    document.getElementById('weatherIcon').className = 'fas fa-location-crosshairs text-2xl text-yellow-500 mb-1';
+                }
+                syncIcon.classList.remove('fa-spin');
+                return;
+            }
         }
 
-        const position = await new Promise((resolve, reject) => {
-            navigator.geolocation.getCurrentPosition(
-                resolve,
-                reject,
-                { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
-            );
-        });
-
-        localStorage.setItem(STORAGE_KEYS.LOC_GRANTED, 'true');
-
-        const { latitude, longitude } = position.coords;
+        // Fetch weather data
         const response = await fetch(
             `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true&daily=temperature_2m_max,temperature_2m_min,precipitation_sum&timezone=auto&temperature_unit=fahrenheit&precipitation_unit=inch`
         );
@@ -543,17 +583,8 @@ async function syncWeather() {
         document.getElementById('weatherIcon').className = `fas ${weatherInfo.icon} text-2xl ${weatherInfo.color} mb-1`;
     } catch (error) {
         console.error('Weather sync failed:', error);
-        if (error.code === 1) {
-            localStorage.removeItem(STORAGE_KEYS.LOC_GRANTED);
-            document.getElementById('weatherCondition').textContent = 'Location blocked';
-            document.getElementById('weatherIcon').className = 'fas fa-location-crosshairs text-2xl text-red-500 mb-1';
-        } else if (error.code === 2) {
-            document.getElementById('weatherCondition').textContent = 'GPS unavailable';
-        } else if (error.code === 3) {
-            document.getElementById('weatherCondition').textContent = 'Timeout';
-        } else {
-            document.getElementById('weatherCondition').textContent = 'Sync failed';
-        }
+        document.getElementById('weatherCondition').textContent = 'Sync failed';
+        document.getElementById('weatherIcon').className = 'fas fa-exclamation-triangle text-2xl text-yellow-500 mb-1';
     }
 
     const updatedSyncIcon = document.getElementById('syncIcon');
