@@ -1,5 +1,6 @@
 // FieldVoice Pro - Final Review Page Logic
 // DOT RPR Daily Report viewer with print-optimized layout
+// v6.6.22: Show "No work performed on [date]" for inactive contractors instead of skipping
 // v6.6.21: Comprehensive PDF styling overhaul - fix truncation, improve capture quality
 // v6.6.14: Fix reports table - add project_id, device_id, user_id
 // v6.6.12: Fix PDF pagination - add explicit page breaks to .page elements
@@ -472,9 +473,8 @@ function renderWorkSummary() {
     }
 
     // v6.6.5: Render contractor blocks with editable textareas
-    // v6.6.21: Skip contractors with no meaningful content (no narrative, equipment, or crew)
+    // v6.6.22: Show ALL contractors - display "No work performed on [date]" for inactive ones
     let html = '';
-    let renderedCount = 0;
 
     projectContractors.forEach(contractor => {
         const activity = getContractorActivity(contractor.id);
@@ -484,61 +484,62 @@ function renderWorkSummary() {
         const equipment = activity?.equipmentUsed || '';
         const crew = activity?.crew || '';
 
-        // v6.6.21: Skip contractors with no meaningful content
-        // Check if all fields are empty or just whitespace
-        const hasContent = (narrative.trim() || equipment.trim() || crew.trim());
-        if (!hasContent) {
-            console.log('[FINAL] Skipping contractor with no content:', contractor.name);
-            return; // Skip this contractor
-        }
-
-        renderedCount++;
         const typeLabel = contractor.type === 'prime' ? 'PRIME CONTRACTOR' : 'SUBCONTRACTOR';
         const trades = contractor.trades ? ` (${contractor.trades.toUpperCase()})` : '';
         const activityPath = `activity_${contractor.id}`;
 
-        html += `<div class="contractor-block" style="margin-bottom: 16px;">`;
-        html += `<div class="contractor-name" style="font-weight: bold; margin-bottom: 8px;">${escapeHtml(contractor.name)} – ${typeLabel}${trades}</div>`;
+        // v6.6.22: Detect "no work" state - either explicit flag or all fields empty
+        const isNoWork = activity?.noWork === true || (!narrative.trim() && !equipment.trim() && !crew.trim());
 
-        // Narrative - editable textarea
-        html += `<div class="contractor-narrative-container" style="margin-bottom: 8px;">
-            <textarea
-                class="editable-field contractor-narrative"
-                data-path="${activityPath}.narrative"
-                data-contractor-id="${contractor.id}"
-                placeholder="Describe work performed by ${escapeHtml(contractor.name)}..."
-            >${escapeHtml(narrative)}</textarea>
-        </div>`;
+        if (isNoWork) {
+            // v6.6.22: Render minimal block with "No work performed" message (no EQUIPMENT/CREW labels)
+            const reportDate = report.overview?.date || getReportDateStr();
+            const displayDate = reportDate ? formatDisplayDate(reportDate) : 'this date';
 
-        // Equipment and Crew - editable textareas
-        html += `<div class="contractor-details-container" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-            <div>
-                <label style="font-size: 8pt; font-weight: bold; color: #666; text-transform: uppercase;">Equipment</label>
+            html += `<div class="contractor-block" style="margin-bottom: 16px; page-break-inside: avoid;">`;
+            html += `<div class="contractor-name" style="font-weight: bold; margin-bottom: 4px;">${escapeHtml(contractor.name)} – ${typeLabel}${trades}</div>`;
+            html += `<div class="no-work-message" style="font-style: italic; color: #333; padding-left: 8px;">No work performed on ${displayDate}.</div>`;
+            html += `</div>`;
+        } else {
+            // Contractor WITH activity - show narrative, EQUIPMENT, CREW labels
+            html += `<div class="contractor-block" style="margin-bottom: 16px;">`;
+            html += `<div class="contractor-name" style="font-weight: bold; margin-bottom: 8px;">${escapeHtml(contractor.name)} – ${typeLabel}${trades}</div>`;
+
+            // Narrative - editable textarea
+            html += `<div class="contractor-narrative-container" style="margin-bottom: 8px;">
                 <textarea
-                    class="editable-field contractor-equipment"
-                    data-path="${activityPath}.equipmentUsed"
+                    class="editable-field contractor-narrative"
+                    data-path="${activityPath}.narrative"
                     data-contractor-id="${contractor.id}"
-                    placeholder="Equipment used..."
-                >${escapeHtml(equipment)}</textarea>
-            </div>
-            <div>
-                <label style="font-size: 8pt; font-weight: bold; color: #666; text-transform: uppercase;">Crew</label>
-                <textarea
-                    class="editable-field contractor-crew"
-                    data-path="${activityPath}.crew"
-                    data-contractor-id="${contractor.id}"
-                    placeholder="Crew count/description..."
-                >${escapeHtml(crew)}</textarea>
-            </div>
-        </div>`;
+                    placeholder="Describe work performed by ${escapeHtml(contractor.name)}..."
+                >${escapeHtml(narrative)}</textarea>
+            </div>`;
 
-        html += `</div>`;
+            // Equipment and Crew - editable textareas
+            html += `<div class="contractor-details-container" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                <div>
+                    <label style="font-size: 8pt; font-weight: bold; color: #666; text-transform: uppercase;">Equipment</label>
+                    <textarea
+                        class="editable-field contractor-equipment"
+                        data-path="${activityPath}.equipmentUsed"
+                        data-contractor-id="${contractor.id}"
+                        placeholder="Equipment used..."
+                    >${escapeHtml(equipment)}</textarea>
+                </div>
+                <div>
+                    <label style="font-size: 8pt; font-weight: bold; color: #666; text-transform: uppercase;">Crew</label>
+                    <textarea
+                        class="editable-field contractor-crew"
+                        data-path="${activityPath}.crew"
+                        data-contractor-id="${contractor.id}"
+                        placeholder="Crew count/description..."
+                    >${escapeHtml(crew)}</textarea>
+                </div>
+            </div>`;
+
+            html += `</div>`;
+        }
     });
-
-    // v6.6.21: If no contractors had content, show a message
-    if (renderedCount === 0) {
-        html = `<p style="color: #666; font-style: italic;">No contractor activities recorded for this date.</p>`;
-    }
 
     container.innerHTML = html;
 }
