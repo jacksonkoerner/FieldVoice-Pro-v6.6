@@ -3,6 +3,12 @@
         let report = null;
         let currentReportId = null; // Supabase report ID
         let permissionsChecked = false;
+
+        // v6.6.16: Read reportId from URL if passed from index.js
+        function getReportIdFromUrl() {
+            const params = new URLSearchParams(window.location.search);
+            return params.get('reportId');
+        }
         let activeProject = null;
         let projectContractors = [];
         let userSettings = null;
@@ -3289,8 +3295,8 @@
                 const todayStr = getTodayDateString();
 
                 // 1. Upsert the main report record
-                // v6.6.15: Always generate fresh UUID - never reuse IDs based on project+date
-                const reportId = currentReportId || generateId();
+                // v6.6.16: Priority: 1) existing currentReportId, 2) URL param, 3) generate new
+                const reportId = currentReportId || getReportIdFromUrl() || generateId();
 
                 const reportData = {
                     id: reportId,
@@ -4909,6 +4915,13 @@
                 const canEdit = await checkReportState();
                 if (!canEdit) {
                     return; // Stop initialization if redirecting
+                }
+
+                // v6.6.16: Set currentReportId from URL param if available (passed from index.js)
+                const urlReportId = getReportIdFromUrl();
+                if (urlReportId && !currentReportId) {
+                    currentReportId = urlReportId;
+                    console.log('[QUICK-INTERVIEW] Using reportId from URL:', currentReportId);
                 }
 
                 // Load user settings from Supabase

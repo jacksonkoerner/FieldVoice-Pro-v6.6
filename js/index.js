@@ -210,7 +210,9 @@ function beginDailyReport() {
 }
 
 function continueDailyReport() {
-    window.location.href = 'quick-interview.html';
+    // v6.6.16: Generate reportId here and pass via URL
+    const newReportId = crypto.randomUUID();
+    window.location.href = `quick-interview.html?reportId=${newReportId}`;
 }
 
 // ============ PROJECT PICKER MODAL ============
@@ -346,7 +348,9 @@ async function selectProjectAndProceed(projectId) {
 
     // Close modal and proceed
     closeProjectPickerModal();
-    window.location.href = 'quick-interview.html';
+    // v6.6.16: Generate reportId here and pass via URL
+    const newReportId = crypto.randomUUID();
+    window.location.href = `quick-interview.html?reportId=${newReportId}`;
 }
 
 function goToProjectSetup() {
@@ -437,7 +441,8 @@ function renderReportCard(report, type) {
     } else if (report.status === 'refined') {
         href = `report.html?date=${report.report_date || report.reportDate || report.date}&reportId=${report.id}`;
     } else {
-        href = 'quick-interview.html';
+        // v6.6.16: Pass existing reportId for draft reports
+        href = `quick-interview.html?reportId=${report.id}`;
     }
 
     return `
