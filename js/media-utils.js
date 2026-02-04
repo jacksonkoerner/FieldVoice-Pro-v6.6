@@ -211,10 +211,27 @@ async function deleteLogoFromStorage(projectId) {
 /**
  * Get high-accuracy GPS coordinates using multi-reading approach
  * Takes up to 3 readings over ~5 seconds and returns the most accurate one
+ * Checks permission first - won't prompt if permission not granted
  * @param {boolean} showWeakSignalWarning - Whether to show toast warning for weak GPS (default true)
  * @returns {Promise<{lat: number, lng: number, accuracy: number}|null>}
  */
 async function getHighAccuracyGPS(showWeakSignalWarning = true) {
+    // Check if location permission was granted - don't prompt if not
+    const granted = localStorage.getItem(STORAGE_KEYS.LOC_GRANTED) === 'true';
+    if (!granted) {
+        console.log('[GPS] Location permission not granted, using cached location');
+        // Try to return cached location if available
+        const cached = getCachedLocation();
+        if (cached) {
+            return {
+                lat: cached.lat,
+                lng: cached.lng,
+                accuracy: 999 // Unknown accuracy for cached location
+            };
+        }
+        return null;
+    }
+
     const gpsOptions = {
         enableHighAccuracy: true,
         timeout: 15000,
@@ -229,7 +246,13 @@ async function getHighAccuracyGPS(showWeakSignalWarning = true) {
                 lng: pos.coords.longitude,
                 accuracy: pos.coords.accuracy
             }),
-            () => resolve(null),
+            (err) => {
+                // If permission denied, clear cached permission status
+                if (err.code === 1) {
+                    clearCachedLocation();
+                }
+                resolve(null);
+            },
             gpsOptions
         );
     });
@@ -254,7 +277,16 @@ async function getHighAccuracyGPS(showWeakSignalWarning = true) {
     const validReadings = results.filter(r => r !== null);
 
     if (validReadings.length === 0) {
-        console.warn('[GPS] No valid readings obtained');
+        console.warn('[GPS] No valid readings obtained, trying cached location');
+        // Fall back to cached location if GPS fails
+        const cached = getCachedLocation();
+        if (cached) {
+            return {
+                lat: cached.lat,
+                lng: cached.lng,
+                accuracy: 999 // Unknown accuracy for cached location
+            };
+        }
         return null;
     }
 
@@ -264,6 +296,9 @@ async function getHighAccuracyGPS(showWeakSignalWarning = true) {
     , null);
 
     console.log(`[GPS] Best of ${validReadings.length} readings: ±${bestReading.accuracy.toFixed(0)}m`);
+
+    // Update the location cache with fresh coordinates
+    cacheLocation(bestReading.lat, bestReading.lng);
 
     // Warn if accuracy is poor (> 100m)
     if (showWeakSignalWarning && bestReading.accuracy > 100) {

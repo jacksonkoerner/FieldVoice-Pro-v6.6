@@ -3574,15 +3574,48 @@
         // ============ WEATHER ============
         async function fetchWeather() {
             try {
-                const position = await new Promise((resolve, reject) => {
-                    navigator.geolocation.getCurrentPosition(resolve, reject, {
-                        enableHighAccuracy: true,
-                        timeout: 15000,
-                        maximumAge: 0
-                    });
-                });
-                const { latitude, longitude } = position.coords;
-                localStorage.setItem(STORAGE_KEYS.LOC_GRANTED, 'true');
+                // Try to get location - use cache first to avoid prompting user
+                let latitude, longitude;
+                const cachedLocation = getLocationFromCache();
+
+                if (cachedLocation) {
+                    // Use cached location - no prompt needed
+                    latitude = cachedLocation.lat;
+                    longitude = cachedLocation.lng;
+                    console.log('[Weather] Using cached location');
+                } else {
+                    // No cached location - check if permission was granted
+                    const granted = localStorage.getItem(STORAGE_KEYS.LOC_GRANTED) === 'true';
+                    if (!granted) {
+                        // Permission not granted - use defaults, don't prompt
+                        console.log('[Weather] Location permission not granted, using defaults');
+                        return;
+                    }
+
+                    // Permission was granted but cache expired - get fresh location
+                    try {
+                        const position = await new Promise((resolve, reject) => {
+                            navigator.geolocation.getCurrentPosition(resolve, reject, {
+                                enableHighAccuracy: true,
+                                timeout: 15000,
+                                maximumAge: 300000
+                            });
+                        });
+                        latitude = position.coords.latitude;
+                        longitude = position.coords.longitude;
+                        // Update cache with fresh location
+                        cacheLocation(latitude, longitude);
+                        console.log('[Weather] Got fresh location and cached');
+                    } catch (geoError) {
+                        console.error('[Weather] Location failed:', geoError.message);
+                        if (geoError.code === 1) {
+                            // Permission denied - clear cached permission status
+                            clearCachedLocation();
+                        }
+                        return;
+                    }
+                }
+
                 const response = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true&daily=temperature_2m_max,temperature_2m_min,precipitation_sum&timezone=auto&temperature_unit=fahrenheit&precipitation_unit=inch`);
                 const data = await response.json();
                 const weatherCodes = { 0: 'Clear', 1: 'Mostly Clear', 2: 'Partly Cloudy', 3: 'Overcast', 45: 'Fog', 48: 'Fog', 51: 'Light Drizzle', 53: 'Drizzle', 55: 'Heavy Drizzle', 61: 'Light Rain', 63: 'Rain', 65: 'Heavy Rain', 80: 'Showers', 95: 'Thunderstorm' };
@@ -4624,10 +4657,11 @@
             btn.disabled = true;
             btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
             try {
-                await new Promise((resolve, reject) => {
+                const position = await new Promise((resolve, reject) => {
                     navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
                 });
-                localStorage.setItem(STORAGE_KEYS.LOC_GRANTED, 'true');
+                // Cache location so other pages don't need to prompt again
+                cacheLocation(position.coords.latitude, position.coords.longitude);
                 updatePermissionUI('loc', 'granted');
                 showToast('Location enabled!');
                 fetchWeather();

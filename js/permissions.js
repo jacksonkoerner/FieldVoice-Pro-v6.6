@@ -81,7 +81,8 @@ function clearLocalPermissionState() {
     localStorage.removeItem(STORAGE_KEYS.MIC_GRANTED);
     localStorage.removeItem(STORAGE_KEYS.MIC_TIMESTAMP);
     localStorage.removeItem(STORAGE_KEYS.CAM_GRANTED);
-    localStorage.removeItem(STORAGE_KEYS.LOC_GRANTED);
+    // Clear location permission and cached coordinates
+    clearCachedLocation();
     localStorage.removeItem(STORAGE_KEYS.SPEECH_GRANTED);
     localStorage.removeItem(STORAGE_KEYS.ONBOARDED);
 
@@ -433,7 +434,8 @@ async function requestLocPermission() {
         log(`Accuracy: ${position.coords.accuracy.toFixed(0)}m`, 'info');
 
         permissionResults.loc.status = 'granted';
-        localStorage.setItem(STORAGE_KEYS.LOC_GRANTED, 'true');
+        // Cache location so other pages don't need to prompt again
+        cacheLocation(position.coords.latitude, position.coords.longitude);
 
         loadingEl.classList.add('hidden');
         successEl.classList.remove('hidden');
@@ -714,7 +716,7 @@ async function manualRequestLoc() {
     log('Manual: Requesting location...', 'info');
 
     try {
-        await new Promise((resolve, reject) => {
+        const position = await new Promise((resolve, reject) => {
             navigator.geolocation.getCurrentPosition(resolve, reject, {
                 enableHighAccuracy: true,
                 timeout: 15000,
@@ -723,7 +725,8 @@ async function manualRequestLoc() {
         });
 
         permissionResults.loc.status = 'granted';
-        localStorage.setItem(STORAGE_KEYS.LOC_GRANTED, 'true');
+        // Cache location so other pages don't need to prompt again
+        cacheLocation(position.coords.latitude, position.coords.longitude);
         updateManualCard('loc', 'granted');
         log('Manual: Location granted', 'success');
     } catch (err) {

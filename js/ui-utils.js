@@ -202,3 +202,74 @@ function getLocalDateString(date = new Date()) {
     const day = String(d.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
 }
+
+// ============ LOCATION CACHING ============
+
+/**
+ * Get cached location from localStorage
+ * @returns {{lat: number, lng: number, timestamp: number}|null} Cached location or null
+ */
+function getCachedLocation() {
+    const granted = localStorage.getItem(STORAGE_KEYS.LOC_GRANTED);
+    if (granted !== 'true') return null;
+
+    const lat = localStorage.getItem(STORAGE_KEYS.LOC_LAT);
+    const lng = localStorage.getItem(STORAGE_KEYS.LOC_LNG);
+    const timestamp = localStorage.getItem(STORAGE_KEYS.LOC_TIMESTAMP);
+
+    if (lat && lng) {
+        return {
+            lat: parseFloat(lat),
+            lng: parseFloat(lng),
+            timestamp: timestamp ? parseInt(timestamp, 10) : null
+        };
+    }
+    return null;
+}
+
+/**
+ * Cache location to localStorage
+ * @param {number} lat - Latitude
+ * @param {number} lng - Longitude
+ */
+function cacheLocation(lat, lng) {
+    localStorage.setItem(STORAGE_KEYS.LOC_LAT, lat.toString());
+    localStorage.setItem(STORAGE_KEYS.LOC_LNG, lng.toString());
+    localStorage.setItem(STORAGE_KEYS.LOC_TIMESTAMP, Date.now().toString());
+    localStorage.setItem(STORAGE_KEYS.LOC_GRANTED, 'true');
+}
+
+/**
+ * Clear cached location from localStorage
+ */
+function clearCachedLocation() {
+    localStorage.removeItem(STORAGE_KEYS.LOC_LAT);
+    localStorage.removeItem(STORAGE_KEYS.LOC_LNG);
+    localStorage.removeItem(STORAGE_KEYS.LOC_TIMESTAMP);
+    localStorage.removeItem(STORAGE_KEYS.LOC_GRANTED);
+}
+
+/**
+ * Check if cached location is stale (older than maxAge in milliseconds)
+ * @param {number} maxAgeMs - Maximum age in milliseconds (default 1 hour)
+ * @returns {boolean} True if location is stale or not cached
+ */
+function isLocationStale(maxAgeMs = 60 * 60 * 1000) {
+    const cached = getCachedLocation();
+    if (!cached || !cached.timestamp) return true;
+    return (Date.now() - cached.timestamp) > maxAgeMs;
+}
+
+/**
+ * Get location from cache if available and fresh
+ * Does NOT prompt user - just returns cached data or null
+ * @param {number} maxAgeMs - Maximum age in milliseconds (default 1 hour)
+ * @returns {{lat: number, lng: number, timestamp: number}|null} Cached location or null
+ */
+function getLocationFromCache(maxAgeMs = 60 * 60 * 1000) {
+    const cached = getCachedLocation();
+    if (cached && !isLocationStale(maxAgeMs)) {
+        return cached;
+    }
+    return null;
+}
