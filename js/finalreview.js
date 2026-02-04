@@ -1,5 +1,6 @@
 // FieldVoice Pro - Final Review Page Logic
 // DOT RPR Daily Report viewer with print-optimized layout
+// v6.6.24: Fix date timezone bug - parse YYYY-MM-DD as local date in formatDisplayDate()
 // v6.6.23: Editable no-work contractors, date timezone fix, expandable textareas
 // v6.6.22: Show "No work performed on [date]" for inactive contractors instead of skipping
 // v6.6.21: Comprehensive PDF styling overhaul - fix truncation, improve capture quality
@@ -1106,6 +1107,15 @@ function updateTotalPages() {
 function formatDisplayDate(dateStr) {
     if (!dateStr) return 'N/A';
     try {
+        // v6.6.24: Parse YYYY-MM-DD as local date to avoid UTC timezone shift
+        // When parsing "2026-02-04" with new Date(), it's treated as UTC midnight,
+        // which displays as 02/03/2026 in timezones behind UTC (e.g., EST, PST)
+        if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+            const [year, month, day] = dateStr.split('-');
+            const d = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+            return d.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
+        }
+        // For other date formats (already formatted, ISO with time, etc.)
         const d = new Date(dateStr);
         if (isNaN(d.getTime())) return dateStr;
         return d.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });

@@ -3159,7 +3159,9 @@
             }
 
             // Set overview
-            report.overview.date = new Date(reportRow.report_date).toLocaleDateString();
+            // v6.6.24: Keep YYYY-MM-DD format as-is from database to avoid UTC timezone shift
+            // The date will be formatted correctly using formatDisplayDate() when displayed
+            report.overview.date = reportRow.report_date;
             report.overview.completedBy = reportRow.inspector_name || '';
 
             // Set contractor work/activities
