@@ -11,6 +11,8 @@ let allProjects = [];
 document.addEventListener('DOMContentLoaded', init);
 
 async function init() {
+    console.log('[Archives] init() starting...');
+
     // Verify supabaseClient exists
     if (typeof supabaseClient === 'undefined') {
         console.error('[Archives] supabaseClient not initialized. Check config.js');
@@ -18,15 +20,31 @@ async function init() {
         return;
     }
 
+    console.log('[Archives] supabaseClient exists:', !!supabaseClient);
+
     // Check online status
     if (!navigator.onLine) {
+        console.log('[Archives] Offline - showing warning');
         showOfflineWarning();
         return;
     }
 
+    console.log('[Archives] Online - loading data...');
+
+    // Test supabaseClient connection
+    console.log('[Archives] Testing supabaseClient connection...');
+    try {
+        const { data, error } = await supabaseClient.from('projects').select('id').limit(1);
+        console.log('[Archives] Connection test:', { data, error });
+    } catch (e) {
+        console.error('[Archives] Connection test failed:', e);
+    }
+
     setupEventListeners();
     await loadProjects();
+    console.log('[Archives] Projects loaded, now loading reports...');
     await loadReports();
+    console.log('[Archives] init() complete');
 }
 
 function setupEventListeners() {
@@ -61,16 +79,24 @@ function setupEventListeners() {
 // ============ Data Loading ============
 
 async function loadProjects() {
+    console.log('[Archives] loadProjects() called');
     try {
+        console.log('[Archives] Querying projects table...');
         const { data, error } = await supabaseClient
             .from('projects')
             .select('id, project_name')
             .eq('status', 'active')
             .order('project_name');
 
-        if (error) throw error;
+        console.log('[Archives] Projects query result:', { data, error });
+
+        if (error) {
+            console.error('[Archives] Projects query error:', error);
+            throw error;
+        }
 
         allProjects = data || [];
+        console.log('[Archives] Loaded projects:', allProjects.length);
         populateProjectFilter();
     } catch (err) {
         console.error('[Archives] Failed to load projects:', err);
@@ -90,9 +116,18 @@ function populateProjectFilter() {
 }
 
 async function loadReports(projectId = null) {
+    console.log('[Archives] loadReports() called, projectId:', projectId);
     showLoading();
 
     try {
+        // DEBUG: Check all reports regardless of status
+        const { data: allReportsDebug } = await supabaseClient
+            .from('reports')
+            .select('id, status')
+            .limit(10);
+        console.log('[Archives] All reports (any status):', allReportsDebug);
+
+        console.log('[Archives] Querying reports table...');
         // Query reports with status = 'submitted'
         let query = supabaseClient
             .from('reports')
@@ -113,9 +148,16 @@ async function loadReports(projectId = null) {
         }
 
         const { data: reports, error: reportsError } = await query;
-        if (reportsError) throw reportsError;
+
+        console.log('[Archives] Reports query result:', { reports, reportsError });
+
+        if (reportsError) {
+            console.error('[Archives] Reports query error:', reportsError);
+            throw reportsError;
+        }
 
         if (!reports || reports.length === 0) {
+            console.log('[Archives] No submitted reports found');
             allReports = [];
             showEmpty();
             return;
