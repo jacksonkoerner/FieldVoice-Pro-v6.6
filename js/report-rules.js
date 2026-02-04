@@ -17,13 +17,14 @@
 
 /**
  * Report status values
- * Flow: draft → pending_refine → refined → submitted
+ * Flow: draft → pending_refine → refined → ready_to_submit → submitted
  * @constant {Object}
  */
 const REPORT_STATUS = {
   DRAFT: 'draft',
   PENDING_REFINE: 'pending_refine',
   REFINED: 'refined',
+  READY_TO_SUBMIT: 'ready_to_submit',
   SUBMITTED: 'submitted'
 };
 
@@ -79,6 +80,7 @@ const STATUS_FLOW = [
   REPORT_STATUS.DRAFT,
   REPORT_STATUS.PENDING_REFINE,
   REPORT_STATUS.REFINED,
+  REPORT_STATUS.READY_TO_SUBMIT,
   REPORT_STATUS.SUBMITTED
 ];
 
@@ -205,10 +207,11 @@ function getProjectsEligibleForNewReport() {
 /**
  * Gets all reports categorized by urgency
  *
- * @returns {{late: Object[], todayDrafts: Object[], todayReady: Object[], todaySubmitted: Object[]}}
+ * @returns {{late: Object[], todayDrafts: Object[], todayReady: Object[], todayReadyToSubmit: Object[], todaySubmitted: Object[]}}
  *   - late: Previous days, not submitted (red warning) - sorted oldest first
  *   - todayDrafts: Today, status = draft or pending_refine - sorted newest first
- *   - todayReady: Today, status = refined (needs review) - sorted newest first
+ *   - todayReady: Today, status = refined (AI refine stage) - sorted newest first
+ *   - todayReadyToSubmit: Today, status = ready_to_submit (final review stage) - sorted newest first
  *   - todaySubmitted: Today, status = submitted (done) - sorted newest first
  */
 function getReportsByUrgency() {
@@ -219,6 +222,7 @@ function getReportsByUrgency() {
     late: [],
     todayDrafts: [],
     todayReady: [],
+    todayReadyToSubmit: [],
     todaySubmitted: []
   };
 
@@ -232,6 +236,8 @@ function getReportsByUrgency() {
         result.todayDrafts.push(report);
       } else if (report.status === REPORT_STATUS.REFINED) {
         result.todayReady.push(report);
+      } else if (report.status === REPORT_STATUS.READY_TO_SUBMIT) {
+        result.todayReadyToSubmit.push(report);
       } else if (report.status === REPORT_STATUS.SUBMITTED) {
         result.todaySubmitted.push(report);
       }
@@ -244,6 +250,7 @@ function getReportsByUrgency() {
   // Sort today's reports by created_at (newest first)
   result.todayDrafts.sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
   result.todayReady.sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
+  result.todayReadyToSubmit.sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
   result.todaySubmitted.sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
 
   return result;
@@ -528,9 +535,9 @@ function validateReportForSubmit(reportId) {
     return { valid: false, errors: ['Report not found'] };
   }
 
-  // Must be in refined status
-  if (report.status !== REPORT_STATUS.REFINED) {
-    errors.push(`Report must be in refined status to submit (current: ${report.status})`);
+  // Must be in refined or ready_to_submit status
+  if (report.status !== REPORT_STATUS.REFINED && report.status !== REPORT_STATUS.READY_TO_SUBMIT) {
+    errors.push(`Report must be in refined or ready_to_submit status to submit (current: ${report.status})`);
   }
 
   // Check for required fields

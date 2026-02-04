@@ -363,10 +363,10 @@ function renderReportCards() {
     const container = document.getElementById('reportCardsSection');
     if (!container) return;
 
-    const { late, todayDrafts, todayReady, todaySubmitted } = getReportsByUrgency();
+    const { late, todayDrafts, todayReady, todayReadyToSubmit, todaySubmitted } = getReportsByUrgency();
 
     // If no reports at all, hide the section
-    if (late.length === 0 && todayDrafts.length === 0 && todayReady.length === 0 && todaySubmitted.length === 0) {
+    if (late.length === 0 && todayDrafts.length === 0 && todayReady.length === 0 && todayReadyToSubmit.length === 0 && todaySubmitted.length === 0) {
         container.innerHTML = '';
         return;
     }
@@ -395,12 +395,22 @@ function renderReportCards() {
         html += '</div>';
     }
 
-    // Today's ready for review
+    // Today's ready for AI review (refined status)
     if (todayReady.length > 0) {
         html += `<div class="mb-3">
-            <p class="text-xs font-bold text-safety-green uppercase tracking-wider mb-2">Ready for Review</p>`;
+            <p class="text-xs font-bold text-slate-600 uppercase tracking-wider mb-2">AI Refine</p>`;
         todayReady.forEach(report => {
             html += renderReportCard(report, 'ready');
+        });
+        html += '</div>';
+    }
+
+    // Today's ready to submit (ready_to_submit status)
+    if (todayReadyToSubmit.length > 0) {
+        html += `<div class="mb-3">
+            <p class="text-xs font-bold text-safety-green uppercase tracking-wider mb-2">Review and Submit</p>`;
+        todayReadyToSubmit.forEach(report => {
+            html += renderReportCard(report, 'ready_to_submit');
         });
         html += '</div>';
     }
@@ -425,7 +435,8 @@ function renderReportCard(report, type) {
     const styles = {
         late: { border: 'border-red-500', bg: 'bg-red-50', icon: 'fa-exclamation-circle', iconColor: 'text-red-500' },
         draft: { border: 'border-dot-orange', bg: 'bg-orange-50', icon: 'fa-pen', iconColor: 'text-dot-orange' },
-        ready: { border: 'border-safety-green', bg: 'bg-green-50', icon: 'fa-check-circle', iconColor: 'text-safety-green' },
+        ready: { border: 'border-slate-400', bg: 'bg-slate-50', icon: 'fa-robot', iconColor: 'text-slate-600' },
+        ready_to_submit: { border: 'border-safety-green', bg: 'bg-green-50', icon: 'fa-check-circle', iconColor: 'text-safety-green' },
         submitted: { border: 'border-slate-300', bg: 'bg-slate-50', icon: 'fa-archive', iconColor: 'text-slate-400' }
     };
 
@@ -433,11 +444,14 @@ function renderReportCard(report, type) {
 
     // Route based on report status:
     // - submitted: archives (view only)
-    // - refined: report.html (already has AI-processed data)
+    // - ready_to_submit: finalreview.html (ready for final submission)
+    // - refined: report.html (AI refine stage)
     // - draft/pending: quick-interview (needs more input or AI processing)
     let href;
     if (type === 'submitted') {
         href = `archives.html?id=${report.id}`;
+    } else if (type === 'ready_to_submit' || report.status === 'ready_to_submit') {
+        href = `finalreview.html?date=${report.report_date || report.reportDate || report.date}&reportId=${report.id}`;
     } else if (report.status === 'refined') {
         href = `report.html?date=${report.report_date || report.reportDate || report.date}&reportId=${report.id}`;
     } else {

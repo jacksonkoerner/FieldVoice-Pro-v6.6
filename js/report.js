@@ -2130,8 +2130,22 @@
 
     // ============ FINAL REVIEW ============
     async function goToFinalReview() {
+        // Update status to ready_to_submit before navigating
+        if (report && report.meta) {
+            report.meta.status = 'ready_to_submit';
+        }
+
         // Save the current report before navigating
         await saveReport();
+
+        // Update fvp_current_reports with new status
+        if (currentReportId) {
+            const currentReports = JSON.parse(localStorage.getItem('fvp_current_reports') || '{}');
+            if (currentReports[currentReportId]) {
+                currentReports[currentReportId].status = 'ready_to_submit';
+                localStorage.setItem('fvp_current_reports', JSON.stringify(currentReports));
+            }
+        }
 
         // Get the report date from URL or current date
         const reportDateStr = getReportDateStr();
