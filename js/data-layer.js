@@ -197,6 +197,15 @@
             cnoSolicitationNo: p.cnoSolicitationNo || p.cno_solicitation_no || '',
             location: p.location || '',
             primeContractor: p.primeContractor || p.prime_contractor || '',
+            // v6.6.23: Add 7 missing fields for report.html compatibility
+            engineer: p.engineer || '',
+            noticeToProceed: p.noticeToProceed || p.notice_to_proceed || null,
+            contractDuration: p.contractDuration || p.contract_duration || null,
+            expectedCompletion: p.expectedCompletion || p.expected_completion || null,
+            defaultStartTime: p.defaultStartTime || p.default_start_time || '',
+            defaultEndTime: p.defaultEndTime || p.default_end_time || '',
+            weatherDays: p.weatherDays || p.weather_days || 0,
+            // Existing fields
             status: p.status || 'active',
             userId: p.userId || p.user_id || '',
             logoUrl: p.logoUrl || p.logo_url || null,

@@ -186,3 +186,19 @@ function initAllAutoExpandTextareas(minHeight = 72, maxHeight = 400) {
         initAutoExpand(textarea, minHeight, maxHeight);
     });
 }
+
+// ============ DATE UTILITIES ============
+
+/**
+ * Get local date string in YYYY-MM-DD format (timezone-safe)
+ * Avoids UTC conversion issues with toISOString().split('T')[0]
+ * @param {Date} date - Date object (defaults to now)
+ * @returns {string} Date string in YYYY-MM-DD format
+ */
+function getLocalDateString(date = new Date()) {
+    const d = date instanceof Date ? date : new Date(date);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
