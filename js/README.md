@@ -1,269 +1,203 @@
-# FieldVoice Pro - Shared JavaScript Modules
+# FieldVoice Pro v6.6 - JavaScript Modules
 
-> Quick reference for AI-assisted development. Before adding a function to an HTML file, check if it exists here.
+Quick reference for development. Before adding a function to an HTML file, check if it exists here.
 
 ## Module Overview
 
-| File | Purpose | Import After |
-|------|---------|--------------|
-| config.js | Supabase client + constants | Supabase CDN |
-| storage-keys.js | localStorage keys + helpers (v6) | (standalone) |
-| report-rules.js | Business logic validation (v6) | storage-keys.js |
-| supabase-utils.js | Data converters (v6 schema) | config.js |
-| sync-manager.js | Real-time entry backup and offline sync | supabase-utils.js |
-| pwa-utils.js | Offline/PWA features | (standalone) |
-| ui-utils.js | UI helpers | (standalone) |
-| media-utils.js | Photo/GPS utilities | (standalone) |
-| indexeddb-utils.js | IndexedDB operations | (standalone) |
-| project-config.js | Project config page logic | All shared modules |
-| sw.js | Service worker | (loaded by pwa-utils.js) |
+| File | Purpose |
+|------|---------|
+| `config.js` | Supabase client initialization, API keys |
+| `storage-keys.js` | localStorage key constants (STORAGE_KEYS object), helper functions |
+| `data-layer.js` | Unified data access (IndexedDB-first, Supabase-fallback) |
+| `ui-utils.js` | Shared UI helpers: escapeHtml, toast notifications, date formatting |
+| `supabase-utils.js` | Supabase data converters (snake_case ↔ camelCase) |
+| `report-rules.js` | Report status flow, validation, business rules enforcement |
+| `sync-manager.js` | Real-time entry backup, offline sync queue management |
+| `media-utils.js` | Photo capture, GPS geotagging, image compression |
+| `indexeddb-utils.js` | IndexedDB database operations for local-first storage |
+| `pwa-utils.js` | Service worker registration, offline detection, PWA navigation |
+| `lock-manager.js` | Report locking to prevent multi-device edit conflicts |
+| `index.js` | Dashboard page — report cards, project picker, begin report |
+| `quick-interview.js` | Voice/text capture, guided + freeform modes, entry management |
+| `report.js` | Report editing page — AI-refined content display, auto-save |
+| `finalreview.js` | Final review — PDF generation with html2canvas + jsPDF, submit to Supabase |
+| `archives.js` | Archives page — project filter, report list, Google Docs PDF viewer |
+| `permissions.js` | Permission setup flow — mic, camera, location grants with error handling |
+| `projects.js` | Projects list page — IndexedDB-first loading, Supabase sync |
+| `project-config.js` | Project configuration — CRUD operations, document import, contractors |
+| `settings.js` | Settings page — user profile management, scratch pad for unsaved changes |
+| `sw.js` | Service worker — offline caching of static assets |
 
----
+## Shared Modules (load in all pages)
 
-## config.js
+### config.js
+**Exports:** `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `supabaseClient`
 
-**Exports:** `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `supabaseClient`, `ACTIVE_PROJECT_KEY`
-
-**Used by:** All pages with Supabase
-
-**Import:**
 ```html
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="./js/config.js"></script>
 ```
 
----
+### storage-keys.js
+**Exports:** `STORAGE_KEYS`, `getDeviceId()`, `getStorageItem()`, `setStorageItem()`, `removeStorageItem()`, `getCurrentReport()`, `saveCurrentReport()`, `deleteCurrentReport()`, `getActiveProject()`, `addToSyncQueue()`, `getSyncQueue()`, `clearSyncQueue()`
 
-## storage-keys.js
-
-**Exports:**
-- `STORAGE_KEYS` constant (USER_PROFILE, PROJECTS, ACTIVE_PROJECT_ID, CURRENT_REPORTS, AI_REPORTS, DRAFTS, SYNC_QUEUE, LAST_SYNC, DEVICE_ID)
-- `getDeviceId()` - Get or create unique device identifier
-- `getStorageItem(key)` - Read from localStorage with JSON parsing
-- `setStorageItem(key, value)` - Write to localStorage with JSON stringify
-- `removeStorageItem(key)` - Remove from localStorage
-- `getCurrentReport(reportId)` - Get a report in progress
-- `saveCurrentReport(reportId, data)` - Save a report in progress
-- `deleteCurrentReport(reportId)` - Remove a report from current reports
-- `getActiveProject()` - Get the currently active project
-- `addToSyncQueue(operation)` - Add operation to offline sync queue
-- `getSyncQueue()` - Get all pending sync operations
-- `clearSyncQueue()` - Clear all pending sync operations
-
-**Used by:** report-rules.js, and will be used by page modules
-
-**Import:**
 ```html
 <script src="./js/storage-keys.js"></script>
 ```
 
----
+### data-layer.js
+**Exports:** `window.dataLayer` with methods:
+- `loadProjects()` — Load all projects from IndexedDB
+- `refreshProjectsFromCloud()` — Sync projects from Supabase
+- `loadActiveProject()` — Get currently selected project
+- `loadUserSettings()` — Load user profile
+- `saveUserSettings()` — Save user profile
 
-## report-rules.js
+Storage strategy: IndexedDB-first, Supabase-fallback, cache on fetch.
 
+```html
+<script src="./js/data-layer.js"></script>
+```
+
+### ui-utils.js
+**Exports:** `escapeHtml()`, `generateId()`, `showToast()`, `formatDate()`, `formatTime()`, `autoExpand()`, `initAutoExpand()`, `initAllAutoExpandTextareas()`
+
+```html
+<script src="./js/ui-utils.js"></script>
+```
+
+### supabase-utils.js
+**Exports:** Data converters for each table:
+- `fromSupabaseProject()` / `toSupabaseProject()`
+- `fromSupabaseContractor()` / `toSupabaseContractor()`
+- `fromSupabaseReport()` / `toSupabaseReport()`
+- `fromSupabaseEntry()` / `toSupabaseEntry()`
+- `fromSupabaseRawCapture()` / `toSupabaseRawCapture()`
+- `fromSupabaseAIResponse()` / `toSupabaseAIResponse()`
+- `fromSupabaseFinal()` / `toSupabaseFinal()`
+- `fromSupabasePhoto()` / `toSupabasePhoto()`
+
+```html
+<script src="./js/supabase-utils.js"></script>
+```
+
+### report-rules.js
 **Exports:**
+- Constants: `REPORT_STATUS`, `CAPTURE_MODE`, `GUIDED_SECTIONS`, `TOGGLE_SECTIONS`
+- Validation: `canStartNewReport()`, `canTransitionStatus()`, `isReportEditable()`, `validateReportForAI()`, `validateReportForSubmit()`
+- Helpers: `getTodayDateString()`, `isReportFromToday()`, `isReportLate()`, `getReportsByUrgency()`
 
-*Constants:*
-- `REPORT_STATUS` - Status enum (draft, submitted, finalized)
-- `CAPTURE_MODE` - Capture mode enum (quick, guided)
-- `GUIDED_SECTIONS` - Array of guided section identifiers
-- `TOGGLE_SECTIONS` - Sections that can be toggled on/off
-
-*Project eligibility:*
-- `canStartNewReport(project)` - Check if project allows new reports
-- `getProjectsEligibleForNewReport(projects)` - Filter projects that can have new reports
-- `getReportsByUrgency(reports)` - Sort reports by urgency
-
-*Status flow:*
-- `canTransitionStatus(from, to)` - Validate status transitions
-- `getNextValidStatus(currentStatus)` - Get next valid status
-- `isReportEditable(report)` - Check if report can be edited
-- `canReturnToNotes(report)` - Check if can go back to quick-interview
-
-*Toggle rules:*
-- `canChangeToggle(section, report)` - Check if toggle can be changed
-- `getSectionToggleState(section, report)` - Get current toggle state
-
-*Mode switching:*
-- `canSwitchCaptureMode(report)` - Check if mode switch is allowed
-
-*Date/time:*
-- `getTodayDateString()` - Get today's date as string
-- `isReportFromToday(report)` - Check if report is from today
-- `isReportLate(report)` - Check if report is past due
-
-*Validation:*
-- `validateReportForAI(report)` - Validate before AI processing
-- `validateReportForSubmit(report)` - Validate before final submission
-
-**Used by:** Will be used by index.html, quick-interview.html
-
-**Import:**
 ```html
 <script src="./js/storage-keys.js"></script>
 <script src="./js/report-rules.js"></script>
 ```
 
----
+### sync-manager.js
+**Exports:** `queueEntryBackup()`, `backupEntry()`, `backupAllEntries()`, `deleteEntry()`, `syncReport()`, `syncRawCapture()`, `processOfflineQueue()`, `initSyncManager()`, `destroySyncManager()`, `getPendingSyncCount()`
 
-## supabase-utils.js
+Note: Auto-sync is disabled by default — user controls sync via explicit buttons.
 
-**Exports:**
-- `fromSupabaseProject(row)` - Convert DB row → JS project object
-- `toSupabaseProject(project)` - Convert JS project → DB row
-- `fromSupabaseContractor(row)` - Convert DB row → JS contractor object
-- `toSupabaseContractor(contractor, projectId)` - Convert JS contractor → DB row
-- `fromSupabaseReport(row)` - Convert DB row → JS report object
-- `toSupabaseReport(report, projectId, userSettings)` - Convert JS report → DB row
-- `fromSupabaseEntry(row)` - Convert DB row → JS entry object
-- `toSupabaseEntry(entry, reportId)` - Convert JS entry → DB row
-- `fromSupabaseRawCapture(row)` - Convert DB row → JS raw capture object
-- `toSupabaseRawCapture(report, reportId)` - Convert JS raw capture → DB row
-- `fromSupabaseAIResponse(row)` - Convert DB row → JS AI response object
-- `toSupabaseAIResponse(aiResponse, reportId)` - Convert JS AI response → DB row
-- `fromSupabaseFinal(row)` - Convert DB row → JS final report object
-- `toSupabaseFinal(final, reportId)` - Convert JS final report → DB row
-- `fromSupabasePhoto(row)` - Convert DB row → JS photo object
-- `toSupabasePhoto(photo, reportId)` - Convert JS photo → DB row
-
-**Note:** Equipment converters removed in v6 — equipment now entered per-report
-
-**Used by:** index, quick-interview, report, finalreview, project-config
-
-**Import:** After config.js
-```html
-<script src="./js/supabase-utils.js"></script>
-```
-
----
-
-## sync-manager.js
-
-**Purpose:** Real-time entry backup and offline sync
-
-**Exports:**
-- `queueEntryBackup(reportId, entry)` - Debounced entry backup
-- `backupEntry(reportId, entry)` - Immediate entry backup
-- `backupAllEntries(reportId, entries)` - Batch backup
-- `deleteEntry(reportId, localId)` - Soft delete entry
-- `syncReport(report, projectId)` - Create/update report in Supabase
-- `syncRawCapture(captureData, reportId)` - Sync raw capture
-- `processOfflineQueue()` - Process pending operations
-- `initSyncManager()` - Initialize listeners
-- `destroySyncManager()` - Cleanup
-- `getPendingSyncCount()` - Get queue length
-
-**Used by:** quick-interview.js, report.js
-
-**Import:** After storage-keys.js and supabase-utils.js
 ```html
 <script src="./js/sync-manager.js"></script>
 ```
 
----
+### media-utils.js
+**Exports:** `readFileAsDataURL()`, `dataURLtoBlob()`, `compressImage()`, `compressImageToThumbnail()`, `uploadLogoToStorage()`, `deleteLogoFromStorage()`, `getHighAccuracyGPS()`
 
-## pwa-utils.js
-
-**Exports:**
-- `initPWA(options)` - Initialize all PWA features
-
-**Options:**
-```javascript
-initPWA();                                    // Basic usage
-initPWA({ onOnline: callback });              // Custom online handler
-initPWA({ onOffline: callback });             // Custom offline handler
-initPWA({ skipServiceWorker: true });         // Skip SW registration
+```html
+<script src="./js/media-utils.js"></script>
 ```
 
-**Used by:** Most pages (9 total)
+### indexeddb-utils.js
+**Exports:** `window.idb` with methods:
+- `initDB()` — Initialize IndexedDB
+- `getAllProjects()` / `getProject()` / `saveProject()` / `deleteProject()`
+- `getAllReports()` / `getReport()` / `saveReport()` / `deleteReport()`
+- `savePhoto()` / `getPhotosForReport()` / `deletePhoto()`
+- `saveArchive()` / `getAllArchives()` / `getArchive()`
 
-**Import:**
+Database: `fieldvoice-pro`, stores: projects, reports, photos, archives
+
+```html
+<script src="./js/indexeddb-utils.js"></script>
+```
+
+### pwa-utils.js
+**Exports:** `initPWA(options)`
+
+Options: `{ onOnline, onOffline, skipServiceWorker }`
+
 ```html
 <script src="./js/pwa-utils.js"></script>
 <script>initPWA();</script>
 ```
 
----
+### lock-manager.js
+**Exports:** `window.lockManager` with methods:
+- `checkLock()` — Check if report is locked by another device
+- `acquireLock()` — Acquire lock for editing
+- `releaseLock()` — Release lock when done
+- `refreshLock()` — Heartbeat to keep lock alive
 
-## ui-utils.js
+Lock timeout: 30 minutes without heartbeat.
 
-**Exports:**
-- `escapeHtml(str)` - XSS-safe HTML escaping
-- `generateId()` - UUID generation
-- `showToast(message, type)` - Toast notifications (success/warning/error/info)
-- `formatDate(dateStr, format)` - Date formatting (short/long/numeric)
-- `formatTime(timeStr)` - Time formatting
-- `autoExpand(textarea, minHeight, maxHeight)` - Auto-resize textarea
-- `initAutoExpand(textarea, minHeight, maxHeight)` - Setup auto-expand listeners
-- `initAllAutoExpandTextareas(minHeight, maxHeight)` - Init all .auto-expand textareas
-
-**Used by:** Most pages
-
-**Import:**
 ```html
+<script src="./js/lock-manager.js"></script>
+```
+
+## Page-Specific Modules
+
+These modules attach to the DOM and don't export functions:
+
+| Module | Page | Purpose |
+|--------|------|---------|
+| `index.js` | index.html | Dashboard logic, report cards, project selection |
+| `quick-interview.js` | quick-interview.html | Field capture, entry management, AI webhook |
+| `report.js` | report.html | AI report editing, auto-save, navigation |
+| `finalreview.js` | finalreview.html | PDF generation, editable fields, submit |
+| `archives.js` | archives.html | Report list, project filter, PDF viewer |
+| `permissions.js` | permissions.html | Permission wizard, error handling |
+| `projects.js` | projects.html | Project list, sync from Supabase |
+| `project-config.js` | project-config.html | Project/contractor CRUD, document import |
+| `settings.js` | settings.html | User profile, scratch pad |
+| `sw.js` | (service worker) | Offline caching |
+
+## Import Order
+
+Standard import order for pages:
+
+```html
+<!-- CDN Dependencies -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<!-- Core Modules -->
+<script src="./js/config.js"></script>
+<script src="./js/storage-keys.js"></script>
+<script src="./js/indexeddb-utils.js"></script>
+<script src="./js/data-layer.js"></script>
+
+<!-- Utility Modules -->
+<script src="./js/supabase-utils.js"></script>
 <script src="./js/ui-utils.js"></script>
-```
+<script src="./js/pwa-utils.js"></script>
 
----
-
-## media-utils.js
-
-**Exports:**
-- `readFileAsDataURL(file)` - Read file as base64
-- `dataURLtoBlob(dataURL)` - Convert data URL to Blob
-- `compressImage(dataUrl, maxWidth, quality)` - Compress image
-- `compressImageToThumbnail(dataUrl, maxWidth, quality)` - Compress image to thumbnail size
-- `uploadLogoToStorage(projectId, imageDataUrl)` - Upload logo to Supabase storage
-- `deleteLogoFromStorage(projectId)` - Delete logo from Supabase storage
-- `getHighAccuracyGPS(onWeakSignal)` - Get GPS coordinates
-
-**Used by:** quick-interview.html, project-config.html
-
-**Import:**
-```html
+<!-- Feature Modules (as needed) -->
+<script src="./js/report-rules.js"></script>
 <script src="./js/media-utils.js"></script>
+<script src="./js/sync-manager.js"></script>
+<script src="./js/lock-manager.js"></script>
+
+<!-- Page Module -->
+<script src="./js/[page].js"></script>
+
+<!-- Initialize PWA -->
+<script>initPWA();</script>
 ```
 
----
+## Development Guidelines
 
-## project-config.js
-
-**Purpose:** Page-specific logic for project-config.html
-
-**Exports:** None (page-specific, attaches to DOM)
-
-**Contains:**
-- Project CRUD operations
-- Contractor CRUD operations
-- File import (PDF/DOCX extraction)
-- Logo upload
-- Drag-drop file handling
-
-**Note:** Equipment management removed in v6 — equipment entered per-report
-
-**Import:**
-```html
-<script src="./js/project-config.js"></script>
-```
-
----
-
-## sw.js (Service Worker)
-
-**Purpose:** Handles offline caching and network requests.
-
-**Not imported directly** - Loaded via `pwa-utils.js` → `initPWA()`
-
-**Cache version:** Check `CACHE_VERSION` constant when debugging cache issues.
-
----
-
-## Rules for Claude Code
-
-1. **Before adding a function to HTML** → Check if it exists here
-2. **Function needed in 2+ files** → It belongs in /js/
-3. **Never duplicate** → Supabase config, converters, or utilities
-4. **New shared function?** → Add to appropriate module, update this README
-5. **New modules (storage-keys.js, report-rules.js) are foundational** → Import them when needed
-6. **Page-specific modules (project-config.js) don't export** → They attach to window/DOM
-7. **Equipment is no longer stored at project level** → Equipment entered per-report in quick-interview
+1. **Check here first** before adding a function to an HTML file
+2. **Function needed in 2+ files?** It belongs in /js/
+3. **Never duplicate** Supabase config, converters, or utilities
+4. **Use `escapeHtml()`** for any user-generated content in HTML
+5. **Page modules don't export** — they attach to window/DOM
