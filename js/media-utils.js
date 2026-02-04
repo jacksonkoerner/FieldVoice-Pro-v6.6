@@ -211,16 +211,27 @@ async function deleteLogoFromStorage(projectId) {
 /**
  * Get high-accuracy GPS coordinates using multi-reading approach
  * Takes up to 3 readings over ~5 seconds and returns the most accurate one
- * Checks permission first - won't prompt if permission not granted
+ * Checks browser permission first - won't prompt if permission not granted
  * @param {boolean} showWeakSignalWarning - Whether to show toast warning for weak GPS (default true)
  * @returns {Promise<{lat: number, lng: number, accuracy: number}|null>}
  */
 async function getHighAccuracyGPS(showWeakSignalWarning = true) {
-    // Check if location permission was granted - don't prompt if not
-    const granted = localStorage.getItem(STORAGE_KEYS.LOC_GRANTED) === 'true';
-    if (!granted) {
-        console.log('[GPS] Location permission not granted, using cached location');
-        // Try to return cached location if available
+    // Check browser's ACTUAL permission state (not just our localStorage flag)
+    // This prevents prompting if browser permission is 'prompt' or 'denied'
+    let browserPermissionState = 'prompt';
+    if (navigator.permissions) {
+        try {
+            const result = await navigator.permissions.query({ name: 'geolocation' });
+            browserPermissionState = result.state;
+            console.log(`[GPS] Browser permission state: ${browserPermissionState}`);
+        } catch (e) {
+            console.warn('[GPS] Permissions API not available:', e.message);
+        }
+    }
+
+    // If browser permission is not 'granted', use cached location instead of prompting
+    if (browserPermissionState !== 'granted') {
+        console.log('[GPS] Browser permission not granted, using cached location');
         const cached = getCachedLocation();
         if (cached) {
             return {
@@ -232,6 +243,7 @@ async function getHighAccuracyGPS(showWeakSignalWarning = true) {
         return null;
     }
 
+    // Browser permission IS granted - safe to call geolocation without prompting
     const gpsOptions = {
         enableHighAccuracy: true,
         timeout: 15000,

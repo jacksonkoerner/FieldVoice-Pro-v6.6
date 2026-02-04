@@ -3592,7 +3592,25 @@
                         return;
                     }
 
-                    // Permission was granted but cache expired - get fresh location
+                    // Permission was granted but cache expired - check browser permission before requesting
+                    // Check browser's ACTUAL permission state to avoid prompting
+                    let browserPermissionState = 'prompt';
+                    if (navigator.permissions) {
+                        try {
+                            const result = await navigator.permissions.query({ name: 'geolocation' });
+                            browserPermissionState = result.state;
+                            console.log(`[Weather] Browser permission state: ${browserPermissionState}`);
+                        } catch (e) {
+                            console.warn('[Weather] Permissions API not available');
+                        }
+                    }
+
+                    // Only call geolocation if browser permission is actually 'granted'
+                    if (browserPermissionState !== 'granted') {
+                        console.log('[Weather] Browser permission not granted, using defaults');
+                        return;
+                    }
+
                     try {
                         const position = await new Promise((resolve, reject) => {
                             navigator.geolocation.getCurrentPosition(resolve, reject, {

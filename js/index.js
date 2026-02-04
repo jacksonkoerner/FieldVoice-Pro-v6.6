@@ -508,9 +508,30 @@ async function syncWeather() {
                 return;
             }
 
-            // Permission was granted but cache expired/cleared - get fresh location
+            // Permission was granted but cache expired/cleared - check browser permission before requesting
             if (!navigator.geolocation) {
                 throw { code: -1, message: 'Geolocation not supported' };
+            }
+
+            // Check browser's ACTUAL permission state to avoid prompting
+            let browserPermissionState = 'prompt';
+            if (navigator.permissions) {
+                try {
+                    const result = await navigator.permissions.query({ name: 'geolocation' });
+                    browserPermissionState = result.state;
+                    console.log(`[Weather] Browser permission state: ${browserPermissionState}`);
+                } catch (e) {
+                    console.warn('[Weather] Permissions API not available');
+                }
+            }
+
+            // Only call geolocation if browser permission is actually 'granted'
+            if (browserPermissionState !== 'granted') {
+                console.log('[Weather] Browser permission not granted, skipping weather sync');
+                document.getElementById('weatherCondition').textContent = 'Location needed';
+                document.getElementById('weatherIcon').className = 'fas fa-location-dot text-2xl text-slate-400 mb-1';
+                syncIcon.classList.remove('fa-spin');
+                return;
             }
 
             try {
