@@ -157,14 +157,62 @@ async function loadReports(projectId = null) {
 
 // ============ Rendering ============
 
+/**
+ * Get reports submitted in the last 24 hours
+ */
+function getRecentReports() {
+    const now = Date.now();
+    const oneDayAgo = now - (24 * 60 * 60 * 1000);
+
+    return allReports.filter(report => {
+        if (!report.submittedAt) return false;
+        const submittedTime = new Date(report.submittedAt).getTime();
+        return submittedTime > oneDayAgo;
+    }).sort((a, b) => {
+        // Sort by submittedAt descending (most recent first)
+        return new Date(b.submittedAt) - new Date(a.submittedAt);
+    });
+}
+
 function renderReports() {
     const container = document.getElementById('reportsList');
+    const recentSection = document.getElementById('recentSection');
+    const recentList = document.getElementById('recentReportsList');
 
+    // Handle empty state
     if (allReports.length === 0) {
         showEmpty();
+        recentSection.classList.add('hidden');
         return;
     }
 
+    // Render recent reports (last 24 hours)
+    const recentReports = getRecentReports();
+
+    if (recentReports.length > 0) {
+        recentSection.classList.remove('hidden');
+        recentList.innerHTML = recentReports.map(report => `
+            <div class="bg-white rounded-lg shadow-sm border border-green-200 p-3 cursor-pointer hover:shadow-md transition-shadow"
+                 onclick="viewPdf('${report.id}')">
+                <div class="flex justify-between items-center gap-2">
+                    <div class="flex-1 min-w-0">
+                        <h3 class="font-medium text-gray-900 text-sm truncate">${escapeHtml(report.projectName)}</h3>
+                        <p class="text-xs text-gray-500">${formatDate(report.reportDate)}</p>
+                    </div>
+                    <div class="flex-shrink-0">
+                        ${report.pdfUrl
+                            ? '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">View PDF</span>'
+                            : '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">No PDF</span>'
+                        }
+                    </div>
+                </div>
+            </div>
+        `).join('');
+    } else {
+        recentSection.classList.add('hidden');
+    }
+
+    // Render all reports in main list
     container.innerHTML = allReports.map(report => `
         <div class="report-card bg-white rounded-xl shadow-sm border border-gray-200 p-4 cursor-pointer hover:shadow-md"
              onclick="viewPdf('${report.id}')">
@@ -238,6 +286,7 @@ function showEmpty() {
     document.getElementById('reportsList').classList.add('hidden');
     document.getElementById('emptyState').classList.remove('hidden');
     document.getElementById('errorState').classList.add('hidden');
+    document.getElementById('recentSection').classList.add('hidden');
 }
 
 function showError(message) {
