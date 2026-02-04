@@ -1982,22 +1982,20 @@
             const reportDateStr = getReportDateStr();
 
             // 1. Upsert the main report record
-            let reportId = currentReportId;
+            // v6.6.15: reportId must come from URL params (set during load)
+            // report.js is for editing existing reports, not creating new ones
+            const reportId = currentReportId;
             if (!reportId) {
-                // Check if a report already exists for this project+date before generating new ID
-                const { data: existingReport } = await supabaseClient
-                    .from('reports')
-                    .select('id')
-                    .eq('project_id', activeProject.id)
-                    .eq('report_date', reportDateStr)
-                    .maybeSingle();
-
-                reportId = existingReport?.id || generateId();
+                console.error('[REPORT] No reportId available - cannot save');
+                isSaving = false;
+                return;
             }
 
             const reportData = {
                 id: reportId,
                 project_id: activeProject.id,
+                user_id: getStorageItem(STORAGE_KEYS.USER_ID) || null,
+                device_id: getDeviceId(),
                 report_date: reportDateStr,
                 inspector_name: report.overview?.completedBy || userSettings?.full_name || '',
                 status: report.meta?.status || 'draft',
