@@ -4917,13 +4917,6 @@
                     return; // Stop initialization if redirecting
                 }
 
-                // v6.6.16: Set currentReportId from URL param if available (passed from index.js)
-                const urlReportId = getReportIdFromUrl();
-                if (urlReportId && !currentReportId) {
-                    currentReportId = urlReportId;
-                    console.log('[QUICK-INTERVIEW] Using reportId from URL:', currentReportId);
-                }
-
                 // Load user settings from Supabase
                 updateLoadingStatus('Loading user settings...');
                 userSettings = await window.dataLayer.loadUserSettings();
@@ -4953,6 +4946,19 @@
                 // Load report from Supabase (baseline)
                 updateLoadingStatus('Loading report data...');
                 report = await getReport();
+
+                // v6.6.20: Read URL param AFTER getReport() since getReport() clears stale IDs
+                const urlReportId = getReportIdFromUrl();
+                if (urlReportId) {
+                    currentReportId = urlReportId;
+                    console.log('[QUICK-INTERVIEW] Using reportId from URL:', currentReportId);
+                }
+
+                // If still no reportId, generate one now
+                if (!currentReportId) {
+                    currentReportId = generateId();
+                    console.log('[QUICK-INTERVIEW] Generated new reportId:', currentReportId);
+                }
 
                 // LOCALSTORAGE-FIRST: Check if we have a localStorage draft with unsaved changes
                 // This recovers data if user swiped away the app without clicking FINISH
