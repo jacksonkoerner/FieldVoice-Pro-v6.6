@@ -1842,6 +1842,229 @@
             }
         }
 
+        // ============================================================
+        // PROCESSING OVERLAY - UI only, does not modify submit logic
+        // ============================================================
+
+        /**
+         * Show confirmation dialog before processing
+         * Returns a Promise that resolves true (confirmed) or false (cancelled)
+         */
+        function showProcessConfirmation() {
+            return new Promise((resolve) => {
+                const dialog = document.getElementById('submitConfirmDialog');
+                const statusDot = document.getElementById('confirmStatusDot');
+                const statusText = document.getElementById('confirmStatusText');
+                const statusContainer = document.getElementById('confirmOnlineStatus');
+                const goBtn = document.getElementById('confirmGoBtn');
+                const cancelBtn = document.getElementById('confirmCancelBtn');
+
+                if (!dialog) { resolve(true); return; } // Fallback if HTML missing
+
+                // Update online status
+                function updateOnlineStatus() {
+                    if (navigator.onLine) {
+                        statusDot.className = 'w-3 h-3 rounded-full bg-green-500';
+                        statusText.textContent = 'Connected — Ready to process';
+                        statusText.className = 'text-sm text-green-700';
+                        statusContainer.className = 'flex items-center gap-2 mb-5 p-3 rounded-lg bg-green-50';
+                        goBtn.disabled = false;
+                        goBtn.className = 'flex-1 py-3 px-4 rounded-xl bg-green-600 text-white font-semibold text-base';
+                    } else {
+                        statusDot.className = 'w-3 h-3 rounded-full bg-red-500 animate-pulse';
+                        statusText.textContent = 'No internet connection';
+                        statusText.className = 'text-sm text-red-700';
+                        statusContainer.className = 'flex items-center gap-2 mb-5 p-3 rounded-lg bg-red-50';
+                        goBtn.disabled = true;
+                        goBtn.className = 'flex-1 py-3 px-4 rounded-xl bg-gray-300 text-gray-500 font-semibold text-base cursor-not-allowed';
+                    }
+                }
+
+                updateOnlineStatus();
+
+                // Listen for online/offline changes while dialog is open
+                const onlineHandler = () => updateOnlineStatus();
+                const offlineHandler = () => updateOnlineStatus();
+                window.addEventListener('online', onlineHandler);
+                window.addEventListener('offline', offlineHandler);
+
+                function cleanup() {
+                    window.removeEventListener('online', onlineHandler);
+                    window.removeEventListener('offline', offlineHandler);
+                    goBtn.removeEventListener('click', onConfirm);
+                    cancelBtn.removeEventListener('click', onCancel);
+                    dialog.classList.add('hidden');
+                }
+
+                function onConfirm() {
+                    cleanup();
+                    resolve(true);
+                }
+
+                function onCancel() {
+                    cleanup();
+                    resolve(false);
+                }
+
+                goBtn.addEventListener('click', onConfirm);
+                cancelBtn.addEventListener('click', onCancel);
+
+                dialog.classList.remove('hidden');
+            });
+        }
+
+        /**
+         * Show the full-screen processing overlay
+         * All clicks/taps/keyboard are blocked
+         */
+        function showProcessingOverlay() {
+            const overlay = document.getElementById('processingOverlay');
+            const errorDiv = document.getElementById('processingError');
+
+            if (!overlay) return;
+
+            overlay.classList.remove('hidden');
+            errorDiv.classList.add('hidden');
+
+            document.getElementById('processingTitle').textContent = 'Processing Your Report';
+            document.getElementById('processingStatus').textContent = "Please wait, don't close this page...";
+            document.getElementById('processingBar').style.width = '0%';
+
+            // Reset all steps
+            document.querySelectorAll('#processingSteps .proc-step').forEach(step => {
+                step.className = 'proc-step flex items-center gap-4';
+            });
+
+            // Block back button / page close
+            window.addEventListener('beforeunload', _blockUnload);
+
+            // Block ALL keyboard input
+            document.addEventListener('keydown', _blockKeys, true);
+
+            // Block ALL touch/click on the overlay (redundant with CSS but extra safety)
+            overlay.addEventListener('touchstart', _blockTouch, { passive: false, capture: true });
+            overlay.addEventListener('touchmove', _blockTouch, { passive: false, capture: true });
+            overlay.addEventListener('touchend', _blockTouch, { passive: false, capture: true });
+            overlay.addEventListener('click', _blockTouch, true);
+            overlay.addEventListener('mousedown', _blockTouch, true);
+            overlay.addEventListener('contextmenu', _blockTouch, true);
+        }
+
+        /**
+         * Update the active step in the overlay
+         * @param {number} stepNum - 1-4
+         * @param {string} state - 'active' or 'complete'
+         */
+        function setProcessingStep(stepNum, state) {
+            const steps = document.querySelectorAll('#processingSteps .proc-step');
+            const bar = document.getElementById('processingBar');
+            if (!steps.length) return;
+
+            steps.forEach((step, index) => {
+                const num = index + 1;
+                if (num < stepNum) {
+                    step.className = 'proc-step flex items-center gap-4 complete';
+                } else if (num === stepNum) {
+                    step.className = `proc-step flex items-center gap-4 ${state}`;
+                } else {
+                    step.className = 'proc-step flex items-center gap-4';
+                }
+            });
+
+            // Progress bar
+            const total = steps.length;
+            let pct = 0;
+            if (state === 'complete') {
+                pct = (stepNum / total) * 100;
+            } else if (state === 'active') {
+                pct = ((stepNum - 1) / total) * 100 + (1 / total) * 40;
+            }
+            if (bar) bar.style.width = pct + '%';
+        }
+
+        /**
+         * Show success state on overlay before redirect
+         */
+        function showProcessingSuccess() {
+            const title = document.getElementById('processingTitle');
+            const status = document.getElementById('processingStatus');
+            const bar = document.getElementById('processingBar');
+
+            if (title) title.textContent = 'Report Ready!';
+            if (status) status.textContent = 'Opening your report...';
+            if (bar) bar.style.width = '100%';
+
+            // Mark all steps complete
+            document.querySelectorAll('#processingSteps .proc-step').forEach(step => {
+                step.className = 'proc-step flex items-center gap-4 complete';
+            });
+        }
+
+        /**
+         * Show error state on overlay
+         * Re-enables buttons in the error div so user can interact
+         */
+        function showProcessingError(message) {
+            const errorDiv = document.getElementById('processingError');
+            const errorMsg = document.getElementById('processingErrorMsg');
+            const title = document.getElementById('processingTitle');
+            const status = document.getElementById('processingStatus');
+
+            if (title) title.textContent = 'Processing Failed';
+            if (status) status.textContent = '';
+            if (errorMsg) errorMsg.textContent = message || 'Could not reach the server. Your data is safe.';
+            if (errorDiv) errorDiv.classList.remove('hidden');
+
+            // Mark current step as error
+            const activeStep = document.querySelector('#processingSteps .proc-step.active');
+            if (activeStep) activeStep.className = 'proc-step flex items-center gap-4 error';
+        }
+
+        /**
+         * Hide the overlay and clean up all event listeners
+         */
+        function hideProcessingOverlay() {
+            const overlay = document.getElementById('processingOverlay');
+            if (!overlay) return;
+
+            overlay.classList.add('hidden');
+
+            window.removeEventListener('beforeunload', _blockUnload);
+            document.removeEventListener('keydown', _blockKeys, true);
+            overlay.removeEventListener('touchstart', _blockTouch, true);
+            overlay.removeEventListener('touchmove', _blockTouch, true);
+            overlay.removeEventListener('touchend', _blockTouch, true);
+            overlay.removeEventListener('click', _blockTouch, true);
+            overlay.removeEventListener('mousedown', _blockTouch, true);
+            overlay.removeEventListener('contextmenu', _blockTouch, true);
+        }
+
+        // Private helper functions for blocking
+        function _blockUnload(e) {
+            e.preventDefault();
+            e.returnValue = 'Your report is being processed. Please wait.';
+            return e.returnValue;
+        }
+
+        function _blockKeys(e) {
+            // Block everything during processing
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+            return false;
+        }
+
+        function _blockTouch(e) {
+            // Check if the click is on an error state button (those should work)
+            if (e.target && e.target.closest && e.target.closest('#processingError')) {
+                return; // Allow clicks on error buttons
+            }
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+            return false;
+        }
+
         // ============ AI PROCESSING WEBHOOK ============
         const N8N_PROCESS_WEBHOOK = 'https://advidere.app.n8n.cloud/webhook/fieldvoice-refine-v6.6';
 
@@ -2115,6 +2338,10 @@
          * Finish the minimal mode report with AI processing
          */
         async function finishMinimalReport() {
+            // === NEW: Show confirmation dialog ===
+            const confirmed = await showProcessConfirmation();
+            if (!confirmed) return;
+
             // Early offline check - show modal when offline
             if (!navigator.onLine) {
                 showNetworkErrorModal(
@@ -2148,21 +2375,30 @@
             }
             showToast('Processing with AI...', 'info');
 
+            // === NEW: Show processing overlay ===
+            showProcessingOverlay();
+            setProcessingStep(1, 'active');
+
             // Mark as interview completed
             report.meta.interviewCompleted = true;
             report.overview.endTime = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
 
             // Ensure report is saved to Supabase first
             await saveReportToSupabase();
+            setProcessingStep(1, 'complete');
+            setProcessingStep(2, 'active');
 
             // Upload any pending photos and insert metadata into photos table
             await uploadPendingPhotos();
+            setProcessingStep(2, 'complete');
+            setProcessingStep(3, 'active');
 
             // Build payload
             const payload = buildProcessPayload();
 
             // Check if online
             if (!navigator.onLine) {
+                hideProcessingOverlay();
                 handleOfflineProcessing(payload, true);
                 return;
             }
@@ -2175,6 +2411,8 @@
             // Call webhook
             try {
                 const result = await callProcessWebhook(payload);
+                setProcessingStep(3, 'complete');
+                setProcessingStep(4, 'active');
                 const processingTime = Date.now() - startTime;
 
                 // Save AI response to Supabase
@@ -2245,10 +2483,19 @@
                     await window.lockManager.releaseCurrentLock();
                 }
 
+                // === NEW: Show success and redirect ===
+                setProcessingStep(4, 'complete');
+                showProcessingSuccess();
+                await new Promise(r => setTimeout(r, 800)); // Brief pause to show success
+                hideProcessingOverlay();
+
                 // Navigate to report with date and reportId parameters
                 window.location.href = `report.html?date=${todayStr}&reportId=${currentReportId}`;
             } catch (error) {
                 console.error('AI processing failed:', error);
+
+                // === NEW: Show error on overlay ===
+                showProcessingError(error.message || 'Could not reach the server. Your data is safe.');
 
                 // Restore button state
                 if (finishBtn) {
@@ -2256,12 +2503,16 @@
                     finishBtn.innerHTML = originalBtnHtml;
                 }
 
-                // Show modal with retry/drafts options
+                // Show modal with retry/drafts options (hidden behind overlay error state)
                 showNetworkErrorModal(
                     'Submission Failed',
                     'Could not reach the server. Your report data is safe.',
-                    () => finishMinimalReport(),  // Retry
                     () => {
+                        hideProcessingOverlay();
+                        finishMinimalReport();  // Retry
+                    },
+                    () => {
+                        hideProcessingOverlay();
                         handleOfflineProcessing(payload, true);
                     }
                 );
@@ -4716,6 +4967,10 @@
         }
 
         async function finishReport() {
+            // === NEW: Show confirmation dialog ===
+            const confirmed = await showProcessConfirmation();
+            if (!confirmed) return;
+
             // Early offline check - show modal when offline
             if (!navigator.onLine) {
                 showNetworkErrorModal(
@@ -4782,6 +5037,10 @@
             }
             showToast('Processing with AI...', 'info');
 
+            // === NEW: Show processing overlay ===
+            showProcessingOverlay();
+            setProcessingStep(1, 'active');
+
             // Set up report data
             report.overview.endTime = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
             report.meta.interviewCompleted = true;
@@ -4803,15 +5062,20 @@
             if (navigator.onLine) {
                 await uploadPendingPhotos();
             }
+            setProcessingStep(1, 'complete');
+            setProcessingStep(2, 'active');
 
             // Ensure report is saved to Supabase first
             await saveReportToSupabase();
+            setProcessingStep(2, 'complete');
+            setProcessingStep(3, 'active');
 
             // Build payload
             const payload = buildProcessPayload();
 
             // Check if online
             if (!navigator.onLine) {
+                hideProcessingOverlay();
                 handleOfflineProcessing(payload, true);
                 return;
             }
@@ -4824,6 +5088,8 @@
             // Call webhook
             try {
                 const result = await callProcessWebhook(payload);
+                setProcessingStep(3, 'complete');
+                setProcessingStep(4, 'active');
                 const processingTime = Date.now() - startTime;
 
                 // Save AI response to Supabase
@@ -4894,10 +5160,19 @@
                     await window.lockManager.releaseCurrentLock();
                 }
 
+                // === NEW: Show success and redirect ===
+                setProcessingStep(4, 'complete');
+                showProcessingSuccess();
+                await new Promise(r => setTimeout(r, 800)); // Brief pause to show success
+                hideProcessingOverlay();
+
                 // Navigate to report with date and reportId parameters
                 window.location.href = `report.html?date=${todayStr}&reportId=${currentReportId}`;
             } catch (error) {
                 console.error('AI processing failed:', error);
+
+                // === NEW: Show error on overlay ===
+                showProcessingError(error.message || 'Could not reach the server. Your data is safe.');
 
                 // Restore button state
                 if (finishBtn) {
@@ -4905,12 +5180,16 @@
                     finishBtn.innerHTML = originalBtnHtml;
                 }
 
-                // Show modal with retry/drafts options
+                // Show modal with retry/drafts options (hidden behind overlay error state)
                 showNetworkErrorModal(
                     'Submission Failed',
                     'Could not reach the server. Your report data is safe.',
-                    () => finishReport(),  // Retry
                     () => {
+                        hideProcessingOverlay();
+                        finishReport();  // Retry
+                    },
+                    () => {
+                        hideProcessingOverlay();
                         handleOfflineProcessing(payload, true);
                     }
                 );
@@ -4962,6 +5241,23 @@
         }
 
         document.addEventListener('DOMContentLoaded', async () => {
+            // === NEW: Wire up processing overlay error buttons ===
+            document.getElementById('processingRetryBtn')?.addEventListener('click', () => {
+                hideProcessingOverlay();
+                // Determine which mode to retry based on visible UI
+                const minimalApp = document.getElementById('minimalModeApp');
+                if (minimalApp && !minimalApp.classList.contains('hidden')) {
+                    finishMinimalReport();
+                } else {
+                    finishReport();
+                }
+            });
+
+            document.getElementById('processingSaveDraftBtn')?.addEventListener('click', () => {
+                hideProcessingOverlay();
+                window.location.href = 'index.html';
+            });
+
             try {
                 // STATE PROTECTION: Check if report is already refined BEFORE any other initialization
                 // This must run first to redirect users away from editing refined reports

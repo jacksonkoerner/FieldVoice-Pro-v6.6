@@ -136,6 +136,47 @@
             font-size: 16px;
             line-height: 1.6;
         }
+        /* Processing overlay - block ALL interaction */
+        #processingOverlay {
+            cursor: default;
+        }
+        #processingOverlay * {
+            pointer-events: none;
+        }
+        /* Re-enable pointer events ONLY for error state buttons */
+        #processingError {
+            pointer-events: auto;
+        }
+        #processingError button {
+            pointer-events: auto;
+            cursor: pointer;
+        }
+
+        /* Step animations */
+        .proc-step.active .proc-icon {
+            background: #2563eb;
+            color: white;
+            animation: proc-pulse 1.5s ease-in-out infinite;
+        }
+        .proc-step.complete .proc-icon {
+            background: #16a34a;
+            color: white;
+        }
+        .proc-step.complete .proc-label {
+            color: #86efac;
+        }
+        .proc-step.active .proc-label {
+            color: white;
+        }
+        .proc-step.error .proc-icon {
+            background: #dc2626;
+            color: white;
+        }
+
+        @keyframes proc-pulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.15); opacity: 0.8; }
+        }
     </style>
 </head>
 <body class="bg-slate-100 min-h-screen">
@@ -854,6 +895,84 @@
                 </button>
                 <button id="network-modal-drafts" class="w-full py-3 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300">
                     Save to Drafts
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Submit Confirmation Dialog -->
+    <div id="submitConfirmDialog" class="fixed inset-0 z-[9998] hidden" style="touch-action: none;">
+        <div class="absolute inset-0 bg-black bg-opacity-60"></div>
+        <div class="absolute bottom-0 left-0 right-0 bg-white rounded-t-2xl p-6 shadow-2xl max-w-lg mx-auto" style="z-index: 1;">
+            <h3 class="text-lg font-bold text-gray-900 mb-2">Ready to Process?</h3>
+            <p class="text-sm text-gray-600 mb-4">Your report will be sent to the AI for review. This takes about 20 seconds.</p>
+
+            <div id="confirmOnlineStatus" class="flex items-center gap-2 mb-5 p-3 rounded-lg bg-green-50">
+                <span id="confirmStatusDot" class="w-3 h-3 rounded-full bg-green-500"></span>
+                <span id="confirmStatusText" class="text-sm text-green-700">Connected — Ready to process</span>
+            </div>
+
+            <div class="flex gap-3">
+                <button id="confirmCancelBtn" class="flex-1 py-3 px-4 rounded-xl border border-gray-300 text-gray-700 font-medium text-base">
+                    Cancel
+                </button>
+                <button id="confirmGoBtn" class="flex-1 py-3 px-4 rounded-xl bg-green-600 text-white font-semibold text-base">
+                    Yes, Process Report
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Processing Overlay - CLICK PROOF -->
+    <div id="processingOverlay" class="fixed inset-0 hidden"
+         style="z-index: 99999; background: rgba(0,0,0,0.92); touch-action: none; user-select: none; -webkit-user-select: none;">
+        <div class="h-full flex flex-col items-center justify-center px-8"
+             style="pointer-events: none;">
+            <div class="w-full max-w-sm" style="pointer-events: none;">
+                <!-- Title -->
+                <h2 id="processingTitle" class="text-white text-xl font-bold text-center mb-8">Processing Your Report</h2>
+
+                <!-- Progress Steps -->
+                <div id="processingSteps" class="space-y-5 mb-8">
+                    <div class="proc-step flex items-center gap-4" data-step="1">
+                        <div class="proc-icon w-8 h-8 rounded-full flex items-center justify-center bg-gray-700 text-gray-400 text-sm font-bold flex-shrink-0 transition-all duration-300">1</div>
+                        <span class="proc-label text-gray-500 text-base transition-all duration-300">Saving report data...</span>
+                    </div>
+                    <div class="proc-step flex items-center gap-4" data-step="2">
+                        <div class="proc-icon w-8 h-8 rounded-full flex items-center justify-center bg-gray-700 text-gray-400 text-sm font-bold flex-shrink-0 transition-all duration-300">2</div>
+                        <span class="proc-label text-gray-500 text-base transition-all duration-300">Uploading photos...</span>
+                    </div>
+                    <div class="proc-step flex items-center gap-4" data-step="3">
+                        <div class="proc-icon w-8 h-8 rounded-full flex items-center justify-center bg-gray-700 text-gray-400 text-sm font-bold flex-shrink-0 transition-all duration-300">3</div>
+                        <span class="proc-label text-gray-500 text-base transition-all duration-300">AI is reviewing your report...</span>
+                    </div>
+                    <div class="proc-step flex items-center gap-4" data-step="4">
+                        <div class="proc-icon w-8 h-8 rounded-full flex items-center justify-center bg-gray-700 text-gray-400 text-sm font-bold flex-shrink-0 transition-all duration-300">4</div>
+                        <span class="proc-label text-gray-500 text-base transition-all duration-300">Finalizing...</span>
+                    </div>
+                </div>
+
+                <!-- Progress Bar -->
+                <div class="w-full bg-gray-700 rounded-full h-2 mb-4">
+                    <div id="processingBar" class="bg-green-500 h-2 rounded-full transition-all duration-700 ease-out" style="width: 0%"></div>
+                </div>
+
+                <!-- Status Text -->
+                <p id="processingStatus" class="text-gray-400 text-sm text-center">Please wait, don't close this page...</p>
+            </div>
+        </div>
+
+        <!-- Error State (hidden by default, HAS pointer events so buttons work) -->
+        <div id="processingError" class="hidden absolute inset-0 flex items-center justify-center px-8">
+            <div class="w-full max-w-sm text-center">
+                <div class="text-red-400 text-5xl mb-4">⚠️</div>
+                <h3 class="text-white text-lg font-bold mb-2">Processing Failed</h3>
+                <p class="text-gray-400 text-sm mb-6" id="processingErrorMsg">Could not reach the server.</p>
+                <button id="processingRetryBtn" class="w-full py-3 px-6 bg-white text-gray-900 rounded-xl font-semibold mb-3">
+                    Try Again
+                </button>
+                <button id="processingSaveDraftBtn" class="w-full py-3 px-6 bg-transparent border border-gray-500 text-gray-300 rounded-xl font-medium">
+                    Save as Draft
                 </button>
             </div>
         </div>
