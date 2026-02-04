@@ -605,7 +605,8 @@
     function getReportDateStr() {
         const params = new URLSearchParams(window.location.search);
         const dateParam = params.get('date');
-        return dateParam || new Date().toISOString().split('T')[0];
+        // v6.6.23: Use getLocalDateString to avoid timezone issues
+        return dateParam || getLocalDateString();
     }
 
     /**
@@ -1005,14 +1006,14 @@
         document.getElementById('weatherDaysCount').value = getValue('overview.weatherDays', activeProject?.weatherDays || 0);
 
         // Project Overview - Right Column
-        // Date
-        const dateStr = getValue('overview.date', new Date().toLocaleDateString());
+        // Date - v6.6.23: Use getLocalDateString to avoid timezone issues
+        const dateStr = getValue('overview.date', getLocalDateString());
         const dateInput = document.getElementById('reportDate');
         try {
-            const d = new Date(dateStr);
-            dateInput.value = d.toISOString().split('T')[0];
+            const d = new Date(dateStr + 'T12:00:00'); // Add noon time to avoid timezone shift
+            dateInput.value = getLocalDateString(d);
         } catch (e) {
-            dateInput.value = new Date().toISOString().split('T')[0];
+            dateInput.value = getLocalDateString();
         }
 
         document.getElementById('projectLocation').value = getValue('overview.location', activeProject?.location || '');

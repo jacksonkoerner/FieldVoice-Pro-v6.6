@@ -185,11 +185,16 @@ function fromSupabaseReport(row) {
  * @returns {Object} Supabase row format
  */
 function toSupabaseReport(report, projectId, userId, deviceId) {
+  // v6.6.23: Use local date string helper to avoid timezone issues
+  const localDateFallback = typeof getLocalDateString === 'function'
+    ? getLocalDateString()
+    : new Date().toISOString().split('T')[0];
+
   const row = {
     project_id: projectId,
     user_id: userId,
     device_id: deviceId,
-    report_date: report.reportDate || report.date || new Date().toISOString().split('T')[0],
+    report_date: report.reportDate || report.date || localDateFallback,
     status: report.status || 'draft',
     capture_mode: report.captureMode || report.capture_mode || 'guided',
     updated_at: new Date().toISOString(),

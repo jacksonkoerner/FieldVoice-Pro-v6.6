@@ -1,5 +1,6 @@
 // FieldVoice Pro - Final Review Page Logic
 // DOT RPR Daily Report viewer with print-optimized layout
+// v6.6.23: Editable no-work contractors, date timezone fix, expandable textareas
 // v6.6.22: Show "No work performed on [date]" for inactive contractors instead of skipping
 // v6.6.21: Comprehensive PDF styling overhaul - fix truncation, improve capture quality
 // v6.6.14: Fix reports table - add project_id, device_id, user_id
@@ -37,6 +38,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         // Setup auto-save listeners for editable fields (v6.6.5)
         setupAutoSave();
+
+        // v6.6.23: Setup no-work toggle listeners
+        setupNoWorkToggles();
 
         // Initialize auto-resize for textareas (v6.6.5)
         initAutoResize();
@@ -142,7 +146,8 @@ async function loadUserSettings() {
 function getReportDateStr() {
     const params = new URLSearchParams(window.location.search);
     const dateParam = params.get('date');
-    return dateParam || new Date().toISOString().split('T')[0];
+    // v6.6.23: Use getLocalDateString to avoid timezone issues
+    return dateParam || getLocalDateString();
 }
 
 async function loadReport() {
@@ -419,7 +424,8 @@ function populateReport() {
 
     let sigDetails = '';
     if (sigTitle || sigCompany) {
-        sigDetails = `Digitally signed by ${sigName}\nDN: cn=${sigName}, c=US,\no=${sigCompany}, ou=${sigTitle},\nemail=${sigName.toLowerCase().replace(/\s/g, '')}@${sigCompany.toLowerCase().replace(/\s/g, '')}.com\nDate: ${new Date().toISOString().split('T')[0]}`;
+        // v6.6.23: Use getLocalDateString to avoid timezone issues
+        sigDetails = `Digitally signed by ${sigName}\nDN: cn=${sigName}, c=US,\no=${sigCompany}, ou=${sigTitle},\nemail=${sigName.toLowerCase().replace(/\s/g, '')}@${sigCompany.toLowerCase().replace(/\s/g, '')}.com\nDate: ${getLocalDateString()}`;
     }
     document.getElementById('signatureDetails').innerHTML = sigDetails.replace(/\n/g, '<br>');
 
@@ -492,13 +498,37 @@ function renderWorkSummary() {
         const isNoWork = activity?.noWork === true || (!narrative.trim() && !equipment.trim() && !crew.trim());
 
         if (isNoWork) {
-            // v6.6.22: Render minimal block with "No work performed" message (no EQUIPMENT/CREW labels)
+            // v6.6.23: Render editable "no work" block with toggle checkbox
             const reportDate = report.overview?.date || getReportDateStr();
             const displayDate = reportDate ? formatDisplayDate(reportDate) : 'this date';
+            const contractorId = contractor.id;
 
-            html += `<div class="contractor-block" style="margin-bottom: 16px; page-break-inside: avoid;">`;
-            html += `<div class="contractor-name" style="font-weight: bold; margin-bottom: 4px;">${escapeHtml(contractor.name)} – ${typeLabel}${trades}</div>`;
-            html += `<div class="no-work-message" style="font-style: italic; color: #333; padding-left: 8px;">No work performed on ${displayDate}.</div>`;
+            html += `<div class="contractor-block" style="margin-bottom: 16px; page-break-inside: avoid;" data-contractor-id="${contractorId}">`;
+            html += `<div class="contractor-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">`;
+            html += `<div class="contractor-name" style="font-weight: bold;">${escapeHtml(contractor.name)} – ${typeLabel}${trades}</div>`;
+            html += `<label class="no-work-toggle" style="font-size: 11px; display: flex; align-items: center; gap: 4px; cursor: pointer;">`;
+            html += `<input type="checkbox" class="no-work-checkbox" data-contractor-id="${contractorId}" checked>`;
+            html += `<span>No work performed</span>`;
+            html += `</label>`;
+            html += `</div>`;
+
+            // Hidden fields (shown when checkbox unchecked)
+            html += `<div class="contractor-fields" data-contractor-id="${contractorId}" style="display: none;">`;
+            html += `<div class="contractor-narrative-container" style="margin-bottom: 8px;">`;
+            html += `<textarea class="editable-field contractor-narrative" data-path="${activityPath}.narrative" data-contractor-id="${contractorId}" placeholder="Describe work performed..." style="width: 100%; min-height: 60px;"></textarea>`;
+            html += `</div>`;
+            html += `<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">`;
+            html += `<div><label style="font-size: 8pt; font-weight: bold; color: #666;">EQUIPMENT</label>`;
+            html += `<textarea class="editable-field contractor-equipment" data-path="${activityPath}.equipmentUsed" data-contractor-id="${contractorId}" placeholder="Equipment used..." style="width: 100%; min-height: 40px;"></textarea></div>`;
+            html += `<div><label style="font-size: 8pt; font-weight: bold; color: #666;">CREW</label>`;
+            html += `<textarea class="editable-field contractor-crew" data-path="${activityPath}.crew" data-contractor-id="${contractorId}" placeholder="Crew count..." style="width: 100%; min-height: 40px;"></textarea></div>`;
+            html += `</div></div>`;
+
+            // No work message (shown when checkbox checked)
+            html += `<div class="no-work-message" data-contractor-id="${contractorId}" style="font-style: italic; color: #333; padding-left: 8px;">`;
+            html += `No work performed on ${displayDate}.`;
+            html += `</div>`;
+
             html += `</div>`;
         } else {
             // Contractor WITH activity - show narrative, EQUIPMENT, CREW labels
@@ -1737,7 +1767,8 @@ function getProjectName() {
  * @returns {string}
  */
 function getReportDate() {
-    return report?.overview?.date || getReportDateStr() || new Date().toISOString().split('T')[0];
+    // v6.6.23: Use getLocalDateString to avoid timezone issues
+    return report?.overview?.date || getReportDateStr() || getLocalDateString();
 }
 
 function showSubmitSuccess() {
@@ -1907,6 +1938,52 @@ function initAutoResize() {
             field.addEventListener('input', () => autoResize(field));
         }
     });
+}
+
+// ============ NO-WORK TOGGLE (v6.6.23) ============
+/**
+ * v6.6.23: Setup event listeners for no-work toggle checkboxes
+ * Allows users to toggle contractors between "no work" and "has work" states
+ */
+function setupNoWorkToggles() {
+    document.querySelectorAll('.no-work-checkbox').forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            const contractorId = this.dataset.contractorId;
+            const fieldsDiv = document.querySelector(`.contractor-fields[data-contractor-id="${contractorId}"]`);
+            const messageDiv = document.querySelector(`.no-work-message[data-contractor-id="${contractorId}"]`);
+
+            if (this.checked) {
+                // No work - hide fields, show message
+                if (fieldsDiv) fieldsDiv.style.display = 'none';
+                if (messageDiv) messageDiv.style.display = 'block';
+                // Update userEdits
+                userEdits[`activity_${contractorId}`] = {
+                    ...userEdits[`activity_${contractorId}`],
+                    noWork: true,
+                    narrative: '',
+                    equipmentUsed: '',
+                    crew: ''
+                };
+            } else {
+                // Has work - show fields, hide message
+                if (fieldsDiv) fieldsDiv.style.display = 'block';
+                if (messageDiv) messageDiv.style.display = 'none';
+                // Update userEdits
+                userEdits[`activity_${contractorId}`] = {
+                    ...userEdits[`activity_${contractorId}`],
+                    noWork: false
+                };
+                // Initialize auto-resize for the newly shown textareas
+                fieldsDiv.querySelectorAll('textarea.editable-field').forEach(textarea => {
+                    autoResize(textarea);
+                });
+            }
+            report.userEdits = userEdits;
+            scheduleSave();
+        });
+    });
+
+    console.log('[FINAL] No-work toggle listeners attached to', document.querySelectorAll('.no-work-checkbox').length, 'checkboxes');
 }
 
 // ============ AUTO-SAVE (v6.6.5) ============

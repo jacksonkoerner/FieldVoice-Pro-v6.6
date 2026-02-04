@@ -777,6 +777,55 @@
             font-size: 9pt;
         }
 
+        /* v6.6.23: Contractor narrative textareas - expandable */
+        .contractor-narrative,
+        .contractor-equipment,
+        .contractor-crew {
+            border: 1px solid #ddd;
+            background: #fafafa;
+            border-radius: 3px;
+            padding: 6px 8px;
+            font-size: 11px;
+            line-height: 1.4;
+            width: 100%;
+            min-height: 40px;
+            height: auto;
+            resize: none;
+            overflow: hidden;
+            box-sizing: border-box;
+        }
+
+        .contractor-narrative {
+            min-height: 60px;
+        }
+
+        .contractor-narrative:focus,
+        .contractor-equipment:focus,
+        .contractor-crew:focus {
+            border-color: #3b82f6;
+            background: #fff;
+        }
+
+        /* v6.6.23: No-work toggle styling */
+        .no-work-toggle {
+            user-select: none;
+        }
+
+        .no-work-toggle input[type="checkbox"] {
+            cursor: pointer;
+            width: 14px;
+            height: 14px;
+        }
+
+        .no-work-toggle span {
+            color: #666;
+        }
+
+        .contractor-header {
+            border-bottom: 1px solid #e5e7eb;
+            padding-bottom: 4px;
+        }
+
         /* Editable table cells */
         .editable-cell {
             border: none;
@@ -827,6 +876,25 @@
             .editable-field::placeholder,
             .editable-cell::placeholder {
                 color: transparent !important;
+            }
+
+            /* v6.6.23: Hide no-work toggle checkbox in print */
+            .no-work-toggle {
+                display: none !important;
+            }
+
+            /* v6.6.23: Contractor textareas - clean for print */
+            .contractor-narrative,
+            .contractor-equipment,
+            .contractor-crew {
+                border: none !important;
+                background: transparent !important;
+                padding: 0 !important;
+            }
+
+            /* v6.6.23: Clean contractor header for print */
+            .contractor-header {
+                border-bottom: none !important;
             }
         }
 
