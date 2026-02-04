@@ -251,7 +251,11 @@ function viewPdf(reportId) {
     const title = document.getElementById('pdfTitle');
 
     title.textContent = `${report.projectName} — ${formatDate(report.reportDate)}`;
-    viewer.src = report.pdfUrl;
+
+    // Use Google Docs viewer for reliable mobile PDF rendering
+    const encodedUrl = encodeURIComponent(report.pdfUrl);
+    viewer.src = `https://docs.google.com/viewer?url=${encodedUrl}&embedded=true`;
+
     modal.classList.remove('hidden');
     document.body.style.overflow = 'hidden';
 }
