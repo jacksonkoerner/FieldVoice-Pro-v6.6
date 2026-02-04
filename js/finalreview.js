@@ -1,5 +1,6 @@
 // FieldVoice Pro - Final Review Page Logic
 // DOT RPR Daily Report viewer with print-optimized layout
+// v6.6.21: Comprehensive PDF styling overhaul - fix truncation, improve capture quality
 // v6.6.14: Fix reports table - add project_id, device_id, user_id
 // v6.6.12: Fix PDF pagination - add explicit page breaks to .page elements
 
@@ -385,12 +386,29 @@ function populateReport() {
     document.getElementById('completedBy').textContent = getValue('overview.completedBy', '');
 
     // Weather
+    // v6.6.21: Improved fallback handling for placeholder values like "--" and "Syncing..."
     const weather = o.weather || {};
-    document.getElementById('weatherTemps').textContent = `High Temp: ${weather.highTemp || 'N/A'}° Low Temp: ${weather.lowTemp || 'N/A'}°`;
-    document.getElementById('weatherPrecip').textContent = `Precipitation: ${weather.precipitation || '0.00"'}`;
-    document.getElementById('weatherCondition').textContent = `General Condition: ${weather.generalCondition || 'N/A'}`;
-    document.getElementById('weatherJobSite').textContent = `Job Site Condition: ${weather.jobSiteCondition || 'N/A'}`;
-    document.getElementById('weatherAdverse').textContent = `Adverse Conditions: ${weather.adverseConditions || 'N/A'}`;
+
+    // Helper to clean weather values - treats "--", "Syncing...", empty as N/A
+    const cleanWeatherDisplay = (value, defaultVal = 'N/A') => {
+        if (!value || value === '--' || value === 'Syncing...' || value === 'N/A' || value.trim() === '') {
+            return defaultVal;
+        }
+        return value;
+    };
+
+    const highTemp = cleanWeatherDisplay(weather.highTemp);
+    const lowTemp = cleanWeatherDisplay(weather.lowTemp);
+    const precipitation = cleanWeatherDisplay(weather.precipitation, '0.00"');
+    const generalCondition = cleanWeatherDisplay(weather.generalCondition, 'Not recorded');
+    const jobSiteCondition = cleanWeatherDisplay(weather.jobSiteCondition);
+    const adverseConditions = cleanWeatherDisplay(weather.adverseConditions, 'None');
+
+    document.getElementById('weatherTemps').textContent = `High Temp: ${highTemp}${highTemp !== 'N/A' ? '' : ''} Low Temp: ${lowTemp}${lowTemp !== 'N/A' ? '' : ''}`;
+    document.getElementById('weatherPrecip').textContent = `Precipitation: ${precipitation}`;
+    document.getElementById('weatherCondition').textContent = `General Condition: ${generalCondition}`;
+    document.getElementById('weatherJobSite').textContent = `Job Site Condition: ${jobSiteCondition}`;
+    document.getElementById('weatherAdverse').textContent = `Adverse Conditions: ${adverseConditions}`;
 
     // Signature
     const sigName = getValue('signature.name', getValue('overview.completedBy', ''));
@@ -454,9 +472,27 @@ function renderWorkSummary() {
     }
 
     // v6.6.5: Render contractor blocks with editable textareas
+    // v6.6.21: Skip contractors with no meaningful content (no narrative, equipment, or crew)
     let html = '';
+    let renderedCount = 0;
+
     projectContractors.forEach(contractor => {
         const activity = getContractorActivity(contractor.id);
+
+        // Get content values
+        const narrative = activity?.narrative || '';
+        const equipment = activity?.equipmentUsed || '';
+        const crew = activity?.crew || '';
+
+        // v6.6.21: Skip contractors with no meaningful content
+        // Check if all fields are empty or just whitespace
+        const hasContent = (narrative.trim() || equipment.trim() || crew.trim());
+        if (!hasContent) {
+            console.log('[FINAL] Skipping contractor with no content:', contractor.name);
+            return; // Skip this contractor
+        }
+
+        renderedCount++;
         const typeLabel = contractor.type === 'prime' ? 'PRIME CONTRACTOR' : 'SUBCONTRACTOR';
         const trades = contractor.trades ? ` (${contractor.trades.toUpperCase()})` : '';
         const activityPath = `activity_${contractor.id}`;
@@ -465,7 +501,6 @@ function renderWorkSummary() {
         html += `<div class="contractor-name" style="font-weight: bold; margin-bottom: 8px;">${escapeHtml(contractor.name)} – ${typeLabel}${trades}</div>`;
 
         // Narrative - editable textarea
-        const narrative = activity?.narrative || '';
         html += `<div class="contractor-narrative-container" style="margin-bottom: 8px;">
             <textarea
                 class="editable-field contractor-narrative"
@@ -476,8 +511,6 @@ function renderWorkSummary() {
         </div>`;
 
         // Equipment and Crew - editable textareas
-        const equipment = activity?.equipmentUsed || '';
-        const crew = activity?.crew || '';
         html += `<div class="contractor-details-container" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
             <div>
                 <label style="font-size: 8pt; font-weight: bold; color: #666; text-transform: uppercase;">Equipment</label>
@@ -501,6 +534,11 @@ function renderWorkSummary() {
 
         html += `</div>`;
     });
+
+    // v6.6.21: If no contractors had content, show a message
+    if (renderedCount === 0) {
+        html = `<p style="color: #666; font-style: italic;">No contractor activities recorded for this date.</p>`;
+    }
 
     container.innerHTML = html;
 }
@@ -1137,6 +1175,96 @@ async function waitForImages(element, timeout = 5000) {
 }
 
 /**
+ * v6.6.21: Prepare DOM for PDF capture
+ * - Forces textarea auto-resize
+ * - Replaces textareas with divs for cleaner capture (textareas can render poorly in html2canvas)
+ * - Waits for images to load
+ */
+async function prepareForPdfCapture() {
+    console.log('[PDF] Preparing DOM for PDF capture...');
+
+    // 1. Force all textareas to auto-resize and set overflow visible
+    document.querySelectorAll('textarea.editable-field').forEach(textarea => {
+        textarea.style.height = 'auto';
+        textarea.style.height = textarea.scrollHeight + 'px';
+        textarea.style.overflow = 'visible';
+    });
+
+    // 2. Replace textareas with divs for cleaner capture
+    // html2canvas sometimes has issues with textarea rendering
+    document.querySelectorAll('.page').forEach(page => {
+        page.querySelectorAll('textarea').forEach(textarea => {
+            const div = document.createElement('div');
+            div.className = textarea.className + ' textarea-replacement';
+
+            // Copy computed styles
+            const computedStyle = window.getComputedStyle(textarea);
+            div.style.fontFamily = computedStyle.fontFamily;
+            div.style.fontSize = computedStyle.fontSize;
+            div.style.lineHeight = computedStyle.lineHeight;
+            div.style.padding = computedStyle.padding;
+            div.style.margin = computedStyle.margin;
+            div.style.width = computedStyle.width;
+            div.style.color = computedStyle.color;
+
+            // Override problematic styles
+            div.style.whiteSpace = 'pre-wrap';
+            div.style.wordWrap = 'break-word';
+            div.style.overflow = 'visible';
+            div.style.height = 'auto';
+            div.style.minHeight = 'auto';
+            div.style.border = 'none';
+            div.style.background = 'transparent';
+
+            // Set content
+            div.textContent = textarea.value || textarea.placeholder || '';
+            div.dataset.originalTextarea = 'true';
+            div.dataset.path = textarea.dataset.path || '';
+
+            // Hide original textarea, insert replacement
+            textarea.style.display = 'none';
+            textarea.parentNode.insertBefore(div, textarea);
+        });
+    });
+
+    // 3. Wait for reflow to complete
+    await new Promise(resolve => setTimeout(resolve, 300));
+
+    // 4. Ensure all images are loaded
+    const images = document.querySelectorAll('.page img');
+    await Promise.all(Array.from(images).map(img => {
+        if (img.complete && img.naturalWidth > 0) return Promise.resolve();
+        return new Promise(resolve => {
+            img.onload = resolve;
+            img.onerror = resolve;
+            setTimeout(resolve, 5000); // Max 5s per image
+        });
+    }));
+
+    console.log('[PDF] DOM preparation complete');
+}
+
+/**
+ * v6.6.21: Restore DOM after PDF capture
+ * - Removes replacement divs
+ * - Shows original textareas
+ */
+function restoreAfterPdfCapture() {
+    console.log('[PDF] Restoring DOM after capture...');
+
+    // Remove replacement divs and restore textareas
+    document.querySelectorAll('.textarea-replacement').forEach(div => {
+        const textarea = div.nextElementSibling;
+        if (textarea && textarea.tagName === 'TEXTAREA') {
+            textarea.style.display = '';
+        }
+        div.remove();
+    });
+
+    console.log('[PDF] DOM restored');
+}
+
+/**
  * Main submit function - orchestrates the complete submit flow
  * 1. Check online status
  * 2. Generate PDF from page content
@@ -1212,6 +1340,7 @@ async function submitReport() {
 
 /**
  * v6.6.13: Generate PDF using direct html2canvas + jsPDF (Option D)
+ * v6.6.21: Enhanced with DOM preparation for cleaner capture
  * Replaces html2pdf.js which has broken dimension calculation in its Worker pattern
  * @returns {Promise<{blob: Blob, filename: string}>}
  */
@@ -1240,74 +1369,100 @@ async function generatePDF() {
         throw new Error('jsPDF library not found. Please ensure jsPDF is loaded.');
     }
 
-    // Create PDF (letter size: 8.5 x 11 inches)
-    const pdf = new jsPDFConstructor({
-        orientation: 'portrait',
-        unit: 'in',
-        format: 'letter'
-    });
+    // v6.6.21: Use try/finally to ensure DOM is always restored
+    try {
+        // v6.6.21: Prepare DOM for capture (replace textareas with divs, resize, etc.)
+        await prepareForPdfCapture();
 
-    const html2canvasOptions = {
-        scale: 2,
-        useCORS: true,
-        allowTaint: false,
-        logging: true,
-        backgroundColor: '#ffffff',
-        windowWidth: 816
-    };
+        // Create PDF (letter size: 8.5 x 11 inches = 612 x 792 points)
+        const pdf = new jsPDFConstructor({
+            orientation: 'portrait',
+            unit: 'pt',
+            format: 'letter',
+            compress: true
+        });
 
-    for (let i = 0; i < pages.length; i++) {
-        const page = pages[i];
-        console.log(`[PDF] Rendering page ${i + 1}/${pages.length}`);
+        // Letter size in points
+        const pageWidth = 612;
+        const pageHeight = 792;
+        const margin = 18; // 0.25 inch margin in points
 
-        // Wait for images on this page to load
-        const images = page.querySelectorAll('img');
-        await Promise.all(Array.from(images).map(img => {
-            if (img.complete && img.naturalWidth > 0) return Promise.resolve();
-            return new Promise(resolve => {
-                img.onload = resolve;
-                img.onerror = resolve;
-                setTimeout(resolve, 3000);
-            });
-        }));
+        // v6.6.21: Enhanced html2canvas options
+        const html2canvasOptions = {
+            scale: 2,
+            useCORS: true,
+            allowTaint: true,
+            logging: false,
+            backgroundColor: '#ffffff',
+            windowWidth: 816,
+            windowHeight: 1056,
+            imageTimeout: 15000,
+            onclone: (clonedDoc) => {
+                // Ensure visibility in cloned document
+                clonedDoc.querySelectorAll('.editable-field, textarea, .textarea-replacement').forEach(el => {
+                    el.style.overflow = 'visible';
+                    el.style.height = 'auto';
+                });
+            }
+        };
 
-        // Capture this page
-        const canvas = await html2canvas(page, html2canvasOptions);
-        console.log(`[PDF] Page ${i + 1} canvas: ${canvas.width}x${canvas.height}`);
+        for (let i = 0; i < pages.length; i++) {
+            const page = pages[i];
+            console.log(`[PDF] Rendering page ${i + 1}/${pages.length}`);
 
-        // Convert to image
-        const imgData = canvas.toDataURL('image/jpeg', 0.95);
+            // Capture this page
+            const canvas = await html2canvas(page, html2canvasOptions);
+            console.log(`[PDF] Page ${i + 1} canvas: ${canvas.width}x${canvas.height}`);
 
-        // Add new page (except for first)
-        if (i > 0) {
-            pdf.addPage();
+            // Convert to image
+            const imgData = canvas.toDataURL('image/jpeg', 0.95);
+
+            // Add new page (except for first)
+            if (i > 0) {
+                pdf.addPage();
+            }
+
+            // Calculate image dimensions to fit page with margins
+            const contentWidth = pageWidth - (margin * 2);
+            const contentHeight = pageHeight - (margin * 2);
+
+            let imgWidth = contentWidth;
+            let imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+            // Scale down if image is too tall
+            if (imgHeight > contentHeight) {
+                imgHeight = contentHeight;
+                imgWidth = (canvas.width * imgHeight) / canvas.height;
+            }
+
+            // Center horizontally if scaled down
+            const xOffset = margin + (contentWidth - imgWidth) / 2;
+
+            pdf.addImage(imgData, 'JPEG', xOffset, margin, imgWidth, imgHeight, undefined, 'FAST');
         }
 
-        // Add image to PDF with margins
-        // Page is 8.5 x 11, using 0.25in margins = 8 x 10.5 content area
-        const imgWidth = 8;
-        const imgHeight = (canvas.height * imgWidth) / canvas.width;
+        // Generate filename
+        const projectName = getProjectName().replace(/[^a-zA-Z0-9]/g, '_').substring(0, 30);
+        const reportDate = getReportDate();
+        const filename = `${projectName}_${reportDate}.pdf`;
 
-        pdf.addImage(imgData, 'JPEG', 0.25, 0.25, imgWidth, Math.min(imgHeight, 10.5));
+        console.log('[PDF] PDF generation complete:', filename);
+
+        // Return blob and filename
+        const blob = pdf.output('blob');
+        console.log('[PDF] Blob size:', blob.size, 'bytes');
+
+        // Validate blob size
+        if (blob.size < 10000) {
+            console.warn('[PDF] Warning: PDF blob is suspiciously small:', blob.size, 'bytes');
+        }
+
+        return { blob, filename };
+
+    } finally {
+        // v6.6.21: Always restore DOM after capture
+        restoreAfterPdfCapture();
     }
-
-    // Generate filename
-    const projectName = getProjectName().replace(/[^a-zA-Z0-9]/g, '_').substring(0, 30);
-    const reportDate = getReportDate();
-    const filename = `${projectName}_${reportDate}.pdf`;
-
-    console.log('[PDF] PDF generation complete:', filename);
-
-    // Return blob and filename
-    const blob = pdf.output('blob');
-    console.log('[PDF] Blob size:', blob.size, 'bytes');
-
-    // Validate blob size
-    if (blob.size < 10000) {
-        console.warn('[PDF] Warning: PDF blob is suspiciously small:', blob.size, 'bytes');
-    }
-
-    return { blob, filename };
 }
 
 /**
