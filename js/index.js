@@ -671,21 +671,6 @@ function getOfflineQueueCount() {
     return queue.length;
 }
 
-function updateDraftsSection() {
-    const count = getOfflineQueueCount();
-    const section = document.getElementById('draftsSection');
-    const badge = document.getElementById('draftsBadge');
-    const description = document.getElementById('draftsDescription');
-
-    if (count > 0) {
-        section.classList.remove('hidden');
-        badge.textContent = count;
-        description.textContent = count === 1 ? '1 item waiting to sync' : `${count} items waiting to sync`;
-    } else {
-        section.classList.add('hidden');
-    }
-}
-
 // ============ INIT ============
 document.addEventListener('DOMContentLoaded', async () => {
     if (shouldShowOnboarding()) {
@@ -768,7 +753,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         updateActiveProjectCard();
         renderReportCards();
         updateReportStatus();
-        updateDraftsSection();
 
         // Show submitted banner if there are submitted reports today and not dismissed this session
         const bannerDismissedThisSession = sessionStorage.getItem('fvp_submitted_banner_dismissed') === 'true';
@@ -785,7 +769,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         updateActiveProjectCard();
         renderReportCards();
         updateReportStatus();
-        updateDraftsSection();
         syncWeather();
     }
 });

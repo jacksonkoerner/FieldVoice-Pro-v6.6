@@ -11,6 +11,13 @@ let allProjects = [];
 document.addEventListener('DOMContentLoaded', init);
 
 async function init() {
+    // Verify supabaseClient exists
+    if (typeof supabaseClient === 'undefined') {
+        console.error('[Archives] supabaseClient not initialized. Check config.js');
+        showError('Database connection not available. Please refresh.');
+        return;
+    }
+
     // Check online status
     if (!navigator.onLine) {
         showOfflineWarning();
