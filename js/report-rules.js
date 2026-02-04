@@ -163,19 +163,10 @@ function canStartNewReport(projectId) {
     };
   }
 
-  // Check 2: Already submitted report for TODAY
-  const submittedToday = projectReports.find(
-    r => r.date === today && r.status === REPORT_STATUS.SUBMITTED
-  );
-  if (submittedToday) {
-    return {
-      allowed: false,
-      reason: 'ALREADY_SUBMITTED_TODAY',
-      blockingReportId: submittedToday.id
-    };
-  }
+  // v6.6.17: Removed ALREADY_SUBMITTED_TODAY check
+  // Users can now create multiple reports per project per day
 
-  // Check 3: In-progress report for TODAY (not blocked, but caller should continue)
+  // Check 2: In-progress report for TODAY (not blocked, but caller should continue)
   const inProgressToday = projectReports.find(
     r => r.date === today && r.status !== REPORT_STATUS.SUBMITTED
   );

@@ -551,33 +551,26 @@ async function syncWeather() {
 // ============ UI UPDATES ============
 function updateReportStatus() {
     const statusSection = document.getElementById('reportStatusSection');
-    const { late, todayDrafts, todayReady } = getReportsByUrgency();
 
-    // If there are any active reports, don't show "Begin" button
-    const hasActiveReports = late.length > 0 || todayDrafts.length > 0 || todayReady.length > 0;
-
-    if (hasActiveReports) {
-        // Report cards section handles display
-        statusSection.innerHTML = '';
-        return;
-    }
-
-    // No active reports - show Begin button
+    // v6.6.17: Always show "Begin Daily Report" button
+    // Users can start new reports even if drafts exist
     statusSection.innerHTML = `
         <div class="bg-white border-2 border-slate-200 p-6">
-            <div class="text-center">
-                <div class="w-16 h-16 bg-slate-100 border-2 border-slate-300 flex items-center justify-center mx-auto mb-4">
-                    <i class="fas fa-clipboard text-slate-400 text-2xl"></i>
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h2 class="text-lg font-bold text-dot-navy">Daily Field Report</h2>
+                    <p class="text-sm text-slate-500">Create a new report for today</p>
                 </div>
-                <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">No Report Started</p>
-                <p class="text-sm text-slate-500 mb-4">Begin documentation to create today's report</p>
-                <button onclick="beginDailyReport()" class="block w-full bg-dot-navy hover:bg-dot-blue text-white p-4 transition-colors">
-                    <div class="flex items-center justify-center gap-3">
-                        <i class="fas fa-plus text-dot-yellow"></i>
-                        <span class="font-bold uppercase tracking-wide">Begin Daily Report</span>
-                    </div>
-                </button>
+                <div class="w-12 h-12 bg-dot-navy/10 rounded-full flex items-center justify-center">
+                    <i class="fas fa-clipboard-list text-dot-navy text-xl"></i>
+                </div>
             </div>
+            <button onclick="beginDailyReport()" class="block w-full bg-dot-navy hover:bg-dot-blue text-white p-4 transition-colors">
+                <div class="flex items-center justify-center gap-3">
+                    <i class="fas fa-plus text-dot-yellow"></i>
+                    <span class="font-bold uppercase tracking-wide">Begin Daily Report</span>
+                </div>
+            </button>
         </div>
     `;
 }
