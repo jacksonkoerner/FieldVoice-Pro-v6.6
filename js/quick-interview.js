@@ -2105,9 +2105,9 @@
 
             showToast("You're offline. Report saved to drafts.", 'warning');
 
-            // Redirect to drafts page if requested
+            // Redirect to index page if requested
             if (redirectToDrafts) {
-                window.location.href = 'drafts.html';
+                window.location.href = 'index.html';
             }
         }
 
@@ -2123,7 +2123,7 @@
                     () => finishMinimalReport(),  // Retry
                     () => {
                         showToast('Report saved to drafts', 'info');
-                        window.location.href = 'drafts.html';
+                        window.location.href = 'index.html';
                     }
                 );
                 return;
@@ -4672,7 +4672,7 @@
                     () => finishReport(),  // Retry
                     () => {
                         showToast('Report saved to drafts', 'info');
-                        window.location.href = 'drafts.html';
+                        window.location.href = 'index.html';
                     }
                 );
                 return;
