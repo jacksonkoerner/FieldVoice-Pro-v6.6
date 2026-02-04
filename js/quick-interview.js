@@ -1857,7 +1857,7 @@
                 const statusText = document.getElementById('confirmStatusText');
                 const statusContainer = document.getElementById('confirmOnlineStatus');
                 const goBtn = document.getElementById('confirmGoBtn');
-                const cancelBtn = document.getElementById('confirmCancelBtn');
+                const cancelBtn = document.getElementById('processConfirmCancelBtn');
 
                 if (!dialog) { resolve(true); return; } // Fallback if HTML missing
 
