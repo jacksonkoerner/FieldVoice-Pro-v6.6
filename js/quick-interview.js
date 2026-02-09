@@ -2,6 +2,7 @@
         let currentSection = null;
         let report = null;
         let currentReportId = null; // Supabase report ID
+        let currentReportDate = null; // v6.6.25: Track original draft date (for late reports)
         let permissionsChecked = false;
 
         // v6.6.16: Read reportId from URL if passed from index.js
@@ -553,7 +554,8 @@
          */
         function saveToLocalStorage() {
             const activeProjectId = getStorageItem(STORAGE_KEYS.ACTIVE_PROJECT_ID);
-            const todayStr = getTodayDateString();
+            // v6.6.25: Preserve original date for late drafts instead of overwriting with today
+            const todayStr = currentReportDate || getTodayDateString();
 
             const data = {
                 projectId: activeProjectId,
@@ -656,7 +658,8 @@
 
         /**
          * Load form data from localStorage
-         * Returns null if no valid draft exists for current project/date
+         * Returns null if no valid draft exists for current project
+         * v6.6.25: Allow loading late drafts (previous days) — don't delete them
          */
         function loadFromLocalStorage() {
             const activeProjectId = getStorageItem(STORAGE_KEYS.ACTIVE_PROJECT_ID);
@@ -672,19 +675,24 @@
                 const data = storedReport._draft_data;
                 if (!data) return null;
 
-                // Verify it's for the same project and date
-                if (data.projectId !== activeProjectId || data.reportDate !== today) {
-                    // Different project or date - clear old draft
-                    console.log('[LOCAL] Draft is for different project/date, clearing');
-                    deleteCurrentReport(draftId);
+                // Verify it's for the same project (reject different-project drafts)
+                if (data.projectId !== activeProjectId) {
+                    console.log('[LOCAL] Draft is for different project, skipping');
                     return null;
+                }
+
+                // v6.6.25: Allow late drafts from previous days to be loaded
+                // The dashboard shows these as "Late Reports" and users should be
+                // able to continue editing them without data loss
+                if (data.reportDate !== today) {
+                    console.log('[LOCAL] Loading late draft from', data.reportDate);
+                    currentReportDate = data.reportDate;
                 }
 
                 console.log('[LOCAL] Found valid draft from', data.lastSaved);
                 return data;
             } catch (e) {
                 console.error('[LOCAL] Failed to parse stored draft:', e);
-                deleteCurrentReport(draftId);
                 return null;
             }
         }
@@ -804,7 +812,8 @@
          */
         function clearLocalStorageDraft() {
             const activeProjectId = getStorageItem(STORAGE_KEYS.ACTIVE_PROJECT_ID);
-            const todayStr = getTodayDateString();
+            // v6.6.25: Use original report date for late drafts
+            const todayStr = currentReportDate || getTodayDateString();
             const draftId = currentReportId || `draft_${activeProjectId}_${todayStr}`;
 
             // v6: Use deleteCurrentReport to clear draft
@@ -818,7 +827,8 @@
         // Update localStorage report to 'refined' status (instead of deleting)
         // v6.6.1: Preserve existing draft data for swipe-out recovery
         function updateLocalReportToRefined() {
-            const todayStr = getTodayDateString();
+            // v6.6.25: Use original report date for late drafts
+            const todayStr = currentReportDate || getTodayDateString();
             const draftKey = `draft_${activeProject?.id}_${todayStr}`;
             const reportId = currentReportId || draftKey;
 
@@ -5371,13 +5381,23 @@
 
                 // Acquire lock on this report (if online)
                 if (activeProject && navigator.onLine) {
-                    const todayStr = getTodayDateString();
+                    const todayStr = currentReportDate || getTodayDateString();
                     const inspectorName = userSettings?.full_name || '';
                     const lockAcquired = await window.lockManager.acquireLock(activeProject.id, todayStr, inspectorName);
                     if (!lockAcquired) {
                         console.warn('[INIT] Failed to acquire lock - may have been taken by another device');
                     }
                 }
+
+                // v6.6.25: Save immediately when the page is being hidden (more reliable
+                // than beforeunload on Android Chrome and PWAs). This catches cases where
+                // the user swipes the app away or the OS freezes the PWA in background.
+                window.addEventListener('pagehide', () => {
+                    if (localSaveTimeout) {
+                        clearTimeout(localSaveTimeout);
+                    }
+                    saveToLocalStorage();
+                });
             } catch (error) {
                 console.error('Initialization failed:', error);
                 hideLoadingOverlay();
