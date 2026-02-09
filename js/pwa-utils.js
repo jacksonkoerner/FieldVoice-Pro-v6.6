@@ -19,6 +19,25 @@ function initPWA(options = {}) {
     }
 
     setupOfflineBanner(options.onOnline, options.onOffline);
+
+    // v6.6.25: Request persistent storage to prevent Android from evicting
+    // localStorage/IndexedDB data when device storage is under pressure
+    requestPersistentStorage();
+}
+
+/**
+ * Request persistent storage from the browser
+ * On Android Chrome, this prevents the OS from silently clearing app data
+ * when storage pressure is high or the PWA hasn't been used recently
+ */
+function requestPersistentStorage() {
+    if (navigator.storage && navigator.storage.persist) {
+        navigator.storage.persist().then(persistent => {
+            console.log('[PWA] Persistent storage:', persistent ? 'granted' : 'denied');
+        }).catch(err => {
+            console.warn('[PWA] Persistent storage request failed:', err);
+        });
+    }
 }
 
 /**
